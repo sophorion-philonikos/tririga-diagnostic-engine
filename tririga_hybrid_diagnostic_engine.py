@@ -1,0 +1,485 @@
+import zipfile
+import xml.etree.ElementTree as ET
+import networkx as nx
+import oracledb
+import re
+import sys
+
+class TririgaHybridEngine:
+    def __init__(self, db_username, db_password, db_dsn):
+        self.graphs = {} 
+        self.queries = {}
+        self.db_conn = None
+        self.cursor = None
+        self.workflow_metadata = {}
+        self.loaded_workflow_names = [] 
+        self._connect_to_oracle(db_username, db_password, db_dsn)
+
+    def _connect_to_oracle(self, username, password, dsn):
+        try:
+            print(f"Establishing live connection to Oracle Database at {dsn}...")
+            self.db_conn = oracledb.connect(user=username, password=password, dsn=dsn)
+            self.cursor = self.db_conn.cursor()
+            print("SUCCESS: Live Database Connection Established.\n")
+        except Exception as e:
+            print(f"CRITICAL: Failed to connect to Oracle. The engine will be blind to live data.\nError: {e}")
+            sys.exit(1)
+
+    def _get_type_str(self, data):
+        """Universally sanitizes type fields to prevent list extraction bugs."""
+        t = data.get('type', data.get('Type', 'Generic'))
+        if isinstance(t, list): return str(t[0])
+        return str(t).strip()
+
+    def get_node(self, task_id):
+        """Universal node finder that identifies exactly which workflow contains the task."""
+        for wf_name, graph in self.graphs.items():
+            if graph.has_node(str(task_id)):
+                return graph.nodes[str(task_id)], wf_name
+        return None, None
+
+    def fetch_retrieved_spec_ids(self, wf_name, task_id):
+        if not self.cursor or wf_name not in self.graphs or not self.graphs[wf_name].has_node(str(task_id)):
+            return []
+        
+        node_data = self.graphs[wf_name].nodes[str(task_id)]
+        t_type = self._get_type_str(node_data)
+        
+        if t_type == '22':
+            filter_bo = node_data.get('FilterBo', [])
+            q_name = filter_bo[0] if isinstance(filter_bo, list) and filter_bo else (filter_bo if isinstance(filter_bo, str) else None)
+            if not q_name or q_name not in self.queries: return []
+            
+            q_data = self.queries[q_name]
+            bo_name = q_data.get('BO')
+            if not bo_name or bo_name == 'Unknown BO': return []
+            
+            clean_bo = re.sub(r'[^a-zA-Z0-9_]', '', bo_name).upper()
+            table_name = f"TRIDATA.T_{clean_bo[:26]}"
+            
+            sql = f"SELECT SPEC_ID FROM {table_name} WHERE 1=1"
+            params = {}
+            
+            for i, f in enumerate(q_data['Filters']):
+                field_name = f['Field'].split('::')[-1].upper()
+                op = f['Operator']
+                val = f['Value']
+                
+                param_key = f"val{i}"
+                if op == 'Equals':
+                    sql += f" AND {field_name} = :{param_key}"
+                    params[param_key] = val
+                elif op == 'Does Not Equal':
+                    sql += f" AND {field_name} != :{param_key}"
+                    params[param_key] = val
+                elif op == 'Contains':
+                    sql += f" AND {field_name} LIKE :{param_key}"
+                    params[param_key] = f"%{val}%"
+                    
+            try:
+                self.cursor.execute(sql, params)
+                rows = self.cursor.fetchall()
+                return [str(r[0]) for r in rows]
+            except Exception as e:
+                print(f"\n[Dynamic SQL Error in Query Task]: {e}")
+                return []
+                
+        elif t_type == '29':
+            bo_name = node_data.get('BO')
+            if isinstance(bo_name, list): bo_name = bo_name[0]
+            if not bo_name or bo_name == 'Unknown BO': return []
+            
+            clean_bo = re.sub(r'[^a-zA-Z0-9_]', '', bo_name).upper()
+            table_name = f"TRIDATA.T_{clean_bo[:26]}"
+            
+            l_fields = node_data.get('LFldName', []) or node_data.get('PField', [])
+            constants = node_data.get('ConstantValue', []) or node_data.get('Value', []) or node_data.get('RValue', [])
+            op_code = node_data.get('Operator', '10')
+            if isinstance(op_code, list) and op_code: op_code = op_code[0]
+            
+            if not l_fields or not constants: return []
+                
+            l_field = l_fields[0].upper()
+            c_val = constants[0]
+            
+            sql = f"SELECT SPEC_ID FROM {table_name} WHERE 1=1"
+            params = {'val0': c_val}
+            
+            if str(op_code) == '10': sql += f" AND {l_field} = :val0"
+            elif str(op_code) == '11': sql += f" AND {l_field} != :val0"
+            elif str(op_code) == '16': 
+                sql += f" AND {l_field} LIKE :val0"
+                params['val0'] = f"%{c_val}%"
+            else: sql += f" AND {l_field} = :val0" 
+                
+            try:
+                self.cursor.execute(sql, params)
+                rows = self.cursor.fetchall()
+                return [str(r[0]) for r in rows]
+            except Exception:
+                return []
+                
+        return []
+
+    def fetch_live_record_data(self, expected_bo_name, spec_id):
+        if not self.cursor or not spec_id: return None
+        
+        payload = {}
+        try:
+            clean_spec_id = int(spec_id)
+            true_bo_name = expected_bo_name
+            
+            try:
+                sql = """
+                    SELECT S.SPEC_NAME, T.NAME 
+                    FROM TRIDATA.IBS_SPEC S 
+                    LEFT JOIN TRIDATA.IBS_SPEC_TYPE T ON S.SPEC_TEMPLATE_ID = T.SPEC_TEMPLATE_ID 
+                    WHERE S.SPEC_ID = :1
+                """
+                self.cursor.execute(sql, [clean_spec_id])
+                spec_row = self.cursor.fetchone()
+                if spec_row:
+                    if spec_row[0]: payload['Record Name (IBS_SPEC)'] = spec_row[0]
+                    if spec_row[1]: true_bo_name = spec_row[1]
+            except Exception as e:
+                payload['IBS_SPEC Error'] = str(e)
+
+            payload['_True_BO_Name'] = true_bo_name
+
+            if true_bo_name:
+                clean_bo = re.sub(r'[^a-zA-Z0-9_]', '', true_bo_name).upper()
+                table_name = f"TRIDATA.T_{clean_bo[:26]}"
+                
+                try:
+                    self.cursor.execute(f"SELECT * FROM {table_name} WHERE SPEC_ID = :1", [clean_spec_id])
+                    columns = [col[0].upper() for col in self.cursor.description]
+                    t_row = self.cursor.fetchone()
+                    
+                    if t_row:
+                        data = dict(zip(columns, t_row))
+                        priority_fields = {'TRIRECORDIDSY': 'triRecordIdSY', 'TRISTATUSCL': 'triStatusCL', 'TRIIDTX': 'triIdTX', 'TRINAMETX': 'triNameTX'}
+                        noisy_fields = ['TRILANGUAGELI', 'TRIMODIFIERBYTX', 'TRIPATHTX', 'SYS_GUIID', 'SYS_OBJECTID', 'SYS_PROJECTID', 'SPEC_ID']
+                        
+                        for db_col, readable_name in priority_fields.items():
+                            if db_col in data and data[db_col] is not None and str(data[db_col]).strip() != '':
+                                payload[readable_name] = data[db_col]
+                        
+                        extra_count = 0
+                        for k, v in data.items():
+                            if k not in priority_fields and k not in noisy_fields and not k.startswith('SYS_'):
+                                if v is not None and str(v).strip() != '':
+                                    if k.endswith('TX') or k.endswith('CL') or k.endswith('LI') or k.endswith('NU') or k.endswith('SY') or k.endswith('BL'):
+                                        payload[k] = v
+                                        extra_count += 1
+                                        if extra_count >= 5: break
+                except Exception as e:
+                    payload['T_Table Error'] = f"Could not query {table_name}: {e}"
+                                
+        except Exception as e:
+            payload['Database Error'] = str(e)
+            
+        return payload if payload else None
+
+    def load_om_package(self, zip_file_path):
+        print(f"Analyzing blueprint from OM Package: {zip_file_path}...")
+        try:
+            with zipfile.ZipFile(zip_file_path, 'r') as z:
+                xml_files = [f for f in z.namelist() if f.endswith('.xml') and not f.startswith('AllObjects') and not f.startswith('ObjectLabel')]
+                if not xml_files:
+                    print("FAILED: No valid workflow/logic blueprints found inside the OM package.")
+                    return False
+                
+                workflow_xmls = []
+                for f_name in xml_files:
+                    with z.open(f_name) as f:
+                        xml_string = f.read().decode('utf-8', errors='ignore')
+                        if '<Query>' in xml_string[:500]:
+                            self._parse_query_xml(xml_string)
+                        elif '<Workflow>' in xml_string[:500]:
+                            workflow_xmls.append((f_name, xml_string))
+
+                if not workflow_xmls:
+                    print("FAILED: No valid Workflow logic blueprints found.")
+                    return False
+
+                for w_name, w_xml in workflow_xmls:
+                    print(f"Targeting workflow logic file: {w_name}")
+                    self._build_dynamic_graph(w_xml)
+                    
+                return True
+        except FileNotFoundError:
+            print(f"CRITICAL: OM Package '{zip_file_path}' not found. Please check the path.")
+            return False
+        except zipfile.BadZipFile:
+            print(f"CRITICAL: '{zip_file_path}' is corrupt or not a valid zip archive.")
+            return False
+
+    def _parse_query_xml(self, xml_payload):
+        try:
+            clean_xml = re.sub(r'\sxmlns="[^"]+"', '', xml_payload, count=1)
+            root = ET.fromstring(clean_xml)
+            name_elem = root.find('.//Header/Name')
+            if name_elem is None or not name_elem.text: return
+            
+            query_name = name_elem.text.strip()
+            query_data = {'Columns': [], 'Filters': [], 'Module': 'Unknown Module', 'BO': 'Unknown BO'}
+            
+            mod_elem = root.find('.//Header/Module')
+            if mod_elem is not None and mod_elem.text: query_data['Module'] = mod_elem.text.strip()
+                
+            bo_elem = root.find('.//Header/BO')
+            if bo_elem is not None and bo_elem.text: query_data['BO'] = bo_elem.text.strip()
+            
+            for col in root.findall('.//Columns/Column'):
+                c_type = col.get('Type')
+                sec = col.find('SecName')
+                fld = col.find('FldName')
+                fval = col.find('FiltVAl')
+                
+                sec_text = sec.text.strip() if sec is not None and sec.text else ""
+                fld_text = fld.text.strip() if fld is not None and fld.text else ""
+                val_text = fval.text.strip() if fval is not None and fval.text else ""
+                
+                if c_type == '1': 
+                    query_data['Columns'].append(f"{sec_text}::{fld_text}")
+                elif c_type == '5': 
+                    filt_type = col.get('FiltType', 'Unknown')
+                    op_map = {'10': 'Equals', '11': 'Does Not Equal', '16': 'Contains'}
+                    op_str = op_map.get(str(filt_type), f"Operator {filt_type}")
+                    query_data['Filters'].append({'Field': f"{sec_text}::{fld_text}", 'Value': val_text, 'Operator': op_str})
+                    
+            self.queries[query_name] = query_data
+        except ET.ParseError:
+            pass
+
+    def _build_dynamic_graph(self, xml_payload):
+        try:
+            clean_xml = re.sub(r'\sxmlns="[^"]+"', '', xml_payload, count=1)
+            root = ET.fromstring(clean_xml)
+            
+            header = root.find('.//Header')
+            wf_name = "Unknown Workflow"
+            if header is not None:
+                name_elem = header.find('Name')
+                desc_elem = header.find('Description')
+                wf_name = name_elem.text.strip() if name_elem is not None and name_elem.text else "Unknown Workflow"
+                
+                if wf_name not in self.loaded_workflow_names and wf_name != "Unknown Workflow":
+                    self.loaded_workflow_names.append(wf_name)
+                    
+                self.workflow_metadata[wf_name] = {
+                    'Name': wf_name,
+                    'Description': desc_elem.text.strip() if desc_elem is not None and desc_elem.text else "No description provided."
+                }
+            
+            self.graphs[wf_name] = nx.DiGraph()
+            parent_groups = {}
+            
+            elements = root.findall('.//Task') + root.findall('.//WorkflowTask') + root.findall('.//step') + root.findall('.//WFStep')
+            
+            array_tags = [
+                'Expression', 'PField', 'PModule', 'PBO', 'PSection', 
+                'Field', 'TrgtFld', 'SrcFld', 'LFldName', 'RFldName', 
+                'RValue', 'Value', 'ConstantValue', 'Operator',
+                'Action', 'QueryName', 'AssociationName', 'AssocName', 
+                'VariableName', 'ChildModule', 'ChildBO', 'RefObject', 'RefModule',
+                'LTask', 'RTask', 'LTaskId', 'RTaskId', 'FilterBo', 'TargetAssociation'
+            ]
+
+            # Phase 1: Parse Nodes and Extract Links
+            for idx, el in enumerate(elements):
+                node_id = el.get('Id', el.get('id', 'Unknown_ID'))
+                
+                if self.graphs[wf_name].has_node(node_id):
+                    node_data = self.graphs[wf_name].nodes[node_id].copy()
+                else:
+                    node_data = {'Transitions': []}
+                
+                label_element = el.find('TaskLabel')
+                if label_element is not None and label_element.text:
+                    node_data['name'] = label_element.text.strip()
+                elif 'name' not in node_data:
+                    node_data['name'] = f"Unnamed Component ({node_id})"
+
+                def traverse(element):
+                    if element.tag == 'TaskRef':
+                        u_type = element.get('UseType')
+                        r_id = element.get('RefTaskId')
+                        if u_type == '1' and r_id and r_id not in ['-1', '0', '']:
+                            node_data.setdefault('FromTask', []).append(r_id)
+                        elif u_type == '2' and r_id and r_id not in ['-1', '0', '']:
+                            node_data.setdefault('FilterTask', []).append(r_id)
+
+                    if element.text and element.text.strip() and element.tag not in ['TaskLabel']:
+                        tag, val = element.tag, element.text.strip()
+                        if tag in array_tags:
+                            if tag not in node_data: node_data[tag] = []
+                            if val not in node_data[tag]: node_data[tag].append(val)
+                        elif tag in node_data and tag not in array_tags:
+                            if isinstance(node_data[tag], list):
+                                if val not in node_data[tag]: node_data[tag].append(val)
+                            elif node_data[tag] != val: node_data[tag] = [node_data[tag], val]
+                        else: 
+                            node_data[tag] = val
+                            
+                    for attr, val in element.attrib.items():
+                        if attr in ['TRGTTaskId', 'TargetTaskId', 'target', 'to'] and val not in ["-1", "0", ""]:
+                            if val not in node_data.get('Transitions', []): node_data.setdefault('Transitions', []).append(val)
+                        elif attr == 'ParId' and val not in ["-1", "0", ""]:
+                            node_data['ParId'] = val
+                        elif attr not in node_data: 
+                            node_data[attr] = val
+                            
+                    for child in element: traverse(child)
+                
+                traverse(el)
+                
+                if 'GUIMappings' not in node_data: node_data['GUIMappings'] = []
+                    
+                for gm in el.findall('.//GUIMapping'):
+                    gm_data = {'PropType': gm.get('PropType', '')}
+                    for tag in ['Tab', 'Section', 'Field', 'PropVal']:
+                        child = gm.find(tag)
+                        if child is not None and child.text: gm_data[tag] = child.text.strip()
+                    if gm_data not in node_data['GUIMappings']: node_data['GUIMappings'].append(gm_data)
+                
+                new_type = node_data.get('Type', node_data.get('type'))
+                if new_type: node_data['type'] = new_type
+                elif 'type' not in node_data: node_data['type'] = 'Generic'
+                    
+                self.graphs[wf_name].add_node(node_id, **node_data)
+                
+                t_type_clean = self._get_type_str(node_data)
+                
+                # Draw Explicit TRGTTaskId Edges (Ignored for Switch Tasks to prevent visual bypass)
+                if t_type_clean != '14':
+                    for target in node_data.get('Transitions', []): 
+                        self.graphs[wf_name].add_edge(node_id, target)
+
+                # Draw TargetAssociation Edges for Switch Logic
+                if t_type_clean == '14':
+                    t_assoc = node_data.get('TargetAssociation', [])
+                    if t_assoc:
+                        assoc_str = t_assoc[0] if isinstance(t_assoc, list) else t_assoc
+                        targets = [t.strip() for t in str(assoc_str).split(';') if t.strip()]
+                        for t in targets:
+                            self.graphs[wf_name].add_edge(node_id, t)
+                
+                # Gather structural containers for Sibling Sequencing
+                par_id = node_data.get('ParId')
+                if par_id and par_id not in ["-1", "0", ""]:
+                    sort_c = el.get('SortCount', '0')
+                    sort_v = int(sort_c) if sort_c.isdigit() else 0
+                    parent_groups.setdefault(par_id, []).append((sort_v, idx, node_id))
+
+            # Phase 2 XML Sequencing: Build sibling paths using ParId and SortCount
+            for par_id, children in parent_groups.items():
+                children.sort(key=lambda x: (x[0], x[1])) 
+                
+                is_switch = False
+                if self.graphs[wf_name].has_node(par_id):
+                    p_type = self._get_type_str(self.graphs[wf_name].nodes[par_id])
+                    if p_type == '14': is_switch = True
+                        
+                # Only link the container directly if it's NOT a switch
+                if not is_switch and children:
+                    self.graphs[wf_name].add_edge(par_id, children[0][2])
+                    
+                # Link siblings horizontally directly to each other
+                for i in range(len(children) - 1):
+                    self.graphs[wf_name].add_edge(children[i][2], children[i+1][2])
+
+            for mapping in root.findall('.//ObjMapping'):
+                target_task_id = mapping.get('TargetTaskId', mapping.get('targetTaskId', mapping.get('TRGTTaskId')))
+                
+                if target_task_id and self.graphs[wf_name].has_node(target_task_id):
+                    node_data = self.graphs[wf_name].nodes[target_task_id]
+                    m_type = mapping.get('Type', '')
+                    
+                    fld_val = mapping.find('FldVal')
+                    src_fld = mapping.find('SrcFld')
+                    fv_text = fld_val.text.strip() if fld_val is not None and fld_val.text else ""
+                    sf_text = src_fld.text.strip() if src_fld is not None and src_fld.text else ""
+                    
+                    if m_type in ['10', '70'] and not fv_text and not sf_text: continue 
+                        
+                    for tag in array_tags:
+                        elem = mapping.find(tag)
+                        if elem is not None and elem.text and elem.text.strip():
+                            val = elem.text.strip()
+                            if tag not in node_data: node_data[tag] = []
+                            if val not in node_data[tag]: node_data[tag].append(val)
+
+            print(f"SUCCESS: Mapped {self.graphs[wf_name].number_of_nodes()} components for '{wf_name}'.\n")
+            return True
+        except ET.ParseError as e:
+            print(f"FAILED: XML blueprint is malformed. Error: {e}")
+            return False
+
+    def _live_database_check(self, query, parameters):
+        if not self.cursor: return False
+        try:
+            self.cursor.execute(query, parameters)
+            return self.cursor.fetchone() is not None
+        except Exception:
+            return False
+
+    def analyze_health(self):
+        print("--- Initiating Universal Hybrid Diagnostic Trace ---\n")
+        if not self.graphs:
+            print("Engine halted: No workflows available to analyze.")
+            return
+
+        warnings_found = 0
+
+        def validate_live_data(wf_name, task_name, key_names, query, error_type, item_type):
+            nonlocal warnings_found
+            for key in key_names:
+                items = data.get(key)
+                if items:
+                    item_list = items if isinstance(items, list) else [items]
+                    for item in item_list:
+                        if item in ['System', 'Workflow', 'Any', 'Location']: continue
+                        if not self._live_database_check(query, [item]):
+                            print(f"[{wf_name}][{error_type}] Task '{task_name}' references {item_type} '{item}', but it DOES NOT EXIST in the live environment.")
+                            warnings_found += 1
+
+        for wf_name, graph in self.graphs.items():
+            for node, data in graph.nodes(data=True):
+                node_name = data.get('name', 'Unknown')
+                node_type = data.get('type', 'Generic')
+                
+                if graph.in_degree(node) == 0 and str(node_type) not in ['1', 'Trigger', 'Start']:
+                    print(f"[{wf_name}][STRUCTURAL NOTE] Root or Orphan Logic: '{node_name}' (Type Code: {node_type}) has no incoming transitions.")
+
+                validate_live_data(
+                    wf_name, node_name, ['Module', 'ModuleName', 'PModule', 'ChildModule', 'RefModule'], 
+                    "SELECT module_id FROM TRIDATA.IBS_MODULE WHERE UPPER(TRIM(module_name)) = UPPER(TRIM(:1)) FETCH FIRST 1 ROWS ONLY", 
+                    "LIVE DB ERROR", "Module"
+                )
+                
+                validate_live_data(
+                    wf_name, node_name, ['BO', 'BoName', 'PBO', 'ChildBO', 'RefObject'], 
+                    "SELECT spec_template_id FROM TRIDATA.IBS_SPEC_TYPE WHERE UPPER(TRIM(name)) = UPPER(TRIM(:1)) FETCH FIRST 1 ROWS ONLY", 
+                    "LIVE DB ERROR", "Business Object (BO)"
+                )
+
+                validate_live_data(
+                    wf_name, node_name, ['AssociationName', 'Association', 'AssocName'], 
+                    "SELECT 1 FROM TRIDATA.IBS_SPEC_ASSIGNMENTS WHERE UPPER(TRIM(ass_type)) = UPPER(TRIM(:1)) FETCH FIRST 1 ROWS ONLY", 
+                    "LIVE DB ERROR", "Association"
+                )
+
+        if warnings_found == 0:
+            print("\n[HEALTHY] All structural paths are intact, and all cross-referenced database dependencies are valid in the live system.")
+        else:
+            print(f"\nDiagnostics Complete: {warnings_found} critical issues identified requiring remediation.")
+
+    def shutdown(self):
+        if self.cursor: self.cursor.close()
+        if self.db_conn: self.db_conn.close()
+        print("\nEngine shutting down. Live connections closed.")
+
+if __name__ == "__main__":
+    print("[INFO] This is the backend engine file.")
+    print("To start the chat interface and log scanner, please run 'python nlp_router.py' instead.")
