@@ -1,3 +1,11 @@
+TRIRIGA NP Pt. 1 UX Int 
+
+
+Summarize this email
+
+Carlos Monroy
+
+​Monroy, Carlos (CTR) <carlos.monroy@associates.ice.dhs.gov>​
 import re
 import networkx as nx
 import os
@@ -17,7 +25,6 @@ class TririgaNLPRouter:
         self.current_context_wf = None 
 
     def _wrap_ascii(self, query, response_text):
-        """Wraps the response in a clean, left-aligned ASCII visual border."""
         lines = str(response_text).split('\n')
         output = f"\n┌── [User Query]: {query}\n│"
         for line in lines:
@@ -26,19 +33,16 @@ class TririgaNLPRouter:
         return output
 
     def _get_target_workflows(self):
-        """Strictly enforces conversational context, removing bleed to other loaded OMP workflows."""
         if self.current_context_wf and self.current_context_wf in self.engine.graphs:
             return {self.current_context_wf: self.engine.graphs[self.current_context_wf]}
         return self.engine.graphs
 
     def _get_type_str(self, data):
-        """Universally sanitizes type fields to prevent list extraction bugs (e.g. "['12']")"""
         t = data.get('type', data.get('Type', 'Generic'))
         if isinstance(t, list): return str(t[0])
         return str(t).strip()
 
     def _fetch_remote_log(self, lines_to_read, show_workflow_note=False):
-        """Centralized SSH handler with smart password caching and expiration loops."""
         try:
             import paramiko
             import getpass
@@ -89,7 +93,6 @@ class TririgaNLPRouter:
                 return f"ERROR: Critical error during SSH execution: {e}"
 
     def process_query(self, user_query):
-        """Primary interface. Cleaned of redundant flags to secure inline interactive execution loops."""
         query = user_query.lower().strip()
         
         if any(w in query for w in ["why did it fail", "check the log", "scan log", "what just failed", "read log"]):
@@ -140,7 +143,6 @@ class TririgaNLPRouter:
         return self._wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', or 'scan log'.")
 
     def _explain_purpose_with_paths(self, user_query):
-        """Generates the base summary and initiates the inline DFS continuous path paginator."""
         wf_name = self.current_context_wf
         
         if not wf_name:
@@ -164,7 +166,6 @@ class TririgaNLPRouter:
             
         print(self._wrap_ascii(user_query, base_summary + "\n\n" + path_text))
         
-        # Inline Execution Pause: Continuous DFS Exploration Loop
         while current_idx < total_paths:
             ans = input(f"\n[?] This workflow contains {total_paths - current_idx} other logical paths. Would you like to explore the next path? (Yes/No): ")
             if ans.strip().lower() in ['y', 'yes']:
@@ -182,7 +183,6 @@ class TririgaNLPRouter:
         return self._wrap_ascii("Exploration Complete", "All paths viewed.") 
 
     def _generate_all_paths(self, wf_name):
-        """Depth-First Search (DFS) algorithm with robust structural jumping logic."""
         graph = self.engine.graphs[wf_name]
         start_nodes = [n for n, d in graph.nodes(data=True) if self._get_type_str(d) in ['1', 'Trigger', 'Start']]
         if not start_nodes: 
@@ -191,7 +191,6 @@ class TririgaNLPRouter:
         all_paths = []
         
         def get_real_successors(node_id, visited_type12=None):
-            """Jumps cleanly over invisible/structural nodes to definitively prevent combinatorial path explosion."""
             if visited_type12 is None: visited_type12 = set()
             real_succs = []
             for succ in graph.successors(node_id):
@@ -199,8 +198,7 @@ class TririgaNLPRouter:
                 s_type = self._get_type_str(s_node)
                 s_name = s_node.get('name', '').lower()
                 
-                # Check for structural glue nodes
-                is_invisible = s_type in ['12', '11'] or s_name.startswith('unnamed') or s_type == 'generic'
+                is_invisible = s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic'
                 
                 if is_invisible:
                     if succ not in visited_type12:
@@ -239,13 +237,12 @@ class TririgaNLPRouter:
                     is_true = False
                     if len(target_list) > 0:
                         true_raw_target = target_list[0]
-                        # Verify against target directly OR jump through its invisible structure nodes
                         if str(succ) == str(true_raw_target):
                             is_true = True
                         elif graph.has_node(true_raw_target):
                             tr_type = self._get_type_str(graph.nodes[true_raw_target])
                             tr_name = graph.nodes[true_raw_target].get('name', '').lower()
-                            if tr_type in ['12', '11'] or tr_name.startswith('unnamed') or tr_type == 'generic':
+                            if tr_type in ['12', '11'] or (tr_name.startswith('unnamed') and tr_type != '9') or tr_type == 'generic':
                                 if str(succ) in get_real_successors(true_raw_target):
                                     is_true = True
                                 
@@ -308,9 +305,9 @@ class TririgaNLPRouter:
         output = [f"--- Execution Path Analysis (Path {current_idx} of {total_paths}) ---"]
         step_num = 1
         for step in path:
-            s_type = step['type']
-            s_name = step['name'].lower()
-            if s_type in ['12', '11'] or s_name.startswith('unnamed') or s_type == 'generic': continue
+            s_type = str(step.get('type', ''))
+            s_name = step.get('name', '').lower()
+            if s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic': continue
             output.append(f"Step {step_num}: '{step['name']}' (Type {step['type']})")
             output.append(f"  -> Action: {step['action']}")
             step_num += 1
@@ -1024,7 +1021,7 @@ class TririgaNLPRouter:
                     c_name = child_data.get('name', n)
                     c_type = self._get_type_str(child_data)
                     
-                    if c_type in ['12', '11'] or c_name.lower().startswith('unnamed') or c_type == 'Generic':
+                    if c_type in ['12', '11'] or (c_name.lower().startswith('unnamed') and c_type != '9') or c_type == 'generic':
                         pass
                     else:
                         target_strings.append(c_name)

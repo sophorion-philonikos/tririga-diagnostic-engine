@@ -1,3 +1,11 @@
+TRIRIGA EGR Pt. 1 UX Int
+
+
+Summarize this email
+
+Carlos Monroy
+
+​Monroy, Carlos (CTR) <carlos.monroy@associates.ice.dhs.gov>​
 import zipfile
 import xml.etree.ElementTree as ET
 import networkx as nx
@@ -26,13 +34,11 @@ class TririgaHybridEngine:
             sys.exit(1)
 
     def _get_type_str(self, data):
-        """Universally sanitizes type fields to prevent list extraction bugs."""
         t = data.get('type', data.get('Type', 'Generic'))
         if isinstance(t, list): return str(t[0])
         return str(t).strip()
 
     def get_node(self, task_id):
-        """Universal node finder that identifies exactly which workflow contains the task."""
         for wf_name, graph in self.graphs.items():
             if graph.has_node(str(task_id)):
                 return graph.nodes[str(task_id)], wf_name
@@ -273,9 +279,8 @@ class TririgaHybridEngine:
                 }
             
             self.graphs[wf_name] = nx.DiGraph()
-            parent_groups = {}
             
-            elements = root.findall('.//Task') + root.findall('.//WorkflowTask') + root.findall('.//step') + root.findall('.//WFStep')
+            elements = root.findall('.//Task') + root.findall('.//WorkflowTask') + root.findall('.//step')
             
             array_tags = [
                 'Expression', 'PField', 'PModule', 'PBO', 'PSection', 
@@ -286,20 +291,26 @@ class TririgaHybridEngine:
                 'LTask', 'RTask', 'LTaskId', 'RTaskId', 'FilterBo', 'TargetAssociation'
             ]
 
-            # Phase 1: Parse Nodes and Extract Links
-            for idx, el in enumerate(elements):
+            for el in elements:
+                if el.tag == 'WFStep': continue
+                
                 node_id = el.get('Id', el.get('id', 'Unknown_ID'))
                 
                 if self.graphs[wf_name].has_node(node_id):
                     node_data = self.graphs[wf_name].nodes[node_id].copy()
                 else:
-                    node_data = {'Transitions': []}
+                    node_data = {}
                 
                 label_element = el.find('TaskLabel')
-                if label_element is not None and label_element.text:
+                t_type = el.get('Type', el.get('type', 'Generic'))
+                
+                if label_element is not None and label_element.text and label_element.text.strip():
                     node_data['name'] = label_element.text.strip()
-                elif 'name' not in node_data:
-                    node_data['name'] = f"Unnamed Component ({node_id})"
+                else:
+                    if str(t_type) == '9':
+                        node_data['name'] = 'End'
+                    elif 'name' not in node_data:
+                        node_data['name'] = f"Unnamed Component ({node_id})"
 
                 def traverse(element):
                     if element.tag == 'TaskRef':
@@ -323,11 +334,7 @@ class TririgaHybridEngine:
                             node_data[tag] = val
                             
                     for attr, val in element.attrib.items():
-                        if attr in ['TRGTTaskId', 'TargetTaskId', 'target', 'to'] and val not in ["-1", "0", ""]:
-                            if val not in node_data.get('Transitions', []): node_data.setdefault('Transitions', []).append(val)
-                        elif attr == 'ParId' and val not in ["-1", "0", ""]:
-                            node_data['ParId'] = val
-                        elif attr not in node_data: 
+                        if attr not in node_data: 
                             node_data[attr] = val
                             
                     for child in element: traverse(child)
@@ -349,45 +356,20 @@ class TririgaHybridEngine:
                     
                 self.graphs[wf_name].add_node(node_id, **node_data)
                 
-                t_type_clean = self._get_type_str(node_data)
+            wfsteps = root.findall('.//WFStep')
+            for step in wfsteps:
+                step_id = step.get('Id')
+                par_id = step.get('ParId')
+                step_type = step.get('Type')
                 
-                # Draw Explicit TRGTTaskId Edges (Ignored for Switch Tasks to prevent visual bypass)
-                if t_type_clean != '14':
-                    for target in node_data.get('Transitions', []): 
-                        self.graphs[wf_name].add_edge(node_id, target)
-
-                # Draw TargetAssociation Edges for Switch Logic
-                if t_type_clean == '14':
-                    t_assoc = node_data.get('TargetAssociation', [])
-                    if t_assoc:
-                        assoc_str = t_assoc[0] if isinstance(t_assoc, list) else t_assoc
-                        targets = [t.strip() for t in str(assoc_str).split(';') if t.strip()]
-                        for t in targets:
-                            self.graphs[wf_name].add_edge(node_id, t)
-                
-                # Gather structural containers for Sibling Sequencing
-                par_id = node_data.get('ParId')
-                if par_id and par_id not in ["-1", "0", ""]:
-                    sort_c = el.get('SortCount', '0')
-                    sort_v = int(sort_c) if sort_c.isdigit() else 0
-                    parent_groups.setdefault(par_id, []).append((sort_v, idx, node_id))
-
-            # Phase 2 XML Sequencing: Build sibling paths using ParId and SortCount
-            for par_id, children in parent_groups.items():
-                children.sort(key=lambda x: (x[0], x[1])) 
-                
-                is_switch = False
-                if self.graphs[wf_name].has_node(par_id):
-                    p_type = self._get_type_str(self.graphs[wf_name].nodes[par_id])
-                    if p_type == '14': is_switch = True
-                        
-                # Only link the container directly if it's NOT a switch
-                if not is_switch and children:
-                    self.graphs[wf_name].add_edge(par_id, children[0][2])
+                if step_id and not self.graphs[wf_name].has_node(step_id):
+                    name = "End" if str(step_type) == '9' else f"Unnamed Component ({step_id})"
+                    self.graphs[wf_name].add_node(step_id, name=name, type=step_type or 'Generic')
+                if par_id and par_id not in ["-1", ""] and not self.graphs[wf_name].has_node(par_id):
+                    self.graphs[wf_name].add_node(par_id, name=f"Unnamed Component ({par_id})", type='Generic')
                     
-                # Link siblings horizontally directly to each other
-                for i in range(len(children) - 1):
-                    self.graphs[wf_name].add_edge(children[i][2], children[i+1][2])
+                if step_id and par_id and par_id not in ["-1", ""]:
+                    self.graphs[wf_name].add_edge(par_id, step_id)
 
             for mapping in root.findall('.//ObjMapping'):
                 target_task_id = mapping.get('TargetTaskId', mapping.get('targetTaskId', mapping.get('TRGTTaskId')))
