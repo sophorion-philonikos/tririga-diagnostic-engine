@@ -6,12 +6,89 @@ from integrations.ssh_client import SSHClientManager
 class TririgaNLPRouter:
     def __init__(self, diagnostic_engine, ssh_host=None, ssh_user=None, ssh_log_path=None, offline_mode=False, local_log_path=None):
         self.engine = diagnostic_engine
-        # Pass the offline mode toggle down to the SSH Manager
         self.ssh_manager = SSHClientManager(ssh_host, ssh_user, ssh_log_path, offline_mode, local_log_path) if (ssh_host or offline_mode) else None
         self.last_live_records = {} 
         self.last_live_record_counts = {} 
         self.current_context_wf = None 
+        
+        # Initialize the Semantic Dispatcher
+        self._build_command_registry()
 
+    def _build_command_registry(self):
+        """
+        The Semantic Dispatcher: Maps compiled regex patterns directly to handler methods.
+        Order is critical: Most specific patterns must appear before general catch-alls.
+        """
+        self.command_registry = [
+            (re.compile(r"why did it fail|check the log|scan log|what just failed|read log", re.IGNORECASE), self._cmd_scan_log),
+            (re.compile(r"another workflow|trace ad hoc|ad hoc trace|ad-hoc trace|external workflow|not in omp", re.IGNORECASE), self._cmd_ad_hoc_trace),
+            (re.compile(r"trace live|how did it execute|live execution|trace execution", re.IGNORECASE), self._cmd_live_trace),
+            (re.compile(r"path.*from\s+['\"]?(.*?)['\"]?\s+to\s+['\"]?(.*?)['\"]?", re.IGNORECASE), self._cmd_trace_path),
+            (re.compile(r"(?:what happens|trace).*(?:when|if)|(?:when|if).*(?:what happens|trace)", re.IGNORECASE), self._cmd_conditional_trace),
+            (re.compile(r"fail|fix|broken", re.IGNORECASE), self._cmd_analyze_failure),
+            (re.compile(r"updates|modifies|uses|where is|touches", re.IGNORECASE), self._cmd_find_references),
+            (re.compile(r"purpose|what does this do|summary|summarize|explain this workflow|explain the workflow", re.IGNORECASE), self._cmd_explain_purpose),
+            (re.compile(r"explain|what happens at|tell me about|look at|what is|diagnose|check|lap data|left data|right data", re.IGNORECASE), self._cmd_explain_task),
+            (re.compile(r"orphan", re.IGNORECASE), self._cmd_find_orphans)
+        ]
+
+    def process_query(self, user_query):
+        """Clean, robust semantic router replacing the legacy if/elif block."""
+        for pattern, handler in self.command_registry:
+            match = pattern.search(user_query)
+            if match:
+                return handler(user_query, match)
+                
+        return wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', or 'scan log'.")
+
+    # ==========================================
+    # COMMAND DISPATCH HANDLERS
+    # ==========================================
+    def _cmd_scan_log(self, q, match):
+        if self.ssh_manager: return self.scan_live_log_ssh(user_query=q)
+        return wrap_ascii(q, "I cannot scan the live logs because the SSH configuration is missing in the engine.")
+
+    def _cmd_ad_hoc_trace(self, q, match):
+        if self.ssh_manager: return self.trace_ad_hoc_live_execution_ssh(user_query=q)
+        return wrap_ascii(q, "I cannot trace live logs because the SSH configuration is missing in the engine.")
+
+    def _cmd_live_trace(self, q, match):
+        if self.ssh_manager: return self.trace_live_execution_ssh(user_query=q)
+        return wrap_ascii(q, "I cannot trace live logs because the SSH configuration is missing in the engine.")
+
+    def _cmd_trace_path(self, q, match):
+        return wrap_ascii(q, self._trace_path(match.group(1), match.group(2)))
+
+    def _cmd_conditional_trace(self, q, match):
+        field, val = self._parse_condition(q)
+        if field and val: return self._trace_condition(field, val, q)
+        return wrap_ascii(q, "Could not parse the condition. Please specify 'when [field] is [value]'.")
+
+    def _cmd_analyze_failure(self, q, match):
+        task_name = self._extract_task_identifier(q)
+        if task_name: return self._analyze_failure(task_name, q)
+        return wrap_ascii(q, "Could not identify a Task ID. Please specify the task number.")
+
+    def _cmd_find_references(self, q, match):
+        search_term = self._extract_tririga_string(q)
+        if search_term: return self._find_references(search_term, q)
+        return wrap_ascii(q, "Could not identify a valid TRIRIGA string to search for.")
+
+    def _cmd_explain_purpose(self, q, match):
+        return self._explain_purpose_with_paths(user_query=q)
+
+    def _cmd_explain_task(self, q, match):
+        task_name = self._extract_task_identifier(q)
+        if task_name: return self._explain_task_logic(task_name, q)
+        return wrap_ascii(q, "Could not identify a Task ID. Please specify the task number.")
+
+    def _cmd_find_orphans(self, q, match):
+        return wrap_ascii(q, self._find_orphans())
+
+
+    # ==========================================
+    # CORE LOGIC & ENGINE INTERACTIONS
+    # ==========================================
     def _get_target_workflows(self):
         if self.current_context_wf and self.current_context_wf in self.engine.graphs:
             return {self.current_context_wf: self.engine.graphs[self.current_context_wf]}
@@ -21,53 +98,6 @@ class TririgaNLPRouter:
         t = data.get('type', data.get('Type', 'Generic'))
         if isinstance(t, list): return str(t[0])
         return str(t).strip()
-
-    def process_query(self, user_query):
-        query = user_query.lower().strip()
-        
-        if any(w in query for w in ["why did it fail", "check the log", "scan log", "what just failed", "read log"]):
-            if self.ssh_manager: return self.scan_live_log_ssh(user_query=user_query)
-            return wrap_ascii(user_query, "I cannot scan the live logs because the SSH configuration is missing in the engine.")
-
-        elif any(w in query for w in ["another workflow", "trace ad hoc", "ad hoc trace", "ad-hoc trace", "external workflow", "not in omp"]):
-            if self.ssh_manager: return self.trace_ad_hoc_live_execution_ssh(user_query=user_query)
-            return wrap_ascii(user_query, "I cannot trace live logs because the SSH configuration is missing in the engine.")
-
-        elif any(w in query for w in ["trace live", "how did it execute", "live execution", "trace execution"]):
-            if self.ssh_manager: return self.trace_live_execution_ssh(user_query=user_query)
-            return wrap_ascii(user_query, "I cannot trace live logs because the SSH configuration is missing in the engine.")
-
-        elif any(w in query for w in ["purpose", "what does this do", "summary", "summarize", "explain this workflow", "explain the workflow"]):
-            return self._explain_purpose_with_paths(user_query=user_query)
-            
-        elif ("what happens" in query or "trace" in query) and ("when" in query or "if" in query):
-            field, val = self._parse_condition(user_query)
-            if field and val: return self._trace_condition(field, val, user_query)
-            return wrap_ascii(user_query, "Could not parse the condition. Please specify 'when [field] is [value]'.")
-         
-        elif any(w in query for w in ["updates", "modifies", "uses", "where is", "touches"]) and not any(w in query for w in ["fail", "fix"]):
-            search_term = self._extract_tririga_string(user_query)
-            if search_term: return self._find_references(search_term, user_query)
-            return wrap_ascii(user_query, "Could not identify a valid TRIRIGA string to search for.")
-                
-        elif "fail" in query or "fix" in query or "broken" in query:
-            task_name = self._extract_task_identifier(user_query)
-            if task_name: return self._analyze_failure(task_name, user_query)
-            return wrap_ascii(user_query, "Could not identify a Task ID. Please specify the task number.")
-                
-        elif any(w in query for w in ["explain", "what happens at", "tell me about", "look at", "what is", "diagnose", "check", "lap data", "left data", "right data"]):
-            task_name = self._extract_task_identifier(user_query)
-            if task_name: return self._explain_task_logic(task_name, user_query)
-            return wrap_ascii(user_query, "Could not identify a Task ID. Please specify the task number.")
-                
-        elif "orphan" in query:
-            return wrap_ascii(user_query, self._find_orphans())
-       
-        match_path = re.search(r"path.*from\s+['\"]?(.*?)['\"]?\s+to\s+['\"]?(.*?)['\"]?", query)
-        if match_path:
-            return wrap_ascii(user_query, self._trace_path(match_path.group(1), match_path.group(2)))
-        
-        return wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', or 'scan log'.")
 
     def _explain_purpose_with_paths(self, user_query):
         wf_name = self.current_context_wf
