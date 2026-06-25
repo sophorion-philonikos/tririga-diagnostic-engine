@@ -16,13 +16,13 @@ class WorkflowVisualizer:
     def _determine_node_shape(self, t_type):
         """Maps TRIRIGA task types to transit map station shapes."""
         if t_type in ['1', 'Trigger', 'Start', '9', '13']:
-            return 'ellipse' # Terminals / End of the Line
+            return 'ellipse' 
         elif t_type == '14':
-            return 'diamond' # Transit Junctions (Switches)
+            return 'diamond' 
         elif t_type in ['22', '29']:
-            return 'database' # Data Stations
+            return 'database' 
         else:
-            return 'box' # Standard Stations
+            return 'box' 
 
     def _build_side_panel_payload(self, node_data):
         """Extracts the deep metadata to display in the HTML side-panel."""
@@ -77,6 +77,8 @@ class WorkflowVisualizer:
         for node_id, data in graph.nodes(data=True):
             t_type = self._get_type_str(data)
             t_name = data.get('name', f"Task {node_id}")
+            t_bo = data.get('BO', data.get('BoName', 'Context BO'))
+            if isinstance(t_bo, list): t_bo = t_bo[0]
             
             is_invisible = t_type in ['12', '11'] or (t_name.lower().startswith('unnamed') and t_type != '9') or t_type == 'generic'
             if is_invisible and graph.out_degree(node_id) > 0:
@@ -84,6 +86,7 @@ class WorkflowVisualizer:
 
             shape = self._determine_node_shape(t_type)
             
+            # --- Native Vis.js Typographic Hierarchy & Micro-Tags ---
             subtitle = f"Type {t_type}"
             if t_type == '14': subtitle = "Decision Gate"
             elif t_type == '22': subtitle = "Execute Query"
@@ -91,11 +94,20 @@ class WorkflowVisualizer:
             elif t_type == '28': subtitle = "Modify Data"
             elif t_type == '23': subtitle = "Modify Form"
             
-            label = f"<b>{t_name}</b>\n({subtitle})"
+            tags = []
+            if data.get('TrgtFld', []): tags.append("[+Data]")
+            if [f for f in data.get('Field', []) if f != '^^'] or data.get('GUIMappings', []): tags.append("[UI]")
+            if data.get('LFldName', []) or data.get('PField', []) or data.get('Expression', []): tags.append("[Filter]")
+            
+            tag_str = (" | " + " ".join(tags)) if tags else ""
+            
+            # Utilizing vis.js supported native structural pseudo-HTML
+            label = f"<b>{t_name}</b>\n<i>{subtitle}</i>\n<code>BO: {t_bo}{tag_str}</code>"
+            
             payload_html = self._build_side_panel_payload(data)
             
             # Apply Transit Map Highlights & Dark Mode Colors
-            border_color = '#555555' # Default Branch (Silver Line)
+            border_color = '#555555' 
             bg_color = '#2b2b2b'
             font_color = '#e0e0e0'
             border_width = 2
@@ -103,16 +115,14 @@ class WorkflowVisualizer:
             shadow_config = False
             
             if str(node_id) in live_trace_ids:
-                border_color = '#00ffcc' # Neon Cyan for Live Trace Line
+                border_color = '#00ffcc' 
                 bg_color = '#1a332e'
-                font_color = '#ffffff'
                 border_width = 3
                 border_width_selected = 3
                 shadow_config = {'color': '#00ffcc', 'size': 10, 'x': 0, 'y': 0}
             elif str(node_id) in critical_path_nodes:
-                border_color = '#0088ff' # Blue for Critical Path Line
+                border_color = '#0088ff' 
                 bg_color = '#1a2633'
-                font_color = '#ffffff'
                 border_width = 2
                 border_width_selected = 2
                 shadow_config = {'color': '#0088ff', 'size': 8, 'x': 0, 'y': 0}
@@ -128,11 +138,20 @@ class WorkflowVisualizer:
                 },
                 'borderWidth': border_width,
                 'borderWidthSelected': border_width_selected,
-                'font': {'multi': 'html', 'size': 14, 'face': 'Segoe UI', 'color': font_color},
-                'margin': 24, # Increased to prevent text from hitting the borders
-                'widthConstraint': { 'maximum': 180 }, 
+                'font': {
+                    'multi': 'html', 
+                    'size': 14, 
+                    'face': 'Segoe UI', 
+                    'color': font_color, 
+                    'align': 'center',
+                    'bold': {'color': '#ffffff', 'size': 14},
+                    'ital': {'color': '#888888', 'size': 12},
+                    'code': {'color': '#4da6ff', 'size': 11, 'face': 'Consolas'}
+                },
+                'margin': 18,
+                'widthConstraint': { 'maximum': 220 }, 
                 'shadow': shadow_config,
-                'customPayload': f"<h3>Station: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<hr/>{payload_html}"
+                'customPayload': f"<h3>Station: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
             })
 
         # Build Vis.js Edges
@@ -172,11 +191,10 @@ class WorkflowVisualizer:
                             else:
                                 if t_list and str(t) in get_visible_targets(t_list[0]): label = "TRUE"
 
-                        # Transit Track Highlights
                         is_edge_live = str(node_id) in live_trace_ids and str(t) in live_trace_ids
                         is_edge_critical = str(node_id) in critical_path_nodes and str(t) in critical_path_nodes
                         
-                        e_color = '#444444' # Default silver/gray track
+                        e_color = '#444444' 
                         e_width = 2
                         
                         if is_edge_live:
@@ -255,7 +273,7 @@ class WorkflowVisualizer:
                         }} 
                     }},
                     edges: {{ 
-                        smooth: {{ type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 }}
+                        smooth: {{ type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.45 }}
                     }}
                 }};
                 
