@@ -2,6 +2,7 @@ import re
 import networkx as nx
 from cli.formatters import wrap_ascii, format_path_narrative
 from integrations.ssh_client import SSHClientManager
+from cli.visualizer import WorkflowVisualizer
 
 class TririgaNLPRouter:
     def __init__(self, diagnostic_engine, ssh_host=None, ssh_user=None, ssh_log_path=None, offline_mode=False, local_log_path=None):
@@ -10,16 +11,13 @@ class TririgaNLPRouter:
         self.last_live_records = {} 
         self.last_live_record_counts = {} 
         self.current_context_wf = None 
+        self.last_execution_trace_ids = [] # Added memory for the visualizer
         
-        # Initialize the Semantic Dispatcher
         self._build_command_registry()
 
     def _build_command_registry(self):
-        """
-        The Semantic Dispatcher: Maps compiled regex patterns directly to handler methods.
-        Order is critical: Most specific patterns must appear before general catch-alls.
-        """
         self.command_registry = [
+            (re.compile(r"visualize|draw graph|show map|render map|generate map", re.IGNORECASE), self._cmd_visualize_workflow),
             (re.compile(r"why did it fail|check the log|scan log|what just failed|read log", re.IGNORECASE), self._cmd_scan_log),
             (re.compile(r"another workflow|trace ad hoc|ad hoc trace|ad-hoc trace|external workflow|not in omp", re.IGNORECASE), self._cmd_ad_hoc_trace),
             (re.compile(r"trace live|how did it execute|live execution|trace execution", re.IGNORECASE), self._cmd_live_trace),
@@ -33,17 +31,29 @@ class TririgaNLPRouter:
         ]
 
     def process_query(self, user_query):
-        """Clean, robust semantic router replacing the legacy if/elif block."""
         for pattern, handler in self.command_registry:
             match = pattern.search(user_query)
             if match:
                 return handler(user_query, match)
                 
-        return wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', or 'scan log'.")
+        return wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', 'visualize workflow', or 'scan log'.")
 
     # ==========================================
     # COMMAND DISPATCH HANDLERS
     # ==========================================
+    def _cmd_visualize_workflow(self, q, match):
+        wf_name = self.current_context_wf
+        
+        if not wf_name:
+            if len(self.engine.loaded_workflow_names) == 1:
+                wf_name = self.engine.loaded_workflow_names[0]
+                self.current_context_wf = wf_name
+            else:
+                return wrap_ascii(q, "Multiple workflows are loaded. Please specify which workflow you want to map, or run 'trace live execution' to set the context.")
+                
+        visualizer = WorkflowVisualizer(self.engine)
+        return visualizer.generate_html_map(wf_name, q, live_trace_ids=self.last_execution_trace_ids)
+
     def _cmd_scan_log(self, q, match):
         if self.ssh_manager: return self.scan_live_log_ssh(user_query=q)
         return wrap_ascii(q, "I cannot scan the live logs because the SSH configuration is missing in the engine.")
@@ -337,6 +347,8 @@ class TririgaNLPRouter:
                     if t_type != '12':
                         if not execution_trace or execution_trace[-1]['id'] != task_id:
                             execution_trace.append({'id': task_id, 'name': t_name, 'type': t_type, 'context': context_str})
+                            
+        self.last_execution_trace_ids = [step['id'] for step in execution_trace]
 
         output = [
             "--- Ad-Hoc Chronological Live Execution Trace (No OMP) ---",
@@ -358,6 +370,7 @@ class TririgaNLPRouter:
             elif ans.strip().lower() in ['n', 'no']:
                 instructions = (
                     "\nType 'exit' to quit.\n"
+                    "Type 'visualize' to generate an offline, interactive map of the workflow.\n"
                     "Type 'scan log' or 'what just failed' to securely scan the live logs for errors.\n"
                     "Type 'trace live execution' to map out exactly how your OMP workflow routed itself.\n"
                     "Type 'trace ad hoc live execution' or 'another workflow' to trace workflows not in the OMP."
@@ -453,6 +466,8 @@ class TririgaNLPRouter:
                         if t_type != '12':
                             if not execution_trace or execution_trace[-1]['id'] != task_id:
                                 execution_trace.append({'id': task_id, 'name': t_name, 'type': t_type, 'context': context_str})
+
+        self.last_execution_trace_ids = [step['id'] for step in execution_trace]
 
         output = ["--- Chronological Live Execution Trace ---"]
         if target_wf_name: output.append(f"Target Workflow: {target_wf_name}")

@@ -43,6 +43,7 @@ if __name__ == "__main__":
         print("="*40)
         
         print("\nType 'exit' to quit.")
+        print("Type 'visualize' to generate an offline, interactive map of the workflow.")
         print("Type 'scan log' or 'what just failed' to securely scan the logs for errors.")
         print("Type 'trace live execution' to map out exactly how your OMP workflow routed itself.")
         print("Type 'trace ad hoc live execution' or 'another workflow' to trace workflows not in the OMP.\n")
