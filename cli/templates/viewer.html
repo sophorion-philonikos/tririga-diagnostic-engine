@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TRIRIGA Diagnostic Blueprint</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://dagrejs.github.io/project/dagre-d3/latest/dagre-d3.min.js"></script>
+    <style type="text/css">
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background-color: #f4f6f9; }
+        
+        #canvas-container { 
+            width: 75%; 
+            height: 100%; 
+            border-right: 2px solid #ccc; 
+            background-color: #f8f9fa;
+            background-image: radial-gradient(#d5d5d5 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative; 
+            overflow: hidden; 
+        }
+        
+        #sidepanel { width: 25%; height: 100%; padding: 20px; overflow-y: auto; background-color: #2b2b2b; color: #f1f1f1; box-sizing: border-box; }
+        h2 { color: #4da6ff; font-size: 1.2em; margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        h3 { color: #ffffff; margin-bottom: 5px; }
+        hr { border-color: #555; }
+        .hint { color: #888; font-style: italic; margin-top: 20px; }
+        
+        svg { width: 100%; height: 100%; }
+        
+        .edgePath path { fill: none; }
+        .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
+        .edgeLabel text { font-family: 'Segoe UI', sans-serif; font-size: 12px; font-weight: bold; fill: #d35400; }
+
+        .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #333; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+        .legend-item:last-child { margin-bottom: 0; }
+        .color-box { width: 16px; height: 16px; margin-right: 10px; border-radius: 3px; }
+        
+        .shape-icon { display: inline-block; width: 20px; height: 15px; margin-right: 10px; border: 1px solid #777; }
+        .s-scalene { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+        .s-oval { background: #00b050; border-radius: 50%; }
+        .s-pill { background: #bbf3ff; border-radius: 8px; }
+        .s-query-chevron { background: #ccffcc; clip-path: polygon(0 0, 80% 0, 100% 50%, 80% 100%, 0 100%); }
+        .s-rect-p { background: #ffcccc; border-radius: 2px; }
+        .s-notch { background: #e6ccff; clip-path: polygon(0 0, 100% 0, 100% 20%, 80% 30%, 100% 40%, 100% 60%, 80% 70%, 100% 80%, 100% 100%, 0 100%, 0 80%, 20% 70%, 0 60%, 0 40%, 20% 30%, 0 20%); }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <svg id="svg-canvas"><g/></svg>
+        <div class="legend">
+            <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">Routing Tracks</div>
+            <div class="legend-item"><div class="color-box" style="background: #e67e22;"></div> Critical Path</div>
+            <div class="legend-item"><div class="color-box" style="background: #00c3a5;"></div> Live Trace Log</div>
+
+            <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">TRIRIGA Task Legend</div>
+            <div class="legend-item"><div class="shape-icon s-oval"></div> Start / End Task</div>
+            <div class="legend-item"><div class="shape-icon s-scalene"></div> Switch (Decision Gate)</div>
+            <div class="legend-item"><div class="shape-icon s-query-chevron"></div> Query Task</div>
+            <div class="legend-item"><div class="shape-icon s-pill"></div> Retrieve Task</div>
+            <div class="legend-item"><div class="shape-icon s-rect-p"></div> Modify Records</div>
+            <div class="legend-item"><div class="shape-icon s-notch"></div> Modify Metadata</div>
+        </div>
+    </div>
+    <div id="sidepanel">
+        <h2>Diagnostics Panel</h2>
+        <div id="payloadData">
+            <p class="hint">Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // Data injected by Python Backend
+        var nodesData = GRAPH_NODES_DATA_PLACEHOLDER;
+        var edgesData = GRAPH_EDGES_DATA_PLACEHOLDER;
+
+        // Native HTML onClick Handler
+        window.diagnosticPayloads = {};
+        window.showDiagnosticPanel = function(nodeId) {
+            if(window.diagnosticPayloads[nodeId]) {
+                document.getElementById('payloadData').innerHTML = window.diagnosticPayloads[nodeId];
+            }
+        };
+
+        edgesData.sort(function(a, b) {
+            if (a.label === "TRUE" && b.label !== "TRUE") return -1;
+            if (a.label !== "TRUE" && b.label === "TRUE") return 1;
+            return 0;
+        });
+
+        var render = new dagreD3.render();
+
+        // Custom Midpoint Snapper Shape
+        render.shapes().orthoCard = function(parent, bbox, node) {
+            var w = node.width, h = node.height;
+            
+            var shapeSvg = parent.insert("rect", ":first-child")
+                .attr("x", -w/2).attr("y", -h/2).attr("width", w).attr("height", h)
+                .style("fill", "transparent").style("stroke", "none");
+                
+            // Ensure foreignObject permits pointer events so HTML onclick works
+            parent.append("foreignObject")
+                .attr("x", -w/2).attr("y", -h/2).attr("width", w).attr("height", h)
+                .style("pointer-events", "all")
+                .append("xhtml:div")
+                .style("width", w + "px").style("height", h + "px")
+                .html(node.htmlContent);
+
+            node.intersect = function(point) {
+                var cx = node.x, cy = node.y;
+                var dx = point.x - cx, dy = point.y - cy;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    return { x: cx + (dx > 0 ? w/2 : -w/2), y: cy };
+                } else {
+                    return { x: cx, y: cy + (dy > 0 ? h/2 : -h/2) };
+                }
+            };
+            return shapeSvg;
+        };
+
+        var g = new dagreD3.graphlib.Graph().setGraph({
+            rankdir: 'TB',
+            nodesep: 60,   
+            edgesep: 20,
+            ranksep: 30 
+        });
+
+        nodesData.forEach(function(n) {
+            // Load custom payload into global dictionary
+            window.diagnosticPayloads[n.id] = n.customPayload;
+
+            g.setNode(n.id, {
+                shape: 'orthoCard',
+                labelType: "html",
+                // Native HTML onclick dynamically injected into the wrapper div
+                htmlContent: "<div onclick=\"window.showDiagnosticPanel('" + n.id + "')\" style='width:" + n.width + "px; height:" + n.height + "px; cursor: pointer;'><img src='" + n.image + "' style='display:block; pointer-events: none;'/></div>",
+                padding: 0,
+                width: n.width,
+                height: n.height
+            });
+        });
+
+        edgesData.forEach(function(e) {
+            var edgeConfig = {
+                label: e.label || "",
+                style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
+                arrowhead: "", 
+                curve: d3.curveStepBefore 
+            };
+            
+            if (e.source_type === '14') {
+                if (e.label === "TRUE") {
+                    edgeConfig.tailport = 'w'; 
+                } else {
+                    edgeConfig.tailport = 'e';
+                }
+            }
+            
+            g.setEdge(e.from, e.to, edgeConfig);
+        });
+
+        var svg = d3.select("#svg-canvas"),
+            inner = svg.select("g");
+
+        var zoom = d3.zoom().on("zoom", function() {
+            inner.attr("transform", d3.event.transform);
+        });
+        svg.call(zoom);
+
+        render(inner, g);
+
+        // Dynamic Centering Math
+        var svgBounds = svg.node().getBoundingClientRect();
+        var graphWidth = g.graph().width;
+        var graphHeight = g.graph().height;
+        var zoomScale = Math.min(svgBounds.width / (graphWidth + 100), svgBounds.height / (graphHeight + 100), 0.9);
+        
+        var translateX = (svgBounds.width - graphWidth * zoomScale) / 2;
+        var translateY = 40; 
+        
+        svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(zoomScale));
+    </script>
+</body>
+</html>
