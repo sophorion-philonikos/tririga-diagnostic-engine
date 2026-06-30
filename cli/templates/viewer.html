@@ -24,7 +24,10 @@
         hr { border-color: #555; }
         .hint { color: #888; font-style: italic; margin-top: 20px; }
         
-        svg { width: 100%; height: 100%; }
+        svg { width: 100%; height: 100%; outline: none; }
+        .node { cursor: pointer; }
+        
+        .node rect { fill: transparent !important; stroke: none !important; }
         
         .edgePath path { fill: none; }
         .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
@@ -69,70 +72,30 @@
     </div>
 
     <script type="text/javascript">
-        // Data injected by Python Backend
         var nodesData = GRAPH_NODES_DATA_PLACEHOLDER;
         var edgesData = GRAPH_EDGES_DATA_PLACEHOLDER;
+        
+        window.payloads = {};
 
-        // Native HTML onClick Handler
-        window.diagnosticPayloads = {};
-        window.showDiagnosticPanel = function(nodeId) {
-            if(window.diagnosticPayloads[nodeId]) {
-                document.getElementById('payloadData').innerHTML = window.diagnosticPayloads[nodeId];
-            }
-        };
-
+        // To prevent Dagre from crossing edges, we weight the TRUE path heavily to form a vertical trunk
         edgesData.sort(function(a, b) {
             if (a.label === "TRUE" && b.label !== "TRUE") return -1;
             if (a.label !== "TRUE" && b.label === "TRUE") return 1;
             return 0;
         });
 
-        var render = new dagreD3.render();
-
-        // Custom Midpoint Snapper Shape
-        render.shapes().orthoCard = function(parent, bbox, node) {
-            var w = node.width, h = node.height;
-            
-            var shapeSvg = parent.insert("rect", ":first-child")
-                .attr("x", -w/2).attr("y", -h/2).attr("width", w).attr("height", h)
-                .style("fill", "transparent").style("stroke", "none");
-                
-            // Ensure foreignObject permits pointer events so HTML onclick works
-            parent.append("foreignObject")
-                .attr("x", -w/2).attr("y", -h/2).attr("width", w).attr("height", h)
-                .style("pointer-events", "all")
-                .append("xhtml:div")
-                .style("width", w + "px").style("height", h + "px")
-                .html(node.htmlContent);
-
-            node.intersect = function(point) {
-                var cx = node.x, cy = node.y;
-                var dx = point.x - cx, dy = point.y - cy;
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    return { x: cx + (dx > 0 ? w/2 : -w/2), y: cy };
-                } else {
-                    return { x: cx, y: cy + (dy > 0 ? h/2 : -h/2) };
-                }
-            };
-            return shapeSvg;
-        };
-
         var g = new dagreD3.graphlib.Graph().setGraph({
             rankdir: 'TB',
-            nodesep: 60,   
-            edgesep: 20,
-            ranksep: 30 
+            nodesep: 80,   
+            edgesep: 30,
+            ranksep: 60   
         });
 
         nodesData.forEach(function(n) {
-            // Load custom payload into global dictionary
-            window.diagnosticPayloads[n.id] = n.customPayload;
-
+            window.payloads[n.id] = n.customPayload;
             g.setNode(n.id, {
-                shape: 'orthoCard',
                 labelType: "html",
-                // Native HTML onclick dynamically injected into the wrapper div
-                htmlContent: "<div onclick=\"window.showDiagnosticPanel('" + n.id + "')\" style='width:" + n.width + "px; height:" + n.height + "px; cursor: pointer;'><img src='" + n.image + "' style='display:block; pointer-events: none;'/></div>",
+                label: "<img src='" + n.image + "' width='" + n.width + "' height='" + n.height + "' style='display:block; pointer-events: none;'/>",
                 padding: 0,
                 width: n.width,
                 height: n.height
@@ -140,22 +103,15 @@
         });
 
         edgesData.forEach(function(e) {
-            var edgeConfig = {
+            // Apply weight to ensure the primary logic path remains a straight, unbreakable column
+            var weight = (e.label === "TRUE" || e.label === "") ? 100 : 1;
+            g.setEdge(e.from, e.to, {
                 label: e.label || "",
                 style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
-                arrowhead: "", 
-                curve: d3.curveStepBefore 
-            };
-            
-            if (e.source_type === '14') {
-                if (e.label === "TRUE") {
-                    edgeConfig.tailport = 'w'; 
-                } else {
-                    edgeConfig.tailport = 'e';
-                }
-            }
-            
-            g.setEdge(e.from, e.to, edgeConfig);
+                arrowhead: "undirected", 
+                weight: weight,
+                source_type: e.source_type // Crucial for identifying Switch tasks in the custom SVG redraw
+            });
         });
 
         var svg = d3.select("#svg-canvas"),
@@ -166,18 +122,99 @@
         });
         svg.call(zoom);
 
+        var render = new dagreD3.render();
         render(inner, g);
 
-        // Dynamic Centering Math
-        var svgBounds = svg.node().getBoundingClientRect();
-        var graphWidth = g.graph().width;
-        var graphHeight = g.graph().height;
-        var zoomScale = Math.min(svgBounds.width / (graphWidth + 100), svgBounds.height / (graphHeight + 100), 0.9);
-        
-        var translateX = (svgBounds.width - graphWidth * zoomScale) / 2;
-        var translateY = 40; 
-        
-        svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(zoomScale));
+        // ============================================================================
+        // THE VANILLA SVG PATH OVERRIDE (Perfect Compass Intersections)
+        // ============================================================================
+        inner.selectAll("g.edgePath").each(function(e) {
+            var edge = g.edge(e);
+            var sourceNode = g.node(e.v);
+            var targetNode = g.node(e.w);
+            var pathElement = d3.select(this).select("path");
+
+            var sx = sourceNode.x, sy = sourceNode.y, sw = sourceNode.width, sh = sourceNode.height;
+            var tx = targetNode.x, ty = targetNode.y, tw = targetNode.width, th = targetNode.height;
+
+            // Target is ALWAYS North (Top Center of target node)
+            var endX = tx;
+            var endY = ty - th/2;
+            var startX, startY, pathData;
+
+            if (edge.source_type === '14') {
+                if (edge.label === "TRUE") {
+                    // TRUE: Exit WEST (Left Center)
+                    startX = sx - sw/2;
+                    startY = sy;
+                    // Draw Line: Left 30px -> Down to just above target -> Right to target X -> Down to target
+                    pathData = `M ${startX},${startY} H ${startX - 30} V ${endY - 20} H ${endX} V ${endY}`;
+                } else if (edge.label === "FALSE") {
+                    // FALSE: Exit EAST (Right Center)
+                    startX = sx + sw/2;
+                    startY = sy;
+                    // Draw Line: Right 30px -> Down to just above target -> Left to target X -> Down to target
+                    pathData = `M ${startX},${startY} H ${startX + 30} V ${endY - 20} H ${endX} V ${endY}`;
+                } else {
+                    // Default Exit: SOUTH (Bottom Center)
+                    startX = sx;
+                    startY = sy + sh/2;
+                    pathData = `M ${startX},${startY} V ${endY - 20} H ${endX} V ${endY}`;
+                }
+            } else {
+                // All other tasks Exit SOUTH (Bottom Center)
+                startX = sx;
+                startY = sy + sh/2;
+                pathData = `M ${startX},${startY} V ${startY + (endY - startY)/2} H ${endX} V ${endY}`;
+            }
+
+            pathElement.attr("d", pathData);
+        });
+
+        // Re-center the TRUE/FALSE labels onto the newly drawn SVG lines
+        inner.selectAll("g.edgeLabel").each(function(e) {
+            var edge = g.edge(e);
+            var sourceNode = g.node(e.v);
+            var labelGroup = d3.select(this);
+            
+            var sx = sourceNode.x, sy = sourceNode.y, sw = sourceNode.width;
+
+            if (edge.source_type === '14') {
+                if (edge.label === "TRUE") {
+                    // Shift label to the newly drawn West branch
+                    labelGroup.attr("transform", `translate(${sx - sw/2 - 15}, ${sy - 15})`);
+                } else if (edge.label === "FALSE") {
+                    // Shift label to the newly drawn East branch
+                    labelGroup.attr("transform", `translate(${sx + sw/2 + 15}, ${sy - 15})`);
+                }
+            }
+        });
+
+        // Native D3 click handler intercepts correctly when pointer-events are configured
+        inner.selectAll("g.node").on("click", function(id) {
+            if (window.payloads[id]) {
+                document.getElementById('payloadData').innerHTML = window.payloads[id];
+            }
+        });
+
+        // Asynchronous Bounding Box Camera Focus
+        setTimeout(function() {
+            var startNodeData = nodesData.find(function(n) { return n.isStart; });
+            var startId = startNodeData ? startNodeData.id : nodesData[0].id;
+            var startNode = g.node(startId);
+            
+            var container = document.getElementById('canvas-container');
+            var canvasWidth = container.clientWidth;
+            var initialScale = 0.85;
+            
+            // X: Center the screen on the exact start node coordinates
+            var tx = (canvasWidth / 2) - (startNode.x * initialScale);
+            // Y: Pin the top of the start node 60 pixels from the toolbar
+            var ty = 60 - (startNode.y * initialScale) + ((startNode.height * initialScale) / 2);
+            
+            svg.transition().duration(250).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+        }, 100);
+
     </script>
 </body>
 </html>
