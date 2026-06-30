@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import webbrowser
 import networkx as nx
 import textwrap
@@ -144,7 +145,8 @@ class WorkflowVisualizer:
 
         svg += "</svg>"
         
-        encoded_svg = "data:image/svg+xml;charset=utf-8," + urllib.parse.quote(svg, safe='')
+        # Base64 natively prevents internal parser crashes inside HTML canvas plugins
+        encoded_svg = "data:image/svg+xml;base64," + base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         return encoded_svg, width, total_h
 
     def _build_side_panel_payload(self, node_data, t_type):
@@ -241,6 +243,10 @@ class WorkflowVisualizer:
 
         dagre_nodes = []
         dagre_edges = []
+        payloads = {}
+
+        in_degrees = dict(graph.in_degree())
+        start_nodes = [n for n, d in in_degrees.items() if d == 0]
 
         for node_id, data in graph.nodes(data=True):
             t_type = self._get_type_str(data)
@@ -254,6 +260,7 @@ class WorkflowVisualizer:
 
             is_live = str(node_id) in live_trace_ids
             is_critical = str(node_id) in critical_path_nodes
+            is_start = node_id in start_nodes
 
             svg_data_uri, node_width, node_height = self._build_svg_node(t_name, t_type, t_bo, data, is_live, is_critical)
             payload_html = self._build_side_panel_payload(data, t_type)
@@ -263,8 +270,10 @@ class WorkflowVisualizer:
                 'image': svg_data_uri,
                 'width': node_width,
                 'height': node_height,
-                'customPayload': f"<h3>Task: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
+                'isStart': is_start
             })
+            
+            payloads[str(node_id)] = f"<h3>Task: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
 
         def get_visible_targets(start_id, visited=None):
             if visited is None: visited = set()
@@ -285,57 +294,69 @@ class WorkflowVisualizer:
 
         edge_tracker = set()
         for node_id in graph.nodes():
-            if str(node_id) in [n['id'] for n in dagre_nodes]:
-                targets = get_visible_targets(node_id)
-                source_data = graph.nodes[node_id]
-                s_type = self._get_type_str(source_data)
+            if str(node_id) not in [n['id'] for n in dagre_nodes]: continue
 
-                for t in targets:
-                    edge_key = f"{node_id}->{t}"
-                    if edge_key not in edge_tracker:
-                        edge_tracker.add(edge_key)
+            targets = get_visible_targets(node_id)
+            source_data = graph.nodes[node_id]
+            s_type = self._get_type_str(source_data)
+
+            local_edges = []
+            for t in targets:
+                edge_key = f"{node_id}->{t}"
+                if edge_key not in edge_tracker:
+                    edge_tracker.add(edge_key)
+                    
+                    label = ""
+                    
+                    if s_type == '14':
+                        true_target = source_data.get('TargetAssociation', '')
+                        if isinstance(true_target, list): true_target = true_target[0] if true_target else ''
+                        t_list = [x for x in true_target.split(';') if x]
                         
-                        label = ""
-                        if s_type == '14':
-                            true_target = source_data.get('TargetAssociation', '')
-                            if isinstance(true_target, list): true_target = true_target[0] if true_target else ''
-                            t_list = [x for x in true_target.split(';') if x]
-                            if t_list and str(t) == str(t_list[0]): label = "TRUE"
+                        if t_list and str(t) == str(t_list[0]): 
+                            label = "TRUE"
+                        else:
+                            if t_list and str(t) in get_visible_targets(t_list[0]): 
+                                label = "TRUE"
                             else:
-                                if t_list and str(t) in get_visible_targets(t_list[0]): label = "TRUE"
+                                label = "FALSE"
 
-                        is_edge_live = str(node_id) in live_trace_ids and str(t) in live_trace_ids
-                        is_edge_critical = str(node_id) in critical_path_nodes and str(t) in critical_path_nodes
-                        
-                        e_color = '#7f8c8d' 
-                        e_width = 2
-                        
-                        if is_edge_live:
-                            e_color = '#00c3a5'
-                            e_width = 4
-                        elif is_edge_critical:
-                            e_color = '#e67e22'
-                            e_width = 3
+                    is_edge_live = str(node_id) in live_trace_ids and str(t) in live_trace_ids
+                    is_edge_critical = str(node_id) in critical_path_nodes and str(t) in critical_path_nodes
+                    
+                    e_color = '#7f8c8d' 
+                    e_width = 2
+                    
+                    if is_edge_live:
+                        e_color = '#00c3a5'
+                        e_width = 4
+                    elif is_edge_critical:
+                        e_color = '#e67e22'
+                        e_width = 3
 
-                        dagre_edges.append({
-                            'from': str(node_id),
-                            'to': str(t),
-                            'label': label,
-                            'color': e_color,
-                            'width': e_width,
-                            'source_type': s_type
-                        })
+                    local_edges.append({
+                        'from': str(node_id),
+                        'to': str(t),
+                        'label': label,
+                        'color': e_color,
+                        'width': e_width
+                    })
 
-        # Load Template and Inject Data
+            # THE BRANCHING FIX: Reversing the sorting algorithm permanently forces Dagre
+            # to mathematically assign TRUE branches to the Left (West) and FALSE branches to the Right (East).
+            local_edges.sort(key=lambda x: 0 if x['label'] == 'FALSE' else (1 if x['label'] == 'TRUE' else 2))
+            dagre_edges.extend(local_edges)
+
         template_path = os.path.join(os.path.dirname(__file__), 'templates', 'viewer.html')
         try:
             with open(template_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
         except FileNotFoundError:
-            return wrap_ascii(user_query, f"ERROR: Could not find template file at {template_path}. Please ensure cli/templates/viewer.html exists.")
+            return wrap_ascii(user_query, f"ERROR: Could not find template file at {template_path}. Ensure you created the cli/templates/ directory.")
 
         html_content = html_content.replace('GRAPH_NODES_DATA_PLACEHOLDER', json.dumps(dagre_nodes))
         html_content = html_content.replace('GRAPH_EDGES_DATA_PLACEHOLDER', json.dumps(dagre_edges))
+        html_content = html_content.replace('PAYLOAD_JSON_PLACEHOLDER', json.dumps(payloads))
 
         file_name = f"blueprint_{wf_name.replace(' ', '_')}.html"
         file_path = os.path.join(os.getcwd(), file_name)
@@ -345,7 +366,7 @@ class WorkflowVisualizer:
 
         webbrowser.open('file://' + os.path.realpath(file_path))
         
-        msg = f"Orthogonal map successfully generated using modular template.\nOpened '{file_name}' in your default web browser."
+        msg = f"Orthogonal map successfully generated using native vanilla pathing.\nOpened '{file_name}' in your default web browser."
         if not live_trace_ids:
             msg += "\n[!] Note: No Live Trace detected. Run 'trace live execution' prior to mapping to see the exact track illuminated."
             

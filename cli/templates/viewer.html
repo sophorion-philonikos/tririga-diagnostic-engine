@@ -18,16 +18,17 @@
             overflow: hidden; 
         }
         
+        /* FOUC FIX: SVG starts invisible, guarantees no split-second flashing */
+        #svg-canvas { width: 100%; height: 100%; outline: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        
         #sidepanel { width: 25%; height: 100%; padding: 20px; overflow-y: auto; background-color: #2b2b2b; color: #f1f1f1; box-sizing: border-box; }
         h2 { color: #4da6ff; font-size: 1.2em; margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
         h3 { color: #ffffff; margin-bottom: 5px; }
         hr { border-color: #555; }
         .hint { color: #888; font-style: italic; margin-top: 20px; }
         
-        svg { width: 100%; height: 100%; outline: none; }
         .node { cursor: pointer; }
-        
-        .node rect { fill: transparent !important; stroke: none !important; }
+        .node rect, .node circle, .node ellipse, .node polygon { fill: transparent !important; stroke: none !important; }
         
         .edgePath path { fill: none; }
         .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
@@ -76,26 +77,22 @@
         var edgesData = GRAPH_EDGES_DATA_PLACEHOLDER;
         
         window.payloads = {};
-
-        // To prevent Dagre from crossing edges, we weight the TRUE path heavily to form a vertical trunk
-        edgesData.sort(function(a, b) {
-            if (a.label === "TRUE" && b.label !== "TRUE") return -1;
-            if (a.label !== "TRUE" && b.label === "TRUE") return 1;
-            return 0;
-        });
+        var startNodeId = null;
 
         var g = new dagreD3.graphlib.Graph().setGraph({
             rankdir: 'TB',
             nodesep: 80,   
             edgesep: 30,
-            ranksep: 60   
+            ranksep: 80   
         });
 
         nodesData.forEach(function(n) {
+            if (n.isStart && !startNodeId) startNodeId = n.id;
             window.payloads[n.id] = n.customPayload;
+            
             g.setNode(n.id, {
                 labelType: "html",
-                label: "<img src='" + n.image + "' width='" + n.width + "' height='" + n.height + "' style='display:block; pointer-events: none;'/>",
+                label: "<div style='width:" + n.width + "px; height:" + n.height + "px;'><img src='" + n.image + "' style='width:100%; height:100%; display:block; pointer-events: none;'/></div>",
                 padding: 0,
                 width: n.width,
                 height: n.height
@@ -103,14 +100,16 @@
         });
 
         edgesData.forEach(function(e) {
-            // Apply weight to ensure the primary logic path remains a straight, unbreakable column
+            // Weighting algorithm: Forces Dagre to align the main logic path into a strict vertical column
             var weight = (e.label === "TRUE" || e.label === "") ? 100 : 1;
+            
             g.setEdge(e.from, e.to, {
                 label: e.label || "",
                 style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
                 arrowhead: "undirected", 
                 weight: weight,
-                source_type: e.source_type // Crucial for identifying Switch tasks in the custom SVG redraw
+                // THE CROSSING FIX: Native D3 Orthogonal routing. Follows Dagre's collision-free control points perfectly.
+                curve: d3.curveStepBefore 
             });
         });
 
@@ -122,98 +121,39 @@
         });
         svg.call(zoom);
 
+        // Execute Mathematical Layout
         var render = new dagreD3.render();
         render(inner, g);
 
-        // ============================================================================
-        // THE VANILLA SVG PATH OVERRIDE (Perfect Compass Intersections)
-        // ============================================================================
-        inner.selectAll("g.edgePath").each(function(e) {
-            var edge = g.edge(e);
-            var sourceNode = g.node(e.v);
-            var targetNode = g.node(e.w);
-            var pathElement = d3.select(this).select("path");
-
-            var sx = sourceNode.x, sy = sourceNode.y, sw = sourceNode.width, sh = sourceNode.height;
-            var tx = targetNode.x, ty = targetNode.y, tw = targetNode.width, th = targetNode.height;
-
-            // Target is ALWAYS North (Top Center of target node)
-            var endX = tx;
-            var endY = ty - th/2;
-            var startX, startY, pathData;
-
-            if (edge.source_type === '14') {
-                if (edge.label === "TRUE") {
-                    // TRUE: Exit WEST (Left Center)
-                    startX = sx - sw/2;
-                    startY = sy;
-                    // Draw Line: Left 30px -> Down to just above target -> Right to target X -> Down to target
-                    pathData = `M ${startX},${startY} H ${startX - 30} V ${endY - 20} H ${endX} V ${endY}`;
-                } else if (edge.label === "FALSE") {
-                    // FALSE: Exit EAST (Right Center)
-                    startX = sx + sw/2;
-                    startY = sy;
-                    // Draw Line: Right 30px -> Down to just above target -> Left to target X -> Down to target
-                    pathData = `M ${startX},${startY} H ${startX + 30} V ${endY - 20} H ${endX} V ${endY}`;
-                } else {
-                    // Default Exit: SOUTH (Bottom Center)
-                    startX = sx;
-                    startY = sy + sh/2;
-                    pathData = `M ${startX},${startY} V ${endY - 20} H ${endX} V ${endY}`;
-                }
-            } else {
-                // All other tasks Exit SOUTH (Bottom Center)
-                startX = sx;
-                startY = sy + sh/2;
-                pathData = `M ${startX},${startY} V ${startY + (endY - startY)/2} H ${endX} V ${endY}`;
-            }
-
-            pathElement.attr("d", pathData);
-        });
-
-        // Re-center the TRUE/FALSE labels onto the newly drawn SVG lines
-        inner.selectAll("g.edgeLabel").each(function(e) {
-            var edge = g.edge(e);
-            var sourceNode = g.node(e.v);
-            var labelGroup = d3.select(this);
-            
-            var sx = sourceNode.x, sy = sourceNode.y, sw = sourceNode.width;
-
-            if (edge.source_type === '14') {
-                if (edge.label === "TRUE") {
-                    // Shift label to the newly drawn West branch
-                    labelGroup.attr("transform", `translate(${sx - sw/2 - 15}, ${sy - 15})`);
-                } else if (edge.label === "FALSE") {
-                    // Shift label to the newly drawn East branch
-                    labelGroup.attr("transform", `translate(${sx + sw/2 + 15}, ${sy - 15})`);
-                }
-            }
-        });
-
-        // Native D3 click handler intercepts correctly when pointer-events are configured
+        // Native Event Delegation
         inner.selectAll("g.node").on("click", function(id) {
             if (window.payloads[id]) {
                 document.getElementById('payloadData').innerHTML = window.payloads[id];
             }
         });
 
-        // Asynchronous Bounding Box Camera Focus
-        setTimeout(function() {
-            var startNodeData = nodesData.find(function(n) { return n.isStart; });
-            var startId = startNodeData ? startNodeData.id : nodesData[0].id;
-            var startNode = g.node(startId);
-            
-            var container = document.getElementById('canvas-container');
-            var canvasWidth = container.clientWidth;
-            var initialScale = 0.85;
-            
-            // X: Center the screen on the exact start node coordinates
-            var tx = (canvasWidth / 2) - (startNode.x * initialScale);
-            // Y: Pin the top of the start node 60 pixels from the toolbar
-            var ty = 60 - (startNode.y * initialScale) + ((startNode.height * initialScale) / 2);
-            
-            svg.transition().duration(250).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
-        }, 100);
+        // THE FOCUS FIX: Calculates camera math synchronously immediately after the render to prevent FOUC
+        if (!startNodeId && nodesData.length > 0) startNodeId = nodesData[0].id;
+        
+        var container = document.getElementById('canvas-container');
+        var canvasWidth = container.clientWidth;
+        var initialScale = 0.85;
+        
+        var tx = canvasWidth / 2;
+        var ty = 60;
+
+        if (startNodeId) {
+            var startNode = g.node(startNodeId);
+            if (startNode) {
+                // Locks X to the center of the Start Node, Locks Y slightly below the top toolbar
+                tx = (canvasWidth / 2) - (startNode.x * initialScale);
+                ty = 60 - (startNode.y * initialScale) + ((startNode.height * initialScale) / 2);
+            }
+        }
+        
+        // Puts the camera in place instantaneously, THEN reveals the canvas. 
+        svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+        document.getElementById('svg-canvas').style.opacity = 1;
 
     </script>
 </body>
