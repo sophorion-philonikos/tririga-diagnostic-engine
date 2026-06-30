@@ -145,7 +145,6 @@ class WorkflowVisualizer:
 
         svg += "</svg>"
         
-        # Base64 natively prevents internal parser crashes inside HTML canvas plugins
         encoded_svg = "data:image/svg+xml;base64," + base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         return encoded_svg, width, total_h
 
@@ -243,7 +242,6 @@ class WorkflowVisualizer:
 
         dagre_nodes = []
         dagre_edges = []
-        payloads = {}
 
         in_degrees = dict(graph.in_degree())
         start_nodes = [n for n, d in in_degrees.items() if d == 0]
@@ -270,10 +268,9 @@ class WorkflowVisualizer:
                 'image': svg_data_uri,
                 'width': node_width,
                 'height': node_height,
-                'isStart': is_start
+                'isStart': is_start,
+                'customPayload': f"<h3>Task: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
             })
-            
-            payloads[str(node_id)] = f"<h3>Task: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
 
         def get_visible_targets(start_id, visited=None):
             if visited is None: visited = set()
@@ -342,8 +339,9 @@ class WorkflowVisualizer:
                         'width': e_width
                     })
 
-            # THE BRANCHING FIX: Reversing the sorting algorithm permanently forces Dagre
-            # to mathematically assign TRUE branches to the Left (West) and FALSE branches to the Right (East).
+            # THE DAGRE PLACEMENT FIX: 
+            # Reversing the array logic physically places FALSE on the Right and TRUE on the Left, 
+            # permanently preventing line crossover in D3.
             local_edges.sort(key=lambda x: 0 if x['label'] == 'FALSE' else (1 if x['label'] == 'TRUE' else 2))
             dagre_edges.extend(local_edges)
 
@@ -356,7 +354,6 @@ class WorkflowVisualizer:
 
         html_content = html_content.replace('GRAPH_NODES_DATA_PLACEHOLDER', json.dumps(dagre_nodes))
         html_content = html_content.replace('GRAPH_EDGES_DATA_PLACEHOLDER', json.dumps(dagre_edges))
-        html_content = html_content.replace('PAYLOAD_JSON_PLACEHOLDER', json.dumps(payloads))
 
         file_name = f"blueprint_{wf_name.replace(' ', '_')}.html"
         file_path = os.path.join(os.getcwd(), file_name)

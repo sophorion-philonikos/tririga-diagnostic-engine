@@ -18,7 +18,6 @@
             overflow: hidden; 
         }
         
-        /* FOUC FIX: SVG starts invisible, guarantees no split-second flashing */
         #svg-canvas { width: 100%; height: 100%; outline: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
         
         #sidepanel { width: 25%; height: 100%; padding: 20px; overflow-y: auto; background-color: #2b2b2b; color: #f1f1f1; box-sizing: border-box; }
@@ -76,7 +75,14 @@
         var nodesData = GRAPH_NODES_DATA_PLACEHOLDER;
         var edgesData = GRAPH_EDGES_DATA_PLACEHOLDER;
         
+        // PURE VANILLA CLICK DELEGATION
         window.payloads = {};
+        window.handleNodeClick = function(id) {
+            if (window.payloads[id]) {
+                document.getElementById('payloadData').innerHTML = window.payloads[id];
+            }
+        };
+
         var startNodeId = null;
 
         var g = new dagreD3.graphlib.Graph().setGraph({
@@ -92,7 +98,8 @@
             
             g.setNode(n.id, {
                 labelType: "html",
-                label: "<div style='width:" + n.width + "px; height:" + n.height + "px;'><img src='" + n.image + "' style='width:100%; height:100%; display:block; pointer-events: none;'/></div>",
+                // NATIVE ONCLICK: Bypasses D3 entirely. Pointer-events:all forces the div to catch the mouse.
+                label: "<div onclick=\"window.handleNodeClick('" + n.id + "')\" style='width:" + n.width + "px; height:" + n.height + "px; pointer-events: all; cursor: pointer;'><img src='" + n.image + "' style='width:100%; height:100%; display:block; pointer-events: none;'/></div>",
                 padding: 0,
                 width: n.width,
                 height: n.height
@@ -100,7 +107,6 @@
         });
 
         edgesData.forEach(function(e) {
-            // Weighting algorithm: Forces Dagre to align the main logic path into a strict vertical column
             var weight = (e.label === "TRUE" || e.label === "") ? 100 : 1;
             
             g.setEdge(e.from, e.to, {
@@ -108,7 +114,6 @@
                 style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
                 arrowhead: "undirected", 
                 weight: weight,
-                // THE CROSSING FIX: Native D3 Orthogonal routing. Follows Dagre's collision-free control points perfectly.
                 curve: d3.curveStepBefore 
             });
         });
@@ -121,18 +126,9 @@
         });
         svg.call(zoom);
 
-        // Execute Mathematical Layout
         var render = new dagreD3.render();
         render(inner, g);
 
-        // Native Event Delegation
-        inner.selectAll("g.node").on("click", function(id) {
-            if (window.payloads[id]) {
-                document.getElementById('payloadData').innerHTML = window.payloads[id];
-            }
-        });
-
-        // THE FOCUS FIX: Calculates camera math synchronously immediately after the render to prevent FOUC
         if (!startNodeId && nodesData.length > 0) startNodeId = nodesData[0].id;
         
         var container = document.getElementById('canvas-container');
@@ -145,13 +141,11 @@
         if (startNodeId) {
             var startNode = g.node(startNodeId);
             if (startNode) {
-                // Locks X to the center of the Start Node, Locks Y slightly below the top toolbar
                 tx = (canvasWidth / 2) - (startNode.x * initialScale);
                 ty = 60 - (startNode.y * initialScale) + ((startNode.height * initialScale) / 2);
             }
         }
         
-        // Puts the camera in place instantaneously, THEN reveals the canvas. 
         svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
         document.getElementById('svg-canvas').style.opacity = 1;
 
