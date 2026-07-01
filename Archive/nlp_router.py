@@ -1,11 +1,3 @@
-TRIRIGA NP Pt. 1 UX Int 
-
-
-Summarize this email
-
-Carlos Monroy
-
-​Monroy, Carlos (CTR) <carlos.monroy@associates.ice.dhs.gov>​
 import re
 import networkx as nx
 import os

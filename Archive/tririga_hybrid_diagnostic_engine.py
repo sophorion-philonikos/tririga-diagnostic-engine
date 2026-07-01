@@ -1,11 +1,3 @@
-TRIRIGA EGR Pt. 1 UX Int
-
-
-Summarize this email
-
-Carlos Monroy
-
-​Monroy, Carlos (CTR) <carlos.monroy@associates.ice.dhs.gov>​
 import zipfile
 import xml.etree.ElementTree as ET
 import networkx as nx
