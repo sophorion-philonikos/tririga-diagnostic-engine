@@ -1,6 +1,11 @@
 import re
+import difflib
 import networkx as nx
 from cli.formatters import wrap_ascii, format_path_narrative
+from cli.models import TaskInsight
+from cli import knowledge
+from cli import relations
+from cli.intents import build_registry, render_help, suggest
 from integrations.ssh_client import SSHClientManager
 from cli.visualizer import WorkflowVisualizer
 
@@ -12,45 +17,47 @@ class TririgaNLPRouter:
         self.last_live_record_counts = {} 
         self.current_context_wf = None 
         self.last_execution_trace_ids = [] # Added memory for the visualizer
-        
+        self.last_path_generation_truncated = False
+        self.last_path_cycle_edges = []
+
+        # Bounds for path enumeration. Root-to-leaf enumeration is inherently exponential
+        # on branch-heavy TRIRIGA workflows, so we cap the number of materialized paths and
+        # the traversal depth rather than pretending the topology collapses to one route.
+        self.MAX_ENUMERATED_PATHS = 250
+
         self._build_command_registry()
 
     def _build_command_registry(self):
-        self.command_registry = [
-            (re.compile(r"visualize|draw graph|show map|render map|generate map", re.IGNORECASE), self._cmd_visualize_workflow),
-            (re.compile(r"why did it fail|check the log|scan log|what just failed|read log", re.IGNORECASE), self._cmd_scan_log),
-            (re.compile(r"another workflow|trace ad hoc|ad hoc trace|ad-hoc trace|external workflow|not in omp", re.IGNORECASE), self._cmd_ad_hoc_trace),
-            (re.compile(r"trace live|how did it execute|live execution|trace execution", re.IGNORECASE), self._cmd_live_trace),
-            (re.compile(r"path.*from\s+['\"]?(.*?)['\"]?\s+to\s+['\"]?(.*?)['\"]?", re.IGNORECASE), self._cmd_trace_path),
-            (re.compile(r"(?:what happens|trace).*(?:when|if)|(?:when|if).*(?:what happens|trace)", re.IGNORECASE), self._cmd_conditional_trace),
-            (re.compile(r"fail|fix|broken", re.IGNORECASE), self._cmd_analyze_failure),
-            (re.compile(r"updates|modifies|uses|where is|touches", re.IGNORECASE), self._cmd_find_references),
-            (re.compile(r"purpose|what does this do|summary|summarize|explain this workflow|explain the workflow", re.IGNORECASE), self._cmd_explain_purpose),
-            (re.compile(r"explain|what happens at|tell me about|look at|what is|diagnose|check|lap data|left data|right data", re.IGNORECASE), self._cmd_explain_task),
-            (re.compile(r"orphan", re.IGNORECASE), self._cmd_find_orphans)
-        ]
+        # Structured, priority-ordered intent registry (see cli/intents.py). Explicit
+        # priorities fix the shadowing problem of the old flat regex list, where broad
+        # patterns like "what is" swallowed glossary questions like "what is Type 14".
+        self.intents = build_registry()
 
     def process_query(self, user_query):
-        for pattern, handler in self.command_registry:
-            match = pattern.search(user_query)
-            if match:
-                return handler(user_query, match)
-                
-        return wrap_ascii(user_query, "I couldn't confidently parse that command. Try rephrasing, like 'Explain task 333376', 'visualize workflow', or 'scan log'.")
+        for intent in self.intents:
+            for pattern in intent.compiled:
+                match = pattern.search(user_query)
+                if match:
+                    handler = getattr(self, intent.handler)
+                    return handler(user_query, match)
+
+        # Did-you-mean fallback: score keyword overlap against every intent's
+        # vocabulary and offer the closest example phrasings.
+        suggestions = suggest(user_query, self.intents)
+        if suggestions:
+            lines = ["I couldn't confidently parse that. Did you mean one of these?"]
+            lines.extend([f"  - {s}" for s in suggestions])
+            lines.append("\nType 'help' to see everything you can ask.")
+            return wrap_ascii(user_query, "\n".join(lines))
+        return wrap_ascii(user_query, "I couldn't confidently parse that command. Type 'help' to see everything you can ask.")
 
     # ==========================================
     # COMMAND DISPATCH HANDLERS
     # ==========================================
     def _cmd_visualize_workflow(self, q, match):
-        wf_name = self.current_context_wf
-        
-        if not wf_name:
-            if len(self.engine.loaded_workflow_names) == 1:
-                wf_name = self.engine.loaded_workflow_names[0]
-                self.current_context_wf = wf_name
-            else:
-                return wrap_ascii(q, "Multiple workflows are loaded. Please specify which workflow you want to map, or run 'trace live execution' to set the context.")
-                
+        wf_name, _graph, err = self._get_context_graph(q)
+        if err: return err
+
         visualizer = WorkflowVisualizer(self.engine)
         return visualizer.generate_html_map(wf_name, q, live_trace_ids=self.last_execution_trace_ids)
 
@@ -95,6 +102,248 @@ class TririgaNLPRouter:
     def _cmd_find_orphans(self, q, match):
         return wrap_ascii(q, self._find_orphans())
 
+    # ==========================================
+    # META / CONTEXT / KNOWLEDGE HANDLERS
+    # ==========================================
+    def _cmd_help(self, q, match):
+        return wrap_ascii(q, render_help(self.intents))
+
+    def _cmd_set_context(self, q, match):
+        token = match.group(1).strip().strip("'\"?.,!")
+        names = self.engine.loaded_workflow_names
+        # Substring match first (case-insensitive), then fuzzy.
+        candidates = [n for n in names if token.lower() in n.lower()]
+        if not candidates:
+            candidates = difflib.get_close_matches(token, names, n=1, cutoff=0.4)
+        if not candidates:
+            listing = "\n".join([f"  {i+1}) {n}" for i, n in enumerate(names)])
+            return wrap_ascii(q, f"No loaded workflow matches '{token}'. Loaded workflows:\n{listing}")
+        self.current_context_wf = candidates[0]
+        return wrap_ascii(q, f"Context set. All questions now target:\n  '{candidates[0]}'\n\n"
+                             "Try: 'what is the purpose', 'list all switches', or 'visualize'.")
+
+    def _cmd_show_context(self, q, match):
+        names = self.engine.loaded_workflow_names
+        lines = [f"{len(names)} workflow(s) loaded from the OM Package:"]
+        for i, n in enumerate(names):
+            marker = "  * ACTIVE ->" if n == self.current_context_wf else "           -"
+            lines.append(f"{marker} {i+1}) {n}")
+        if not self.current_context_wf:
+            lines.append("\nNo active context yet. Set one with: use workflow <name>")
+        return wrap_ascii(q, "\n".join(lines))
+
+    def _cmd_glossary_type(self, q, match):
+        code = match.group(1)
+        answer = knowledge.explain_task_type(code, self.engine.graphs, self._get_type_str)
+        answer += ("\n\nYou can also ask: \"list all tasks\" to see every type in this workflow, "
+                   f"or \"explain task <id>\" to dissect a specific Type {code} task.")
+        return wrap_ascii(q, answer)
+
+    def _cmd_glossary_operator(self, q, match):
+        return wrap_ascii(q, knowledge.explain_operator(match.group(1)))
+
+    def _cmd_glossary_concept(self, q, match):
+        term = match.group(1)
+        answer = knowledge.explain_concept(term)
+        if answer is None:
+            return wrap_ascii(q, f"'{term}' is not in my concept glossary yet.")
+        return wrap_ascii(q, answer)
+
+    # ==========================================
+    # RELATIONSHIP / CONSTRAINT / INVENTORY HANDLERS
+    # ==========================================
+    def _cmd_relation(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        refs, note = self._resolve_task_refs(q, graph, max_refs=2)
+        if len(refs) < 2:
+            return wrap_ascii(q, "I need two tasks to compare. Reference them by ID or name, e.g. "
+                                 "\"what does task 333395 have to do with the Start task?\"")
+        answer = relations.describe_relation(self.engine, graph, wf_name, refs[0], refs[1], self._get_type_str)
+        if note: answer = note + "\n\n" + answer
+        # Suggest constraints for whichever referenced task is not the Start task.
+        suggest_ref = refs[0]
+        if self._get_type_str(graph.nodes[refs[0]]) in ['1', 'Trigger', 'Start']:
+            suggest_ref = refs[1]
+        answer += ("\n\nYou can also ask: \"what must be true to reach task "
+                   f"{suggest_ref}\" or \"explain task {suggest_ref}\".")
+        return wrap_ascii(q, answer)
+
+    def _cmd_constraints(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        refs, note = self._resolve_task_refs(q, graph, max_refs=1)
+        if not refs:
+            return wrap_ascii(q, "I need a target task. Reference it by ID or name, e.g. "
+                                 "\"what must be true to reach task 333449?\"")
+        answer = relations.describe_constraints(self.engine, graph, wf_name, refs[0], self._get_type_str)
+        if note: answer = note + "\n\n" + answer
+        answer += f"\n\nYou can also ask: \"what does task {refs[0]} have to do with the Start task?\""
+        return wrap_ascii(q, answer)
+
+    def _cmd_inventory(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        return wrap_ascii(q, self._build_inventory(q, wf_name, graph))
+
+    def _build_inventory(self, q, wf_name, graph):
+        ql = q.lower()
+        type_labels = {
+            '1': 'Start', '9': 'End', '13': 'Stop', '14': 'Switch (Decision Gate)',
+            '22': 'Query', '23': 'Modify Metadata (UI)', '25': 'Create Record',
+            '28': 'Modify Records', '29': 'Retrieve Records', '39': 'Custom Task',
+        }
+
+        def visible_nodes():
+            for node, data in graph.nodes(data=True):
+                t = self._get_type_str(data)
+                name = data.get('name', '').lower()
+                if t in ['12', '11'] or (name.startswith('unnamed') and t != '9') or t == 'generic':
+                    continue
+                yield node, data, t
+
+        # Fields touched across the workflow.
+        if re.search(r"what fields|fields .*(touch|modif|updat|chang)", ql):
+            field_writers = {}
+            for node, data, t in visible_nodes():
+                for f in data.get('TrgtFld', []):
+                    field_writers.setdefault(f, []).append(f"{data.get('name','?')} ({node})")
+            if not field_writers:
+                return f"No database fields are modified by '{wf_name}'."
+            lines = [f"'{wf_name}' modifies {len(field_writers)} database field(s):"]
+            for f, writers in sorted(field_writers.items()):
+                lines.append(f"  - {f}  <- written by {len(writers)} task(s): {', '.join(writers[:4])}"
+                             + (f" (+{len(writers)-4} more)" if len(writers) > 4 else ""))
+            lines.append("\nYou can also ask: \"which tasks update <field>\" for the full reverse search.")
+            return "\n".join(lines)
+
+        # Tasks that modify the database.
+        if re.search(r"which tasks (modify|update|change|write)|modif(?:y|ies|ications?)", ql):
+            rows = [(n, d) for n, d, t in visible_nodes() if t == '28']
+            if not rows:
+                return f"No Modify Records (Type 28) tasks exist in '{wf_name}'."
+            lines = [f"{len(rows)} Modify Records task(s) in '{wf_name}':"]
+            for n, d in rows:
+                flds = d.get('TrgtFld', [])
+                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) writes [{', '.join(flds[:5])}"
+                             + (f", +{len(flds)-5} more]" if len(flds) > 5 else "]"))
+            return "\n".join(lines)
+
+        # Queries.
+        if re.search(r"quer(?:y|ies)", ql):
+            rows = [(n, d) for n, d, t in visible_nodes() if t == '22']
+            lines = [f"{len(rows)} Query task(s) in '{wf_name}':"]
+            for n, d in rows:
+                fb = d.get('FilterBo', ['?'])
+                q_name = fb[0] if isinstance(fb, list) else fb
+                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) executes query '{q_name}'")
+                q_data = self.engine.queries.get(q_name)
+                if q_data:
+                    lines.append(f"      Module '{q_data.get('Module')}' :: BO '{q_data.get('BO')}', "
+                                 f"{len(q_data.get('Filters', []))} internal filter(s)")
+            if not rows:
+                lines = [f"No Query (Type 22) tasks exist in '{wf_name}'."]
+            return "\n".join(lines)
+
+        # Switches.
+        if re.search(r"switch", ql):
+            rows = [(n, d) for n, d, t in visible_nodes() if t == '14']
+            lines = [f"{len(rows)} Switch task(s) in '{wf_name}':"]
+            for n, d in rows:
+                exp = d.get('Expression', [])
+                exp_str = ", ".join(exp) if exp else "condition not captured"
+                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) evaluates ({exp_str})")
+            lines.append("\nYou can also ask: \"what must be true to reach task <id>\" to see which of "
+                         "these gates govern a specific task.")
+            return "\n".join(lines)
+
+        # Retrieves.
+        if re.search(r"retrieve", ql):
+            rows = [(n, d) for n, d, t in visible_nodes() if t == '29']
+            lines = [f"{len(rows)} Retrieve Records task(s) in '{wf_name}':"]
+            for n, d in rows:
+                bo = d.get('BO', ['?'])
+                bo = bo[0] if isinstance(bo, list) else bo
+                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) targeting BO '{bo}'")
+            return "\n".join(lines)
+
+        # Default: full task census grouped by type.
+        census = {}
+        for n, d, t in visible_nodes():
+            census.setdefault(t, []).append((n, d.get('name', '?')))
+        lines = [f"Task census for '{wf_name}' ({sum(len(v) for v in census.values())} visible task(s)):"]
+        for t in sorted(census, key=lambda x: (not x.isdigit(), int(x) if x.isdigit() else 0)):
+            label = type_labels.get(t, f"Type {t}")
+            entries = census[t]
+            lines.append(f"\n  Type {t} - {label}: {len(entries)} task(s)")
+            for n, name in entries[:10]:
+                lines.append(f"    - '{name}' (ID: {n})")
+            if len(entries) > 10:
+                lines.append(f"    (+{len(entries)-10} more)")
+        lines.append("\nYou can also ask: \"list all switches\", \"list queries\", or \"what is Type 29\".")
+        return "\n".join(lines)
+
+    # ==========================================
+    # CONTEXT & TASK RESOLUTION HELPERS
+    # ==========================================
+    def _get_context_graph(self, q):
+        """Resolve the active workflow graph, or return an actionable error response."""
+        wf = self.current_context_wf
+        if not wf:
+            if len(self.engine.loaded_workflow_names) == 1:
+                wf = self.engine.loaded_workflow_names[0]
+                self.current_context_wf = wf
+            else:
+                names = "\n".join([f"  - {n}" for n in self.engine.loaded_workflow_names])
+                return None, None, wrap_ascii(
+                    q, f"Multiple workflows are loaded:\n{names}\n\n"
+                       "Tell me which to use, e.g. \"use workflow triBuilding\".")
+        return wf, self.engine.graphs[wf], None
+
+    def _resolve_task_refs(self, query, graph, max_refs=2):
+        """Extract up to max_refs task references from free text.
+
+        Accepts, in priority order: bare numeric IDs (5+ digits) present in the graph,
+        the keywords 'start'/'end' (mapped to the Start/End nodes), quoted task names
+        (exact then fuzzy), and finally fuzzy matching of capitalized/known task names.
+        Returns (refs, note) where note carries any 'did you mean' clarification.
+        """
+        refs, notes = [], []
+
+        def add(node_id):
+            node_id = str(node_id)
+            if node_id not in refs:
+                refs.append(node_id)
+
+        for num in re.findall(r"\b(\d{4,})\b", query):
+            if graph.has_node(num):
+                add(num)
+
+        ql = query.lower()
+        if len(refs) < max_refs and re.search(r"\bstart(?:\s+task)?\b", ql):
+            for n, d in graph.nodes(data=True):
+                if self._get_type_str(d) in ['1', 'Trigger', 'Start']:
+                    add(n)
+                    break
+        if len(refs) < max_refs and re.search(r"\bend(?:\s+task)?\b", ql):
+            for n, d in graph.nodes(data=True):
+                if self._get_type_str(d) in ['9', '13']:
+                    add(n)
+                    break
+
+        if len(refs) < max_refs:
+            name_map = {str(d.get('name', '')).lower(): n for n, d in graph.nodes(data=True) if d.get('name')}
+            for quoted in re.findall(r"['\"]([^'\"]+)['\"]", query):
+                key = quoted.lower()
+                if key in name_map:
+                    add(name_map[key])
+                else:
+                    close = difflib.get_close_matches(key, list(name_map.keys()), n=1, cutoff=0.6)
+                    if close:
+                        add(name_map[close[0]])
+                        notes.append(f"[?] Interpreted '{quoted}' as task '{close[0]}'.")
+
+        return refs[:max_refs], "\n".join(notes)
 
     # ==========================================
     # CORE LOGIC & ENGINE INTERACTIONS
@@ -110,119 +359,219 @@ class TririgaNLPRouter:
         return str(t).strip()
 
     def _explain_purpose_with_paths(self, user_query):
-        wf_name = self.current_context_wf
-        
-        if not wf_name:
-            if len(self.engine.loaded_workflow_names) == 1:
-                wf_name = self.engine.loaded_workflow_names[0]
-                self.current_context_wf = wf_name
-            else:
-                return wrap_ascii(user_query, "Multiple workflows are loaded. Please run 'trace live execution' on one first so I know which context to explicitly explain.")
-        
+        wf_name, _graph, err = self._get_context_graph(user_query)
+        if err: return err
+
         base_summary = self._explain_purpose(wf_name)
         all_paths = self._generate_all_paths(wf_name)
-        
-        if not all_paths: return wrap_ascii(user_query, base_summary)
-        
+
+        # Surface topology caveats explicitly rather than silently.
+        notes = []
+        if self.last_path_cycle_edges:
+            edge_str = ", ".join(["{}->{}".format(e[0], e[1]) for e in self.last_path_cycle_edges])
+            notes.append(
+                f"[!] Cyclic routing detected (recurrence loop). Loop edge(s): {edge_str}. "
+                "Each path is walked through the loop once, up to the point it re-enters a visited task."
+            )
+        if self.last_path_generation_truncated:
+            notes.append(
+                f"[!] This workflow's branching exceeds the enumeration bound; the first "
+                f"{self.MAX_ENUMERATED_PATHS} logical paths were materialized. The complete topology "
+                "remains intact in the graph model (no routes were collapsed)."
+            )
+
+        if not all_paths:
+            body = base_summary
+            if notes:
+                body += "\n\n" + "\n".join(notes)
+            return wrap_ascii(user_query, body)
+
         total_paths = len(all_paths)
-        current_idx = 1
-        path_text = format_path_narrative(all_paths[0], 1, total_paths)
-        
-        if total_paths == 1:
-            return wrap_ascii(user_query, base_summary + "\n\n" + path_text)
-            
-        print(wrap_ascii(user_query, base_summary + "\n\n" + path_text))
-        
-        while current_idx < total_paths:
-            ans = input(f"\n[?] This workflow contains {total_paths - current_idx} other logical paths. Would you like to explore the next path? (Yes/No): ")
-            if ans.strip().lower() in ['y', 'yes']:
-                current_idx += 1
-                path_text = format_path_narrative(all_paths[current_idx-1], current_idx, total_paths)
-                if current_idx == total_paths:
-                    return wrap_ascii(f"[Interactive] Exploring Path {current_idx}", path_text + "\n\n[!] All logic paths successfully explored.")
-                else:
-                    print(wrap_ascii(f"[Interactive] Exploring Path {current_idx}", path_text))
-            elif ans.strip().lower() in ['n', 'no']:
-                return wrap_ascii(f"[Interactive] Declined remaining paths", "Path exploration successfully closed.")
+
+        # Interactive path explorer: reveal paths in small batches so the user is never
+        # flooded, and is always told how many remain and offered the choice to continue.
+        PATH_BATCH_SIZE = 3
+
+        def render_batch(start_idx, end_idx):
+            return "\n\n".join(
+                format_path_narrative(all_paths[i], i + 1, total_paths)
+                for i in range(start_idx, end_idx)
+            )
+
+        header_segments = [base_summary]
+        if notes:
+            header_segments.append("\n".join(notes))
+
+        first_end = min(PATH_BATCH_SIZE, total_paths)
+        first_block = "\n\n".join(header_segments + [render_batch(0, first_end)])
+
+        # If everything fits in the first batch, return it in one shot (no prompt needed).
+        if total_paths <= PATH_BATCH_SIZE:
+            return wrap_ascii(user_query, first_block)
+
+        print(wrap_ascii(user_query, first_block))
+        shown = first_end
+
+        while shown < total_paths:
+            remaining = total_paths - shown
+            next_count = min(PATH_BATCH_SIZE, remaining)
+            ans = input(
+                f"\n[?] Showing {shown} of {total_paths} logical paths. {remaining} remaining. "
+                f"Would you like to see the next {next_count}? (Yes/No): "
+            )
+            answer = ans.strip().lower()
+            if answer in ['y', 'yes']:
+                start_idx = shown
+                end_idx = shown + next_count
+                batch_text = render_batch(start_idx, end_idx)
+                shown = end_idx
+                if shown >= total_paths:
+                    return wrap_ascii(
+                        f"[Interactive] Paths {start_idx + 1}-{shown} of {total_paths}",
+                        batch_text + f"\n\n[!] All {total_paths} logical paths have now been explored.",
+                    )
+                print(wrap_ascii(f"[Interactive] Paths {start_idx + 1}-{shown} of {total_paths}", batch_text))
+            elif answer in ['n', 'no']:
+                return wrap_ascii(
+                    "[Interactive] Path exploration closed",
+                    f"Stopped after {shown} of {total_paths} paths. "
+                    f"{total_paths - shown} path(s) left unexplored. "
+                    "Re-run the purpose command anytime to walk through them again.",
+                )
             else:
                 print("\n[!] Please answer Yes or No.")
-                
-        return wrap_ascii("Exploration Complete", "All paths viewed.") 
+
+        return wrap_ascii("[Interactive] Exploration complete", f"All {total_paths} logical paths viewed.")
+
+    def _resolve_visible_successors(self, graph, node_id, cache):
+        """Resolve the nearest *visible* successors of a node, hopping over invisible
+        junction tasks (Type 11/12/generic/unnamed connectors) exactly once.
+
+        Results are memoized per node because visibility resolution is purely
+        topological (path-independent). This is the "junction-once / shared subgraph"
+        optimization: each junction is expanded a single time regardless of how many
+        distinct execution paths flow through it, which is what stops branch-heavy
+        workflows from re-materializing the same downstream subgraph over and over.
+        """
+        if node_id in cache:
+            return cache[node_id]
+
+        result = []
+        result_seen = set()
+        visited_invisible = set()
+        queue = list(graph.successors(node_id))
+        i = 0
+        while i < len(queue):
+            succ = queue[i]
+            i += 1
+            s_node = graph.nodes[succ]
+            s_type = self._get_type_str(s_node)
+            s_name = s_node.get('name', '').lower()
+            is_invisible = s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic'
+
+            if is_invisible:
+                if succ not in visited_invisible:
+                    visited_invisible.add(succ)
+                    queue.extend(graph.successors(succ))
+            elif succ not in result_seen:
+                result_seen.add(succ)
+                result.append(succ)
+
+        cache[node_id] = result
+        return result
 
     def _generate_all_paths(self, wf_name):
         graph = self.engine.graphs[wf_name]
+        self.last_path_generation_truncated = False
+        self.last_path_cycle_edges = []
+
+        # Cycle awareness: TRIRIGA recurrence loops make the graph cyclic. Report the loop
+        # explicitly instead of silently truncating it inside the traversal guard.
+        if not nx.is_directed_acyclic_graph(graph):
+            try:
+                self.last_path_cycle_edges = list(nx.find_cycle(graph))
+            except Exception:
+                self.last_path_cycle_edges = []
+
         start_nodes = [n for n, d in graph.nodes(data=True) if self._get_type_str(d) in ['1', 'Trigger', 'Start']]
-        if not start_nodes: 
+        if not start_nodes:
             start_nodes = [n for n, d in graph.nodes(data=True) if graph.in_degree(n) == 0]
-        
+
+        succ_cache = {}
+        max_depth = graph.number_of_nodes() + 5
         all_paths = []
-        
-        def get_real_successors(node_id, visited_type12=None):
-            if visited_type12 is None: visited_type12 = set()
-            real_succs = []
-            for succ in graph.successors(node_id):
-                s_node = graph.nodes[succ]
-                s_type = self._get_type_str(s_node)
-                s_name = s_node.get('name', '').lower()
-                
-                is_invisible = s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic'
-                
-                if is_invisible:
-                    if succ not in visited_type12:
-                        visited_type12.add(succ)
-                        real_succs.extend(get_real_successors(succ, visited_type12))
-                else:
-                    real_succs.append(succ)
-                    
-            seen = set()
-            return [x for x in real_succs if not (x in seen or seen.add(x))]
-        
-        def dfs(current_node, current_path_steps, visited):
-            if current_node in visited: return
-                
+
+        # Explicit-stack iterative DFS. Each frame carries the path prefix that leads INTO
+        # the node plus the per-path visited set (which safely terminates cycles). Using an
+        # explicit stack avoids Python's recursion ceiling on deep topologies.
+        stack = [(sn, [], frozenset()) for sn in reversed(start_nodes)]
+
+        while stack:
+            if len(all_paths) >= self.MAX_ENUMERATED_PATHS:
+                self.last_path_generation_truncated = True
+                break
+
+            current_node, current_path_steps, visited = stack.pop()
+
+            if current_node in visited:
+                # Loop back-edge on this path: terminate the branch here (already recorded
+                # globally via last_path_cycle_edges) rather than looping forever.
+                if current_path_steps:
+                    all_paths.append(current_path_steps)
+                continue
+
+            if len(current_path_steps) >= max_depth:
+                self.last_path_generation_truncated = True
+                if current_path_steps:
+                    all_paths.append(current_path_steps)
+                continue
+
             node_data = graph.nodes[current_node]
             t_type = self._get_type_str(node_data)
             t_name = node_data.get('name', f"Task {current_node}")
-            
             action_text = self._translate_task_to_action(current_node, node_data)
             step_info = {'id': current_node, 'name': t_name, 'type': t_type, 'action': action_text}
             new_path_steps = current_path_steps + [step_info]
-            
-            successors = get_real_successors(current_node)
-            
+
+            successors = self._resolve_visible_successors(graph, current_node, succ_cache)
+
             if not successors or t_type in ['9', '13', 'End']:
                 all_paths.append(new_path_steps)
-                return
-                
-            for succ in successors:
-                step_info_copy = dict(step_info)
-                if t_type == '14':
-                    targets = node_data.get('TargetAssociation', '')
-                    if isinstance(targets, list): targets = targets[0] if targets else ''
-                    target_list = [t for t in targets.split(';') if t]
-                    
-                    is_true = False
-                    if len(target_list) > 0:
-                        true_raw_target = target_list[0]
-                        if str(succ) == str(true_raw_target):
-                            is_true = True
-                        elif graph.has_node(true_raw_target):
-                            tr_type = self._get_type_str(graph.nodes[true_raw_target])
-                            tr_name = graph.nodes[true_raw_target].get('name', '').lower()
-                            if tr_type in ['12', '11'] or (tr_name.startswith('unnamed') and tr_type != '9') or tr_type == 'generic':
-                                if str(succ) in get_real_successors(true_raw_target):
-                                    is_true = True
-                                
-                    path_str = "TRUE (Primary)" if is_true else "FALSE (Default)"
-                    step_info_copy['action'] += f" Routed to the {path_str} path."
-                    
-                path_for_next = new_path_steps[:-1] + [step_info_copy]
-                dfs(succ, path_for_next, visited | {current_node})
+                continue
 
-        for sn in start_nodes:
-            dfs(sn, [], set())
-            
+            new_visited = visited | {current_node}
+            truth_map = self.engine.get_switch_truth_map(node_data) if t_type == '14' else {}
+
+            for succ in reversed(successors):
+                if t_type == '14':
+                    step_info_copy = dict(step_info)
+                    verdict = self._classify_switch_branch(graph, node_data, succ, truth_map, succ_cache)
+                    path_str = "TRUE (Primary)" if verdict == 'TRUE' else "FALSE (Default)"
+                    step_info_copy['action'] += f" Routed to the {path_str} path."
+                    path_for_next = new_path_steps[:-1] + [step_info_copy]
+                else:
+                    path_for_next = new_path_steps
+
+                stack.append((succ, path_for_next, new_visited))
+
         return all_paths
+
+    def _classify_switch_branch(self, graph, switch_data, visible_succ, truth_map, succ_cache):
+        """Return 'TRUE' or 'FALSE' for a visible successor of a Switch (Type 14) task.
+
+        Uses the EventName-derived truth map keyed by raw TargetAssociation ids, then
+        resolves it forward through any invisible junctions to the concrete visible
+        successor actually rendered on that branch.
+        """
+        if not truth_map:
+            return 'FALSE'
+        for raw_target, verdict in truth_map.items():
+            if str(visible_succ) == str(raw_target):
+                return verdict
+            if graph.has_node(str(raw_target)):
+                if str(visible_succ) in [str(x) for x in self._resolve_visible_successors(graph, str(raw_target), succ_cache)]:
+                    return verdict
+        return 'FALSE'
 
     def _translate_task_to_action(self, node_id, data):
         t_type = self._get_type_str(data)
@@ -530,11 +879,43 @@ class TririgaNLPRouter:
     def _extract_task_identifier(self, query):
         m = re.search(r'(?i)(?:id\s*[=:]?\s*["\']?|task\s+)[\#]?(\d{5,})', query)
         if m: return m.group(1).strip()
+        # Bare numeric ID anywhere in the sentence.
+        m = re.search(r'\b(\d{5,})\b', query)
+        if m: return m.group(1).strip()
         m = re.search(r'["\'](.*?)["\']', query)
         if m: return m.group(1).strip()
         m = re.search(r'(?i)(?:task|called|at|about|in)\s+([a-zA-Z0-9_\?]+)', query)
         if m: return m.group(1).strip()
         return None
+
+    def _find_task_nodes(self, task_identifier):
+        """Locate tasks by ID or name across the active context; fuzzy-match names.
+
+        Returns (found_nodes, note) where found_nodes is [(node_id, data, wf_name)]
+        and note carries a 'did you mean' clarification when fuzzy matching fired.
+        """
+        found_nodes = []
+        for wf_name, graph in self._get_target_workflows().items():
+            for node_id, data in graph.nodes(data=True):
+                name = data.get('name', '').lower()
+                if task_identifier.lower() in [name, name.strip('?'), str(node_id)]:
+                    found_nodes.append((node_id, data, wf_name))
+        if found_nodes:
+            return found_nodes, ""
+
+        # Fuzzy fallback over task names.
+        name_index = {}
+        for wf_name, graph in self._get_target_workflows().items():
+            for node_id, data in graph.nodes(data=True):
+                n = str(data.get('name', '')).lower()
+                if n and not n.startswith('unnamed'):
+                    name_index.setdefault(n, []).append((node_id, data, wf_name))
+        close = difflib.get_close_matches(task_identifier.lower(), list(name_index.keys()), n=1, cutoff=0.6)
+        if close:
+            matches = name_index[close[0]]
+            display = matches[0][1].get('name', close[0])
+            return matches, f"[?] No exact match for '{task_identifier}'; interpreting it as task '{display}'."
+        return [], ""
 
     def _extract_tririga_string(self, query):
         words = query.split()
@@ -545,14 +926,8 @@ class TririgaNLPRouter:
         return None
 
     def _translate_operator(self, op_code):
-        if not op_code: return "Equals"
-        if isinstance(op_code, list): op_code = op_code[0] if op_code else '10'
-        op_map = {
-            '10': 'Equals', '11': 'Does Not Equal', '12': 'Is Less Than', '13': 'Is Less Than or Equal To', 
-            '14': 'Is Greater Than', '15': 'Is Greater Than or Equal To', '16': 'Contains', '17': 'Does Not Contain', 
-            '18': 'Starts With', '19': 'Ends With', '20': 'Is Empty', '21': 'Is Not Empty', '22': 'Is In', '23': 'Is Not In'
-        }
-        return op_map.get(str(op_code).strip(), f"Unknown Operator ({str(op_code).strip()})")
+        # Single source of truth for operator codes lives in cli/knowledge.py.
+        return knowledge.translate_operator(op_code)
 
     def _trace_condition(self, field, value, user_query):
         val_clean = value.lower()
@@ -675,16 +1050,11 @@ class TririgaNLPRouter:
         return wrap_ascii(user_query, f"Reverse Search Results for '{search_term}':\n" + "\n".join(output))
 
     def _analyze_failure(self, task_identifier, user_query):
-        found_nodes = []
-        for wf_name, graph in self._get_target_workflows().items():
-            for node_id, data in graph.nodes(data=True):
-                name = data.get('name', '').lower()
-                if task_identifier.lower() in [name, name.strip('?'), str(node_id)]:
-                    found_nodes.append((node_id, data, wf_name))
-                
+        found_nodes, fuzzy_note = self._find_task_nodes(task_identifier)
         if not found_nodes: return wrap_ascii(user_query, f"Error: Could not find task '{task_identifier}' in active workflow context.")
             
         output = []
+        if fuzzy_note: output.append(fuzzy_note)
         for node_id, data, wf_name in found_nodes:
             output.append(f"Root-Cause Analysis for Failed Task: '{data.get('name')}' (ID: {node_id}, Type: {self._get_type_str(data)}) in '{wf_name}'")
             
@@ -721,16 +1091,11 @@ class TririgaNLPRouter:
         return wrap_ascii(user_query, "\n".join(output))
 
     def _explain_task_logic(self, task_identifier, user_query):
-        found_nodes = []
-        for wf_name, graph in self._get_target_workflows().items():
-            for node_id, data in graph.nodes(data=True):
-                name = data.get('name', '').lower()
-                if task_identifier.lower() in [name, name.strip('?'), str(node_id)]:
-                    found_nodes.append((node_id, data, wf_name))
-                
+        found_nodes, fuzzy_note = self._find_task_nodes(task_identifier)
         if not found_nodes: return wrap_ascii(user_query, f"Error: Could not find task '{task_identifier}' in active workflow context.")
             
         output = []
+        if fuzzy_note: output.append(fuzzy_note)
         spec_ids_to_query = []
         active_t_bo = None
         
@@ -958,11 +1323,7 @@ class TririgaNLPRouter:
                     output.append(f"                 Dynamic SQL extraction is required to view the individual targets.")
 
                 if payload:
-                    items = list(payload.items())
-                    for idx in range(0, len(items), 3):
-                        chunk = items[idx:idx+3]
-                        row_str = "  |  ".join([f"{k}: '{v}'" for k, v in chunk])
-                        output.append(f"        * {row_str}")
+                    output.extend(TaskInsight.format_payload_rows_cli(payload.items()))
                 else:
                     output.append("        * Data payload could not be extracted from live tables.")
                 
@@ -983,41 +1344,33 @@ class TririgaNLPRouter:
                     output.append(f"  - Routes To: {', '.join(target_strings)}")
 
         output_str = "\n".join(output)
-        
-        if len(spec_ids_to_query) > 1:
-            print(wrap_ascii(user_query, output_str))
-            
-            while True:
-                ans = input(f"\n[?] Would you like to see the remaining {len(spec_ids_to_query)-1} retrieved record payloads? (Yes/No): ")
-                if ans.strip().lower() in ['y', 'yes']:
-                    remainder_output = []
-                    remainder_output.append(f"--- Remaining Payloads ---")
-                    
-                    for i in range(1, len(spec_ids_to_query)):
-                        sid = spec_ids_to_query[i]
-                        payload = self.engine.fetch_live_record_data(active_t_bo, sid)
-                        
-                        remainder_output.append(f"\n  [Record {i+1} of {len(spec_ids_to_query)} | Spec ID: {sid}]")
-                        if payload:
-                            true_bo = payload.pop('_True_BO_Name', active_t_bo)
-                            if true_bo and active_t_bo and true_bo.lower() != active_t_bo.lower():
-                                remainder_output.append(f"    [!] NOTE: Displaying Context Payload ({true_bo}).")
 
-                            items = list(payload.items())
-                            for idx in range(0, len(items), 3):
-                                chunk = items[idx:idx+3]
-                                row_str = "  |  ".join([f"{k}: '{v}'" for k, v in chunk])
-                                remainder_output.append(f"      * {row_str}")
-                        else:
-                            remainder_output.append("      * Data payload could not be extracted from live tables.")
-                            
-                    return wrap_ascii("Yes (Displaying remaining records)", "\n".join(remainder_output))
-                elif ans.strip().lower() in ['n', 'no']:
-                    return wrap_ascii(ans, "Remaining payloads discarded.")
+        # Render remaining retrieved payloads inline (bounded), replacing the previous
+        # blocking input() prompt so the handler returns a single complete result.
+        if len(spec_ids_to_query) > 1:
+            MAX_EXTRA_RECORDS = 10
+            remaining = spec_ids_to_query[1:]
+            shown = remaining[:MAX_EXTRA_RECORDS]
+
+            extra = [f"\n--- Additional Retrieved Payloads ({len(remaining)} further record(s)) ---"]
+            for offset, sid in enumerate(shown):
+                record_index = offset + 2
+                payload = self.engine.fetch_live_record_data(active_t_bo, sid)
+                extra.append(f"\n  [Record {record_index} of {len(spec_ids_to_query)} | Spec ID: {sid}]")
+                if payload:
+                    true_bo = payload.pop('_True_BO_Name', active_t_bo)
+                    if true_bo and active_t_bo and true_bo.lower() != active_t_bo.lower():
+                        extra.append(f"    [!] NOTE: Displaying Context Payload ({true_bo}).")
+                    extra.extend(TaskInsight.format_payload_rows_cli(payload.items(), indent="      "))
                 else:
-                    print("\n[!] Please answer Yes or No.")
-        else:
-            return wrap_ascii(user_query, output_str)
+                    extra.append("      * Data payload could not be extracted from live tables.")
+
+            if len(remaining) > MAX_EXTRA_RECORDS:
+                extra.append(f"\n  [!] {len(remaining) - MAX_EXTRA_RECORDS} additional record(s) omitted for brevity.")
+
+            output_str = output_str + "\n" + "\n".join(extra)
+
+        return wrap_ascii(user_query, output_str)
 
     def _find_orphans(self):
         output = []

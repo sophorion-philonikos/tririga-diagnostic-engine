@@ -6,6 +6,7 @@ import networkx as nx
 import textwrap
 import urllib.parse
 from cli.formatters import wrap_ascii
+from cli.models import TaskInsight, MechanicSection
 
 class WorkflowVisualizer:
     def __init__(self, engine):
@@ -148,84 +149,97 @@ class WorkflowVisualizer:
         encoded_svg = "data:image/svg+xml;base64," + base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         return encoded_svg, width, total_h
 
-    def _build_side_panel_payload(self, node_data, t_type):
-        payload = []
-        
+    def _build_task_insight(self, node_id, node_data, t_type, t_name, t_bo):
+        """Assemble a renderer-neutral TaskInsight for the diagnostics side panel."""
+        sections = self._build_mechanic_sections(node_data, t_type)
+        return TaskInsight(
+            task_id=str(node_id),
+            name=t_name,
+            type_code=str(t_type),
+            bo=str(t_bo),
+            mechanics=sections,
+        )
+
+    def _build_mechanic_sections(self, node_data, t_type):
+        """Return structured, plain-text mechanic sections (no inline markup)."""
+        sections = []
+
         expressions = node_data.get('Expression', [])
-        if expressions: 
-            if isinstance(expressions, str): expressions = [expressions]
-            payload.append(f"<b>Expressions Evaluated:</b><br/>" + "<br/>".join([f"&bull; {e}" for e in expressions]))
-        
+        if isinstance(expressions, str): expressions = [expressions]
+        if expressions:
+            sections.append(MechanicSection('Expressions Evaluated', list(expressions)))
+
         if t_type == '28':
-            trgt_flds = node_data.get('TrgtFld', [])
-            src_flds = node_data.get('SrcFld', [])
-            trgt_bos = node_data.get('TrgtBo', node_data.get('TrgtBO', []))
-            src_bos = node_data.get('SrcBo', node_data.get('SrcBO', []))
-            fld_vals = node_data.get('FldVal', node_data.get('ConstantValue', []))
-            
-            if isinstance(trgt_flds, str): trgt_flds = [trgt_flds]
-            if isinstance(src_flds, str): src_flds = [src_flds]
-            if isinstance(trgt_bos, str): trgt_bos = [trgt_bos]
-            if isinstance(src_bos, str): src_bos = [src_bos]
-            if isinstance(fld_vals, str): fld_vals = [fld_vals]
-            
-            if trgt_flds:
-                mapping_sentences = []
-                for i in range(len(trgt_flds)):
-                    t_fld = trgt_flds[i]
-                    t_bo_raw = node_data.get('BO', ['Target Context'])
-                    if isinstance(t_bo_raw, list): t_bo_raw = t_bo_raw[0] if t_bo_raw else 'Target Context'
-                    t_bo = trgt_bos[i] if i < len(trgt_bos) else (trgt_bos[0] if trgt_bos else t_bo_raw)
-                    s_bo = src_bos[i] if i < len(src_bos) else (src_bos[0] if src_bos else 'Source Context')
-                    val = fld_vals[i] if i < len(fld_vals) else None
-                    s_fld = src_flds[i] if i < len(src_flds) else None
-                    
-                    source_val_text = val if val else (s_fld if s_fld else 'mapped data')
-                    if val and val.lower() == 'source' and s_fld:
-                        source_val_text = f"'{s_fld}'"
-                    elif val and val.lower() == 'source':
-                        source_val_text = "the source record"
-                    elif val:
-                        source_val_text = f"'{val}'"
-                        
-                    sentence = f"The field <b>{t_fld}</b> on the BO <b>{t_bo}</b> is being updated to the value <b>{source_val_text}</b>, which comes from BO <b>{s_bo}</b>."
-                    mapping_sentences.append(sentence)
-                
-                payload.append(f"<b>Data Mapping Mechanics:</b><br/>" + "<br/>".join([f"&bull; {s}" for s in mapping_sentences]))
+            t_bo_raw = node_data.get('BO', 'Target Context')
+            if isinstance(t_bo_raw, list): t_bo_raw = t_bo_raw[0] if t_bo_raw else 'Target Context'
+
+            obj_records = node_data.get('ObjMappingRecords', [])
+            mapping_sentences = []
+            for rec in obj_records:
+                t_fld = rec.get('TrgtFld')
+                if not t_fld: continue
+                t_bo = rec.get('TrgtBo', t_bo_raw)
+                s_bo = rec.get('SrcBo', 'Source Context')
+                s_fld = rec.get('SrcFld')
+                val = rec.get('FldVal') or rec.get('SrcFldVal')
+
+                source_val_text = val if val else (s_fld if s_fld else 'mapped data')
+                if val and val.lower() == 'source' and s_fld:
+                    source_val_text = f"'{s_fld}'"
+                elif val and val.lower() == 'source':
+                    source_val_text = "the source record"
+                elif val:
+                    source_val_text = f"'{val}'"
+
+                mapping_sentences.append(
+                    f"Field '{t_fld}' on BO '{t_bo}' is updated to {source_val_text}, sourced from BO '{s_bo}'."
+                )
+
+            if mapping_sentences:
+                sections.append(MechanicSection('Data Mapping Mechanics', mapping_sentences))
+            else:
+                trgt_flds = node_data.get('TrgtFld', [])
+                if isinstance(trgt_flds, str): trgt_flds = [trgt_flds]
+                if trgt_flds:
+                    sections.append(MechanicSection('Database Fields Modified', list(trgt_flds)))
         else:
             trgt_flds = node_data.get('TrgtFld', [])
-            if trgt_flds: 
-                if isinstance(trgt_flds, str): trgt_flds = [trgt_flds]
-                payload.append(f"<b>Database Fields Modified:</b><br/>" + "<br/>".join([f"&bull; {f}" for f in trgt_flds]))
-                
+            if isinstance(trgt_flds, str): trgt_flds = [trgt_flds]
+            if trgt_flds:
+                sections.append(MechanicSection('Database Fields Modified', list(trgt_flds)))
+
         gui_fields = [f for f in node_data.get('Field', []) if f != '^^']
-        if gui_fields: 
-            if isinstance(gui_fields, str): gui_fields = [gui_fields]
-            payload.append(f"<b>GUI Properties Modified:</b><br/>" + "<br/>".join([f"&bull; {f}" for f in gui_fields]))
-            
+        if isinstance(gui_fields, str): gui_fields = [gui_fields]
+        if gui_fields:
+            sections.append(MechanicSection('GUI Properties Modified', list(gui_fields)))
+
         gui_mappings = node_data.get('GUIMappings', [])
         if gui_mappings:
             mapping_strs = []
+            seen = set()
             for gm in gui_mappings:
                 sec = gm.get('Section', '')
                 fld = gm.get('Field', '')
-                if sec and sec != '^^': mapping_strs.append(f"Section: {sec}")
-                elif fld and fld != '^^': mapping_strs.append(f"Field: {fld}")
+                entry = None
+                if sec and sec != '^^': entry = f"Section: {sec}"
+                elif fld and fld != '^^': entry = f"Field: {fld}"
+                if entry and entry not in seen:
+                    seen.add(entry)
+                    mapping_strs.append(entry)
             if mapping_strs:
-                payload.append(f"<b>Dynamic UI Targets:</b><br/>" + "<br/>".join(list(set([f"&bull; {m}" for m in mapping_strs]))))
-                
-        filters = node_data.get('LFldName', []) + node_data.get('PField', [])
-        if filters: 
-            if isinstance(filters, str): filters = [filters]
-            payload.append(f"<b>Left Fields Evaluated:</b><br/>" + "<br/>".join([f"&bull; {f}" for f in filters]))
-            
-        constants = node_data.get('ConstantValue', [])
-        if constants: 
-            if isinstance(constants, str): constants = [constants]
-            payload.append(f"<b>Constants Checked:</b><br/>" + "<br/>".join([f"&bull; {c}" for c in constants]))
+                sections.append(MechanicSection('Dynamic UI Targets', mapping_strs))
 
-        if not payload: return "<i>No explicit payload mechanics mapped for this task.</i>"
-        return "<br/><br/>".join(payload)
+        filters = node_data.get('LFldName', []) + node_data.get('PField', [])
+        if isinstance(filters, str): filters = [filters]
+        if filters:
+            sections.append(MechanicSection('Left Fields Evaluated', list(filters)))
+
+        constants = node_data.get('ConstantValue', [])
+        if isinstance(constants, str): constants = [constants]
+        if constants:
+            sections.append(MechanicSection('Constants Checked', list(constants)))
+
+        return sections
 
     def generate_html_map(self, wf_name, user_query, live_trace_ids=None):
         if wf_name not in self.engine.graphs:
@@ -261,7 +275,7 @@ class WorkflowVisualizer:
             is_start = node_id in start_nodes
 
             svg_data_uri, node_width, node_height = self._build_svg_node(t_name, t_type, t_bo, data, is_live, is_critical)
-            payload_html = self._build_side_panel_payload(data, t_type)
+            insight = self._build_task_insight(node_id, data, t_type, t_name, t_bo)
 
             dagre_nodes.append({
                 'id': str(node_id),
@@ -269,7 +283,7 @@ class WorkflowVisualizer:
                 'width': node_width,
                 'height': node_height,
                 'isStart': is_start,
-                'customPayload': f"<h3>Task: {t_name}</h3><b>Type:</b> {t_type}<br/><b>ID:</b> {node_id}<br/><b>Context:</b> {t_bo}<hr/>{payload_html}"
+                'customPayload': insight.render_html()
             })
 
         def get_visible_targets(start_id, visited=None):
@@ -306,17 +320,18 @@ class WorkflowVisualizer:
                     label = ""
                     
                     if s_type == '14':
-                        true_target = source_data.get('TargetAssociation', '')
-                        if isinstance(true_target, list): true_target = true_target[0] if true_target else ''
-                        t_list = [x for x in true_target.split(';') if x]
-                        
-                        if t_list and str(t) == str(t_list[0]): 
-                            label = "TRUE"
-                        else:
-                            if t_list and str(t) in get_visible_targets(t_list[0]): 
-                                label = "TRUE"
-                            else:
-                                label = "FALSE"
+                        # Truth is read from the workflow's own EventName/TargetAssociation
+                        # declaration via the shared engine helper, then resolved forward
+                        # through invisible junctions to the concrete visible successor.
+                        truth_map = self.engine.get_switch_truth_map(source_data)
+                        label = "FALSE"
+                        for raw_target, verdict in truth_map.items():
+                            if str(t) == str(raw_target):
+                                label = verdict
+                                break
+                            if graph.has_node(str(raw_target)) and str(t) in [str(x) for x in get_visible_targets(str(raw_target))]:
+                                label = verdict
+                                break
 
                     is_edge_live = str(node_id) in live_trace_ids and str(t) in live_trace_ids
                     is_edge_critical = str(node_id) in critical_path_nodes and str(t) in critical_path_nodes
@@ -339,9 +354,16 @@ class WorkflowVisualizer:
                         'width': e_width
                     })
 
-            # THE DAGRE PLACEMENT FIX: 
-            # Reversing the array logic physically places FALSE on the Right and TRUE on the Left, 
-            # permanently preventing line crossover in D3.
+            # Declare each switch's edges in a CONSISTENT order (FALSE/default first, then
+            # TRUE, then unlabeled). Edge declaration order is a supported Dagre input that
+            # seeds the ordering phase, so applying the same order at every switch makes the
+            # TRUE and FALSE branches resolve to the same side workflow-wide. That consistency
+            # is what produces the clean cascading "switch ladder" layout (the FALSE/default
+            # chain stays on the spine while TRUE branches peel off predictably), instead of
+            # each switch being placed by whatever locally minimizes crossings.
+            #
+            # This is deterministic ordering (not a CSS/coordinate hack): worst case on an
+            # arbitrary graph is a crossing, never a broken or mis-rendered topology.
             local_edges.sort(key=lambda x: 0 if x['label'] == 'FALSE' else (1 if x['label'] == 'TRUE' else 2))
             dagre_edges.extend(local_edges)
 

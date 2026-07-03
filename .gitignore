@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets / local configuration -- never commit credentials
+.env
+.env.*
+*.secrets
+
+# Generated diagnostic artifacts
+blueprint_*.html
+
+# Logs and OM packages (may contain sensitive customer data)
+*.log
+server*.log
+
+# OS cruft
+.DS_Store
+**/.DS_Store

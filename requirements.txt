@@ -1,0 +1,5 @@
+# TRIRIGA Diagnostic Engine runtime dependencies
+# Pinned to the versions verified against this codebase.
+networkx==3.2.1
+oracledb==4.0.1
+paramiko==5.0.0

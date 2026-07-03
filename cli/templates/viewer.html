@@ -112,7 +112,10 @@
             g.setEdge(e.from, e.to, {
                 label: e.label || "",
                 style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
-                arrowhead: "undirected", 
+                // Directed arrowhead so execution direction is unambiguous regardless of how
+                // Dagre lays out ports (including reversed back-edges on cyclic workflows).
+                arrowhead: "vee",
+                arrowheadStyle: "fill: " + e.color + "; stroke: " + e.color + ";",
                 weight: weight,
                 curve: d3.curveStepBefore 
             });

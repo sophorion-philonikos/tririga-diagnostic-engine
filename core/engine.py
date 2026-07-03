@@ -14,6 +14,11 @@ class TririgaHybridEngine:
         self.workflow_metadata = {}
         self.loaded_workflow_names = [] 
         self.offline_mode = offline_mode
+        # Live-lookup memoization: the same Module/BO/Association names and spec records are
+        # validated repeatedly across dozens of nodes. Caching collapses O(nodes x keys) round
+        # trips down to O(distinct lookups).
+        self._validation_cache = {}
+        self._record_payload_cache = {}
         
         if not self.offline_mode:
             self._connect_to_oracle(db_username, db_password, db_dsn)
@@ -34,6 +39,59 @@ class TririgaHybridEngine:
         t = data.get('type', data.get('Type', 'Generic'))
         if isinstance(t, list): return str(t[0])
         return str(t).strip()
+
+    def _strip_namespaces(self, xml_payload):
+        """Make an XML payload namespace-agnostic before parsing.
+
+        TRIRIGA OM Package exports are inconsistent about XML namespaces. Rather than
+        stripping only the first ``xmlns`` (which silently breaks the moment a payload
+        declares a default namespace plus any prefixed ones), we remove ALL namespace
+        declarations and element/attribute prefixes so ElementTree's plain ``find``/
+        ``findall`` calls keep matching bare tag names.
+        """
+        # Remove every namespace declaration (default and prefixed).
+        cleaned = re.sub(r'\sxmlns(:\w+)?\s*=\s*"[^"]*"', '', xml_payload)
+        # Strip prefixes from opening and closing element tags: <ns:Tag> -> <Tag>.
+        cleaned = re.sub(r'(</?)[\w.-]+:', r'\1', cleaned)
+        # Strip prefixes from attribute names: ns:attr="..." -> attr="...".
+        cleaned = re.sub(r'(\s)[\w.-]+:([\w.-]+\s*=)', r'\1\2', cleaned)
+        return cleaned
+
+    def get_switch_truth_map(self, node_data):
+        """Map each raw TargetAssociation task id of a Switch (Type 14) task to 'TRUE'/'FALSE'.
+
+        TRIRIGA encodes switch routing across two parallel fields:
+            TargetAssociation = "333546;333395;"   (ordered branch target task ids)
+            EventName         = "0=true;1=false;"   (branch index -> truth value)
+
+        Combining them lets branch truth be read from the workflow's own declaration
+        rather than assuming the first listed target is always the TRUE path.
+        """
+        targets = node_data.get('TargetAssociation', '')
+        if isinstance(targets, list): targets = targets[0] if targets else ''
+        target_list = [t for t in str(targets).split(';') if t]
+
+        event = node_data.get('EventName', '')
+        if isinstance(event, list): event = event[0] if event else ''
+
+        index_truth = {}
+        for token in str(event).split(';'):
+            token = token.strip()
+            if '=' in token:
+                idx, val = token.split('=', 1)
+                idx = idx.strip()
+                val = val.strip().lower()
+                if idx.isdigit():
+                    index_truth[int(idx)] = 'TRUE' if val in ('true', '1', 'yes') else 'FALSE'
+
+        truth_map = {}
+        for i, tgt in enumerate(target_list):
+            if i in index_truth:
+                truth_map[str(tgt)] = index_truth[i]
+            else:
+                # Positional fallback only when EventName is absent/malformed for this index.
+                truth_map[str(tgt)] = 'TRUE' if i == 0 else 'FALSE'
+        return truth_map
 
     def get_node(self, task_id):
         for wf_name, graph in self.graphs.items():
@@ -126,7 +184,11 @@ class TririgaHybridEngine:
 
     def fetch_live_record_data(self, expected_bo_name, spec_id):
         if not self.cursor or not spec_id: return None
-        
+
+        cache_key = (str(expected_bo_name), str(spec_id))
+        if cache_key in self._record_payload_cache:
+            return self._record_payload_cache[cache_key]
+
         payload = {}
         try:
             clean_spec_id = int(spec_id)
@@ -180,8 +242,10 @@ class TririgaHybridEngine:
                                 
         except Exception as e:
             payload['Database Error'] = str(e)
-            
-        return payload if payload else None
+
+        result = payload if payload else None
+        self._record_payload_cache[cache_key] = result
+        return result
 
     def load_om_package(self, zip_file_path):
         print(f"Analyzing blueprint from OM Package: {zip_file_path}...")
@@ -196,9 +260,12 @@ class TririgaHybridEngine:
                 for f_name in xml_files:
                     with z.open(f_name) as f:
                         xml_string = f.read().decode('utf-8', errors='ignore')
-                        if '<Query>' in xml_string[:500]:
+                        # Detect root type on a namespace-stripped sample so prefixed
+                        # roots (e.g. <ns:Workflow>) are still classified correctly.
+                        head = self._strip_namespaces(xml_string[:500])
+                        if '<Query>' in head:
                             self._parse_query_xml(xml_string)
-                        elif '<Workflow>' in xml_string[:500]:
+                        elif '<Workflow>' in head:
                             workflow_xmls.append((f_name, xml_string))
 
                 if not workflow_xmls:
@@ -219,7 +286,7 @@ class TririgaHybridEngine:
 
     def _parse_query_xml(self, xml_payload):
         try:
-            clean_xml = re.sub(r'\sxmlns="[^"]+"', '', xml_payload, count=1)
+            clean_xml = self._strip_namespaces(xml_payload)
             root = ET.fromstring(clean_xml)
             name_elem = root.find('.//Header/Name')
             if name_elem is None or not name_elem.text: return
@@ -257,7 +324,7 @@ class TririgaHybridEngine:
 
     def _build_dynamic_graph(self, xml_payload):
         try:
-            clean_xml = re.sub(r'\sxmlns="[^"]+"', '', xml_payload, count=1)
+            clean_xml = self._strip_namespaces(xml_payload)
             root = ET.fromstring(clean_xml)
             
             header = root.find('.//Header')
@@ -346,7 +413,47 @@ class TririgaHybridEngine:
                         child = gm.find(tag)
                         if child is not None and child.text: gm_data[tag] = child.text.strip()
                     if gm_data not in node_data['GUIMappings']: node_data['GUIMappings'].append(gm_data)
-                
+
+                # Structured ObjMapping extraction: each <ObjMapping> is an ordered, self-contained
+                # data-mapping record. We preserve document order and per-record field grouping so that
+                # a Target field is never index-zipped against an unrelated Source field downstream.
+                if 'ObjMappingRecords' not in node_data: node_data['ObjMappingRecords'] = []
+                obj_map_tags = [
+                    'TrgtModule', 'TrgtBo', 'TrgtTab', 'TrgtSec', 'TrgtFld',
+                    'SrcModule', 'SrcBo', 'SrcTab', 'SrcSec', 'SrcFld',
+                    'FldVal', 'SrcFldVal'
+                ]
+                for om in el.findall('.//ObjMapping'):
+                    rec = {'Type': om.get('Type', '')}
+                    for tag in obj_map_tags:
+                        child = om.find(tag)
+                        if child is not None and child.text and child.text.strip():
+                            rec[tag] = child.text.strip()
+                    # Keep only mappings that actually carry a target or a value; skip empty scaffolding.
+                    if rec.get('TrgtFld') or rec.get('FldVal') or rec.get('SrcFld'):
+                        if rec not in node_data['ObjMappingRecords']:
+                            node_data['ObjMappingRecords'].append(rec)
+
+                # Structured TaskRef extraction. TaskRef context (Ref* fields) describes *where a
+                # task pulls its records from*, which is a different scope than the task's own
+                # Condition/Param evaluation fields. Capturing them as discrete records keeps that
+                # reference context from being conflated with the task's evaluation metadata.
+                if 'TaskRefRecords' not in node_data: node_data['TaskRefRecords'] = []
+                task_ref_tags = ['RefModule', 'RefObject', 'RefSec', 'RefField', 'RefAssoc', 'RefRecordMod', 'RefRecordBO', 'RefRecord']
+                for tr in el.findall('.//TaskRef'):
+                    ref_rec = {
+                        'UseType': tr.get('UseType', ''),
+                        'RefTaskId': tr.get('RefTaskId', ''),
+                        'CtxType': tr.get('CtxType', ''),
+                    }
+                    for tag in task_ref_tags:
+                        child = tr.find(tag)
+                        if child is not None and child.text and child.text.strip():
+                            ref_rec[tag] = child.text.strip()
+                    if len(ref_rec) > 3:
+                        if ref_rec not in node_data['TaskRefRecords']:
+                            node_data['TaskRefRecords'].append(ref_rec)
+
                 new_type = node_data.get('Type', node_data.get('type'))
                 if new_type: node_data['type'] = new_type
                 elif 'type' not in node_data: node_data['type'] = 'Generic'
@@ -368,27 +475,6 @@ class TririgaHybridEngine:
                 if step_id and par_id and par_id not in ["-1", ""]:
                     self.graphs[wf_name].add_edge(par_id, step_id)
 
-            for mapping in root.findall('.//ObjMapping'):
-                target_task_id = mapping.get('TargetTaskId', mapping.get('targetTaskId', mapping.get('TRGTTaskId')))
-                
-                if target_task_id and self.graphs[wf_name].has_node(target_task_id):
-                    node_data = self.graphs[wf_name].nodes[target_task_id]
-                    m_type = mapping.get('Type', '')
-                    
-                    fld_val = mapping.find('FldVal')
-                    src_fld = mapping.find('SrcFld')
-                    fv_text = fld_val.text.strip() if fld_val is not None and fld_val.text else ""
-                    sf_text = src_fld.text.strip() if src_fld is not None and src_fld.text else ""
-                    
-                    if m_type in ['10', '70'] and not fv_text and not sf_text: continue 
-                        
-                    for tag in array_tags:
-                        elem = mapping.find(tag)
-                        if elem is not None and elem.text and elem.text.strip():
-                            val = elem.text.strip()
-                            if tag not in node_data: node_data[tag] = []
-                            if val not in node_data[tag]: node_data[tag].append(val)
-
             print(f"SUCCESS: Mapped {self.graphs[wf_name].number_of_nodes()} components for '{wf_name}'.\n")
             return True
         except ET.ParseError as e:
@@ -397,11 +483,16 @@ class TririgaHybridEngine:
 
     def _live_database_check(self, query, parameters):
         if not self.cursor: return False
+        cache_key = (query, tuple(parameters))
+        if cache_key in self._validation_cache:
+            return self._validation_cache[cache_key]
         try:
             self.cursor.execute(query, parameters)
-            return self.cursor.fetchone() is not None
+            result = self.cursor.fetchone() is not None
         except Exception:
-            return False
+            result = False
+        self._validation_cache[cache_key] = result
+        return result
 
     def analyze_health(self):
         print("--- Initiating Universal Hybrid Diagnostic Trace ---\n")
