@@ -57,19 +57,28 @@ class TririgaHybridEngine:
         cleaned = re.sub(r'(\s)[\w.-]+:([\w.-]+\s*=)', r'\1\2', cleaned)
         return cleaned
 
-    def get_switch_truth_map(self, node_data):
-        """Map each raw TargetAssociation task id of a Switch (Type 14) task to 'TRUE'/'FALSE'.
+    def get_branch_map(self, node_data):
+        """Map each raw TargetAssociation task id of a branching task to its branch label.
 
-        TRIRIGA encodes switch routing across two parallel fields:
+        TRIRIGA encodes branch routing across two parallel fields:
             TargetAssociation = "333546;333395;"   (ordered branch target task ids)
-            EventName         = "0=true;1=false;"   (branch index -> truth value)
+            EventName         = "0=true;1=false;"   (branch index -> truth value, Switch only)
 
-        Combining them lets branch truth be read from the workflow's own declaration
-        rather than assuming the first listed target is always the TRUE path.
+        Switch (Type 14) branches are labeled 'TRUE'/'FALSE'. Iter (Type 24) tasks use the
+        exact same TargetAssociation mechanics but carry loop semantics: the FIRST id is the
+        LOOP BODY (run once per record) and the SECOND is the EXIT taken when the record set
+        is exhausted -- so those branches are labeled 'LOOP BODY'/'EXIT'.
         """
+        t_type = self._get_type_str(node_data)
+
         targets = node_data.get('TargetAssociation', '')
         if isinstance(targets, list): targets = targets[0] if targets else ''
         target_list = [t for t in str(targets).split(';') if t]
+
+        if t_type == '24':
+            labels = ['LOOP BODY', 'EXIT']
+            return {str(tgt): (labels[i] if i < len(labels) else 'EXIT')
+                    for i, tgt in enumerate(target_list)}
 
         event = node_data.get('EventName', '')
         if isinstance(event, list): event = event[0] if event else ''
@@ -92,6 +101,10 @@ class TririgaHybridEngine:
                 # Positional fallback only when EventName is absent/malformed for this index.
                 truth_map[str(tgt)] = 'TRUE' if i == 0 else 'FALSE'
         return truth_map
+
+    def get_switch_truth_map(self, node_data):
+        """Backwards-compatible alias; see get_branch_map."""
+        return self.get_branch_map(node_data)
 
     def get_node(self, task_id):
         for wf_name, graph in self.graphs.items():
@@ -284,6 +297,27 @@ class TririgaHybridEngine:
             print(f"CRITICAL: '{zip_file_path}' is corrupt or not a valid zip archive.")
             return False
 
+    def load_workflow_xml_file(self, file_path):
+        """Load a bare workflow (or query) XML file that is not inside an OM Package."""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                xml_string = f.read()
+        except (FileNotFoundError, IsADirectoryError):
+            print(f"CRITICAL: Workflow XML file '{file_path}' not found.")
+            return False
+
+        head = self._strip_namespaces(xml_string[:500])
+        if '<Query>' in head:
+            self._parse_query_xml(xml_string)
+            print(f"SUCCESS: Parsed query XML from '{file_path}'.")
+            return True
+        if '<Workflow>' in head:
+            print(f"Analyzing blueprint from raw XML file: {file_path}...")
+            return self._build_dynamic_graph(xml_string)
+
+        print(f"FAILED: '{file_path}' does not look like a TRIRIGA Workflow or Query XML export.")
+        return False
+
     def _parse_query_xml(self, xml_payload):
         try:
             clean_xml = self._strip_namespaces(xml_payload)
@@ -330,16 +364,23 @@ class TririgaHybridEngine:
             header = root.find('.//Header')
             wf_name = "Unknown Workflow"
             if header is not None:
-                name_elem = header.find('Name')
-                desc_elem = header.find('Description')
-                wf_name = name_elem.text.strip() if name_elem is not None and name_elem.text else "Unknown Workflow"
-                
+                def header_text(tag, default=""):
+                    elem = header.find(tag)
+                    return elem.text.strip() if elem is not None and elem.text and elem.text.strip() else default
+
+                wf_name = header_text('Name', "Unknown Workflow")
+
                 if wf_name not in self.loaded_workflow_names and wf_name != "Unknown Workflow":
                     self.loaded_workflow_names.append(wf_name)
-                    
+
                 self.workflow_metadata[wf_name] = {
                     'Name': wf_name,
-                    'Description': desc_elem.text.strip() if desc_elem is not None and desc_elem.text else "No description provided."
+                    'Description': header_text('Description', "No description provided."),
+                    'Module': header_text('Module'),
+                    'BO': header_text('BO'),
+                    'EventName': header_text('EventName'),
+                    'ObjectLabelName': header_text('ObjectLabelName'),
+                    'UpdatedBy': header_text('UpdatedBy'),
                 }
             
             self.graphs[wf_name] = nx.DiGraph()

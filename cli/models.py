@@ -11,12 +11,7 @@ from dataclasses import dataclass, field
 from typing import List, Tuple, Any
 import html as _html
 
-
-TYPE_SUBTITLES = {
-    '1': 'Start Task', '9': 'End Task', '13': 'End Task',
-    '14': 'Decision Gate', '22': 'Execute Query', '23': 'Modify Form',
-    '25': 'Create Record', '28': 'Modify Data', '29': 'Retrieve Records',
-}
+from cli.knowledge import type_display_name
 
 
 @dataclass
@@ -49,7 +44,7 @@ class TaskInsight:
     flags: List[str] = field(default_factory=list)
 
     def display_subtitle(self):
-        return self.subtitle or TYPE_SUBTITLES.get(str(self.type_code), f"Type {self.type_code}")
+        return self.subtitle or type_display_name(self.type_code)
 
     @staticmethod
     def format_payload_rows_cli(rows, indent="        "):

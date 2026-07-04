@@ -62,6 +62,29 @@ def build_registry():
             keywords=['current', 'loaded', 'workflows', 'context'],
         ),
 
+        Intent(
+            id='load_workflow_file', category='Workflow Context', handler='_cmd_load_workflow_file', priority=12,
+            patterns=[r"load (?:workflow |wf )?(?:xml )?file\s+['\"]?(.+?)['\"]?\s*$",
+                      r"load workflow\s+['\"]?(\S+\.(?:xml|txt))['\"]?\s*$"],
+            help_line="Load a bare workflow XML export (outside an OM Package) for analysis.",
+            examples=["load workflow file wf_all_tasks.txt"],
+            keywords=['load', 'file', 'xml', 'import'],
+        ),
+
+        # ---------- Trigger / header metadata (must outrank glossary 'trigger' concept) ----------
+        Intent(
+            id='trigger_info', category='Workflow Understanding', handler='_cmd_trigger_info', priority=19,
+            patterns=[r"what (?:triggers|fires|starts|launches|kicks off)\s+(?:this|the|it)",
+                      r"when does (?:this|the|it)(?: workflow)? (?:run|fire|execute|start)",
+                      r"what event (?:fires|triggers|starts|launches)",
+                      r"what is the trigger\b", r"trigger (?:info|profile|event)\b",
+                      r"who (?:last )?(?:updated|modified|edited) (?:this|the) workflow",
+                      r"(?:which|what) (?:module|bo|business object) is (?:this|the|it)(?: workflow)? (?:on|bound to|attached to|for)"],
+            help_line="Show what fires the workflow: trigger event, Module::BO, version label, last editor.",
+            examples=["what triggers this workflow?", "when does it run?"],
+            keywords=['trigger', 'fires', 'event', 'runs', 'module', 'updated by'],
+        ),
+
         # ---------- Glossary (must outrank broad explain-task) ----------
         Intent(
             id='glossary_type', category='TRIRIGA Knowledge', handler='_cmd_glossary_type', priority=20,
@@ -83,10 +106,21 @@ def build_registry():
             id='glossary_concept', category='TRIRIGA Knowledge', handler='_cmd_glossary_concept', priority=22,
             patterns=[r"(?:what\s+(?:is|are)|define|meaning of)\s+(?:a\s+|an\s+|the\s+)?"
                       r"(business object|bo|module|association|spec[_ ]?id|wfiid|om package|omp|"
-                      r"smart section|expression|trigger|gui ?mapping|switch)\b(?!\s*\d)"],
-            help_line="Define a TRIRIGA concept (BO, association, SPEC_ID, WFIID, OM Package, ...).",
+                      r"smart section|expression|trigger action|trigger|gui ?mapping|switch|"
+                      r"variable|loop|iteration|fact)\b(?!\s*\d)"],
+            help_line="Define a TRIRIGA concept (BO, association, variable, loop, WFIID, OM Package, ...).",
             examples=["what is a BO?", "what is a WFIID?"],
             keywords=['concept', 'definition', 'association', 'spec id', 'module'],
+        ),
+
+        # ---------- Workflow comparison (must outrank relation's 'compared to') ----------
+        Intent(
+            id='compare_workflows', category='Workflow Understanding', handler='_cmd_compare_workflows', priority=29,
+            patterns=[r"compare (?:the )?workflows?\b", r"compare\s+.*\bworkflows?\b",
+                      r"difference between\s+.+\s+and\s+.+", r"how (?:do|does)\s+.+\s+differ"],
+            help_line="Structural diff of two loaded workflows: triggers, task counts by type, fields modified.",
+            examples=["compare workflows", "what is the difference between triBuilding and triLand?"],
+            keywords=['compare', 'difference', 'diff', 'versus'],
         ),
 
         # ---------- Relationships (must outrank broad explain-task) ----------
@@ -113,6 +147,38 @@ def build_registry():
         ),
 
         # ---------- Inventory ----------
+        Intent(
+            id='list_variables', category='Workflow Inventory', handler='_cmd_list_variables', priority=36,
+            patterns=[r"(?:list|show|any|what|which)\b.*\bvariables?\b",
+                      r"variables? (?:used|defined|declared|assigned)"],
+            help_line="List workflow variables: Definition (Type 40) and Assignment (Type 41) tasks.",
+            examples=["list variables", "which tasks use variables?"],
+            keywords=['variables', 'variable', 'definition', 'assignment'],
+        ),
+        Intent(
+            id='list_loops', category='Workflow Inventory', handler='_cmd_list_loops', priority=37,
+            patterns=[r"(?:list|show|any|are there|find)\b.*\bloops?\b",
+                      r"does (?:this|the|it)\b.*\bloop\b", r"(?:list|show|any)\b.*\biterat"],
+            help_line="Report loop constructs: Loop/Iter/Break/Continue tasks plus any cycles in the graph.",
+            examples=["are there any loops?", "list loops"],
+            keywords=['loops', 'loop', 'iterator', 'cycle', 'iteration'],
+        ),
+        Intent(
+            id='task_type_index', category='Workflow Inventory', handler='_cmd_task_type_index', priority=38,
+            patterns=[r"(?:list|show|what|which)\b.*\btask types\b", r"what types (?:of tasks? )?(?:exist|are there)",
+                      r"task[- ]type index", r"all (?:the )?task types"],
+            help_line="Full task-type index (all known type codes), marking types present in your workflows.",
+            examples=["list task types", "what task types exist?"],
+            keywords=['task types', 'types', 'index', 'codes'],
+        ),
+        Intent(
+            id='list_associations', category='Workflow Inventory', handler='_cmd_list_associations', priority=39,
+            patterns=[r"(?:list|show|what|which)\b.*\bassociations?\b(?!\s+mean)",
+                      r"associations? (?:used|traversed|created)"],
+            help_line="List every association name the workflow traverses or creates, and by which tasks.",
+            examples=["what associations does it use?"],
+            keywords=['associations', 'association', 'links'],
+        ),
         Intent(
             id='inventory', category='Workflow Inventory', handler='_cmd_inventory', priority=40,
             patterns=[r"list (?:all |the )?(tasks?|switch(?:es)?|quer(?:y|ies)|retrieves?|end tasks?|"

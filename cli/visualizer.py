@@ -7,6 +7,7 @@ import textwrap
 import urllib.parse
 from cli.formatters import wrap_ascii
 from cli.models import TaskInsight, MechanicSection
+from cli.knowledge import type_display_name
 
 class WorkflowVisualizer:
     def __init__(self, engine):
@@ -26,12 +27,7 @@ class WorkflowVisualizer:
         if payload_data.get('LFldName', []) or payload_data.get('PField', []) or payload_data.get('Expression', []): 
             tags.append({'label': '[Filter]', 'bg': '#4d3300', 'border': '#f1c232', 'text': '#ffffff'})
 
-        subtitle = f"Type {t_type}"
-        if t_type == '14': subtitle = "Decision Gate"
-        elif t_type == '22': subtitle = "Execute Query"
-        elif t_type == '29': subtitle = "Retrieve Records"
-        elif t_type == '28': subtitle = "Modify Data"
-        elif t_type == '23': subtitle = "Modify Form"
+        subtitle = type_display_name(t_type)
 
         width = 240
         wrap_limit = 28
@@ -91,6 +87,24 @@ class WorkflowVisualizer:
         elif t_type == '14':
             bg_color = '#00b0f0' 
             border_color = '#007ab3'
+        elif t_type in ['20', '24']:          # Loop / Iter (cycle constructs)
+            bg_color = '#ffe0b3'
+            border_color = '#e69500'
+        elif t_type in ['19', '21']:          # Continue / Break (loop control)
+            bg_color = '#f2f2f2'
+            border_color = '#999999'
+        elif t_type == '38':                  # Call Workflow (sub-routine)
+            bg_color = '#fff2b3'
+            border_color = '#d4b106'
+        elif t_type in ['40', '41']:          # Variable Definition / Assignment
+            bg_color = '#d0f0ee'
+            border_color = '#2aa198'
+        elif t_type == '31':                  # Trigger Action (state transition)
+            bg_color = '#ffd6e7'
+            border_color = '#eb2f96'
+        elif t_type in ['26', '30', '32', '33']:  # Record persistence / linkage
+            bg_color = '#fde3cf'
+            border_color = '#d46b08'
 
         stroke_width = 2
         if is_live:
@@ -319,12 +333,13 @@ class WorkflowVisualizer:
                     
                     label = ""
                     
-                    if s_type == '14':
-                        # Truth is read from the workflow's own EventName/TargetAssociation
-                        # declaration via the shared engine helper, then resolved forward
-                        # through invisible junctions to the concrete visible successor.
-                        truth_map = self.engine.get_switch_truth_map(source_data)
-                        label = "FALSE"
+                    if s_type in ('14', '24'):
+                        # Branch labels are read from the workflow's own EventName/
+                        # TargetAssociation declaration via the shared engine helper
+                        # (Switch -> TRUE/FALSE, Iter -> LOOP BODY/EXIT), then resolved
+                        # forward through invisible junctions to the visible successor.
+                        truth_map = self.engine.get_branch_map(source_data)
+                        label = "FALSE" if s_type == '14' else "EXIT"
                         for raw_target, verdict in truth_map.items():
                             if str(t) == str(raw_target):
                                 label = verdict
@@ -364,7 +379,10 @@ class WorkflowVisualizer:
             #
             # This is deterministic ordering (not a CSS/coordinate hack): worst case on an
             # arbitrary graph is a crossing, never a broken or mis-rendered topology.
-            local_edges.sort(key=lambda x: 0 if x['label'] == 'FALSE' else (1 if x['label'] == 'TRUE' else 2))
+            # Iter tasks follow the same convention: the EXIT continuation stays on the
+            # spine (like FALSE) while the LOOP BODY peels off (like TRUE).
+            local_edges.sort(key=lambda x: 0 if x['label'] in ('FALSE', 'EXIT')
+                             else (1 if x['label'] in ('TRUE', 'LOOP BODY') else 2))
             dagre_edges.extend(local_edges)
 
         template_path = os.path.join(os.path.dirname(__file__), 'templates', 'viewer.html')

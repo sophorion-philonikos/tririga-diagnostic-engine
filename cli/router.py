@@ -5,6 +5,7 @@ from cli.formatters import wrap_ascii, format_path_narrative
 from cli.models import TaskInsight
 from cli import knowledge
 from cli import relations
+from cli import inventory
 from cli.intents import build_registry, render_help, suggest
 from integrations.ssh_client import SSHClientManager
 from cli.visualizer import WorkflowVisualizer
@@ -184,104 +185,65 @@ class TririgaNLPRouter:
     def _cmd_inventory(self, q, match):
         wf_name, graph, err = self._get_context_graph(q)
         if err: return err
-        return wrap_ascii(q, self._build_inventory(q, wf_name, graph))
+        return wrap_ascii(q, inventory.build_inventory(q, self.engine, wf_name, graph, self._get_type_str))
 
-    def _build_inventory(self, q, wf_name, graph):
-        ql = q.lower()
-        type_labels = {
-            '1': 'Start', '9': 'End', '13': 'Stop', '14': 'Switch (Decision Gate)',
-            '22': 'Query', '23': 'Modify Metadata (UI)', '25': 'Create Record',
-            '28': 'Modify Records', '29': 'Retrieve Records', '39': 'Custom Task',
-        }
+    def _cmd_trigger_info(self, q, match):
+        wf_name, _graph, err = self._get_context_graph(q)
+        if err: return err
+        meta = self.engine.workflow_metadata.get(wf_name, {})
+        answer = inventory.describe_trigger(wf_name, meta)
+        answer += "\n\nYou can also ask: \"what is the purpose of this workflow\" for the full path analysis."
+        return wrap_ascii(q, answer)
 
-        def visible_nodes():
-            for node, data in graph.nodes(data=True):
-                t = self._get_type_str(data)
-                name = data.get('name', '').lower()
-                if t in ['12', '11'] or (name.startswith('unnamed') and t != '9') or t == 'generic':
-                    continue
-                yield node, data, t
+    def _cmd_list_variables(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        return wrap_ascii(q, inventory.list_variables(wf_name, graph, self._get_type_str))
 
-        # Fields touched across the workflow.
-        if re.search(r"what fields|fields .*(touch|modif|updat|chang)", ql):
-            field_writers = {}
-            for node, data, t in visible_nodes():
-                for f in data.get('TrgtFld', []):
-                    field_writers.setdefault(f, []).append(f"{data.get('name','?')} ({node})")
-            if not field_writers:
-                return f"No database fields are modified by '{wf_name}'."
-            lines = [f"'{wf_name}' modifies {len(field_writers)} database field(s):"]
-            for f, writers in sorted(field_writers.items()):
-                lines.append(f"  - {f}  <- written by {len(writers)} task(s): {', '.join(writers[:4])}"
-                             + (f" (+{len(writers)-4} more)" if len(writers) > 4 else ""))
-            lines.append("\nYou can also ask: \"which tasks update <field>\" for the full reverse search.")
-            return "\n".join(lines)
+    def _cmd_list_loops(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        return wrap_ascii(q, inventory.list_loops(self.engine, wf_name, graph, self._get_type_str))
 
-        # Tasks that modify the database.
-        if re.search(r"which tasks (modify|update|change|write)|modif(?:y|ies|ications?)", ql):
-            rows = [(n, d) for n, d, t in visible_nodes() if t == '28']
-            if not rows:
-                return f"No Modify Records (Type 28) tasks exist in '{wf_name}'."
-            lines = [f"{len(rows)} Modify Records task(s) in '{wf_name}':"]
-            for n, d in rows:
-                flds = d.get('TrgtFld', [])
-                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) writes [{', '.join(flds[:5])}"
-                             + (f", +{len(flds)-5} more]" if len(flds) > 5 else "]"))
-            return "\n".join(lines)
+    def _cmd_list_associations(self, q, match):
+        wf_name, graph, err = self._get_context_graph(q)
+        if err: return err
+        return wrap_ascii(q, inventory.list_associations(wf_name, graph, self._get_type_str))
 
-        # Queries.
-        if re.search(r"quer(?:y|ies)", ql):
-            rows = [(n, d) for n, d, t in visible_nodes() if t == '22']
-            lines = [f"{len(rows)} Query task(s) in '{wf_name}':"]
-            for n, d in rows:
-                fb = d.get('FilterBo', ['?'])
-                q_name = fb[0] if isinstance(fb, list) else fb
-                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) executes query '{q_name}'")
-                q_data = self.engine.queries.get(q_name)
-                if q_data:
-                    lines.append(f"      Module '{q_data.get('Module')}' :: BO '{q_data.get('BO')}', "
-                                 f"{len(q_data.get('Filters', []))} internal filter(s)")
-            if not rows:
-                lines = [f"No Query (Type 22) tasks exist in '{wf_name}'."]
-            return "\n".join(lines)
+    def _cmd_task_type_index(self, q, match):
+        return wrap_ascii(q, inventory.task_type_index(self.engine, self._get_type_str))
 
-        # Switches.
-        if re.search(r"switch", ql):
-            rows = [(n, d) for n, d, t in visible_nodes() if t == '14']
-            lines = [f"{len(rows)} Switch task(s) in '{wf_name}':"]
-            for n, d in rows:
-                exp = d.get('Expression', [])
-                exp_str = ", ".join(exp) if exp else "condition not captured"
-                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) evaluates ({exp_str})")
-            lines.append("\nYou can also ask: \"what must be true to reach task <id>\" to see which of "
-                         "these gates govern a specific task.")
-            return "\n".join(lines)
+    def _cmd_compare_workflows(self, q, match):
+        names = self.engine.loaded_workflow_names
+        if len(names) < 2:
+            return wrap_ascii(q, "Only one workflow is loaded, so there is nothing to compare it against. "
+                                 "Load another with: load workflow file <path>")
+        # Resolve up to two workflow names from the query text; fall back to the
+        # first two loaded workflows when the phrasing names none explicitly.
+        resolved = []
+        for token in re.findall(r"[A-Za-z][\w\-]{2,}", q):
+            matches = [n for n in names if token.lower() in n.lower() and n not in resolved]
+            if matches:
+                resolved.append(matches[0])
+            if len(resolved) == 2:
+                break
+        if len(resolved) < 2:
+            resolved = names[:2]
+        return wrap_ascii(q, inventory.compare_workflows(self.engine, resolved[0], resolved[1], self._get_type_str))
 
-        # Retrieves.
-        if re.search(r"retrieve", ql):
-            rows = [(n, d) for n, d, t in visible_nodes() if t == '29']
-            lines = [f"{len(rows)} Retrieve Records task(s) in '{wf_name}':"]
-            for n, d in rows:
-                bo = d.get('BO', ['?'])
-                bo = bo[0] if isinstance(bo, list) else bo
-                lines.append(f"  - '{d.get('name','?')}' (ID: {n}) targeting BO '{bo}'")
-            return "\n".join(lines)
-
-        # Default: full task census grouped by type.
-        census = {}
-        for n, d, t in visible_nodes():
-            census.setdefault(t, []).append((n, d.get('name', '?')))
-        lines = [f"Task census for '{wf_name}' ({sum(len(v) for v in census.values())} visible task(s)):"]
-        for t in sorted(census, key=lambda x: (not x.isdigit(), int(x) if x.isdigit() else 0)):
-            label = type_labels.get(t, f"Type {t}")
-            entries = census[t]
-            lines.append(f"\n  Type {t} - {label}: {len(entries)} task(s)")
-            for n, name in entries[:10]:
-                lines.append(f"    - '{name}' (ID: {n})")
-            if len(entries) > 10:
-                lines.append(f"    (+{len(entries)-10} more)")
-        lines.append("\nYou can also ask: \"list all switches\", \"list queries\", or \"what is Type 29\".")
-        return "\n".join(lines)
+    def _cmd_load_workflow_file(self, q, match):
+        path = match.group(1).strip().strip("'\"")
+        before = set(self.engine.loaded_workflow_names)
+        ok = self.engine.load_workflow_xml_file(path)
+        if not ok:
+            return wrap_ascii(q, f"Could not load '{path}'. Check that the path points to a TRIRIGA "
+                                 "Workflow or Query XML export.")
+        new_names = [n for n in self.engine.loaded_workflow_names if n not in before]
+        if new_names:
+            self.current_context_wf = new_names[0]
+            return wrap_ascii(q, f"Loaded workflow '{new_names[0]}' and set it as the active context.\n\n"
+                                 "Try: 'list all tasks', 'list loops', or 'what triggers this workflow'.")
+        return wrap_ascii(q, f"Parsed '{path}' successfully.")
 
     # ==========================================
     # CONTEXT & TASK RESOLUTION HELPERS
@@ -540,14 +502,24 @@ class TririgaNLPRouter:
                 continue
 
             new_visited = visited | {current_node}
-            truth_map = self.engine.get_switch_truth_map(node_data) if t_type == '14' else {}
+            # Switch (14) and Iter (24) both declare branches through TargetAssociation;
+            # the shared branch map yields TRUE/FALSE or LOOP BODY/EXIT respectively.
+            branch_map = self.engine.get_branch_map(node_data) if t_type in ('14', '24') else {}
 
             for succ in reversed(successors):
                 if t_type == '14':
                     step_info_copy = dict(step_info)
-                    verdict = self._classify_switch_branch(graph, node_data, succ, truth_map, succ_cache)
+                    verdict = self._classify_branch(graph, node_data, succ, branch_map, succ_cache, default='FALSE')
                     path_str = "TRUE (Primary)" if verdict == 'TRUE' else "FALSE (Default)"
                     step_info_copy['action'] += f" Routed to the {path_str} path."
+                    path_for_next = new_path_steps[:-1] + [step_info_copy]
+                elif t_type == '24':
+                    step_info_copy = dict(step_info)
+                    verdict = self._classify_branch(graph, node_data, succ, branch_map, succ_cache, default='EXIT')
+                    if verdict == 'LOOP BODY':
+                        step_info_copy['action'] += " Entered the LOOP BODY (runs once per record)."
+                    else:
+                        step_info_copy['action'] += " EXITED the loop (record set exhausted)."
                     path_for_next = new_path_steps[:-1] + [step_info_copy]
                 else:
                     path_for_next = new_path_steps
@@ -556,22 +528,23 @@ class TririgaNLPRouter:
 
         return all_paths
 
-    def _classify_switch_branch(self, graph, switch_data, visible_succ, truth_map, succ_cache):
-        """Return 'TRUE' or 'FALSE' for a visible successor of a Switch (Type 14) task.
+    def _classify_branch(self, graph, branch_data, visible_succ, branch_map, succ_cache, default='FALSE'):
+        """Return the branch label for a visible successor of a branching task
+        (Switch Type 14 -> TRUE/FALSE, Iter Type 24 -> LOOP BODY/EXIT).
 
-        Uses the EventName-derived truth map keyed by raw TargetAssociation ids, then
+        Uses the TargetAssociation-derived branch map keyed by raw target ids, then
         resolves it forward through any invisible junctions to the concrete visible
         successor actually rendered on that branch.
         """
-        if not truth_map:
-            return 'FALSE'
-        for raw_target, verdict in truth_map.items():
+        if not branch_map:
+            return default
+        for raw_target, verdict in branch_map.items():
             if str(visible_succ) == str(raw_target):
                 return verdict
             if graph.has_node(str(raw_target)):
                 if str(visible_succ) in [str(x) for x in self._resolve_visible_successors(graph, str(raw_target), succ_cache)]:
                     return verdict
-        return 'FALSE'
+        return default
 
     def _translate_task_to_action(self, node_id, data):
         t_type = self._get_type_str(data)
@@ -608,6 +581,36 @@ class TririgaNLPRouter:
             flds = data.get('TrgtFld', [])
             fld_str = f" modifying fields [{', '.join(flds[:3])}{'...' if len(flds)>3 else ''}]" if flds else ""
             return f"Updated the target '{bo}' record{fld_str}."
+
+        def _scalar(key, default=''):
+            v = data.get(key, default)
+            if isinstance(v, list): v = v[0] if v else default
+            return str(v).strip() if v else default
+
+        if t_type == '17': return "Created/managed a scheduled Event so logic runs at a future date or recurrence."
+        if t_type == '19': return "Jumped to the next loop iteration (Continue), skipping the rest of this pass."
+        if t_type == '20': return "Entered a Loop block: repeats its body while the loop condition holds."
+        if t_type == '21': return "Broke out of the enclosing loop (Break), resuming at the loop's exit branch."
+        if t_type == '24': return "Iterated over the retrieved record set, running the LOOP BODY once per record."
+        if t_type == '26': return "Saved the in-memory record permanently to the database."
+        if t_type == '30': return "Created an association link between the target record sets."
+        if t_type == '31':
+            evt = _scalar('EventName')
+            return f"Fired record action '{evt}' on the target records." if evt else "Fired a state-transition action on the target records."
+        if t_type == '32': return "Removed an association/reference link between records."
+        if t_type == '33': return "Added the record as a child in the target hierarchy."
+        if t_type == '34': return "Switched the workflow's execution context into a specific Project."
+        if t_type == '35': return "Attached a format/template file to the context record."
+        if t_type == '36': return "Populated the attached template file with live record data."
+        if t_type == '37': return "Distilled the populated document into its final form (e.g. PDF)."
+        if t_type == '38': return "Invoked a sub-workflow synchronously, passing the current record context."
+        if t_type == '40':
+            var = _scalar('VariableName')
+            return f"Defined workflow variable '{var}'." if var else "Defined a workflow variable."
+        if t_type == '41':
+            var = _scalar('VariableName')
+            return f"Assigned a value to workflow variable '{var}'." if var else "Assigned a value to a workflow variable."
+        if t_type == '43': return "Evaluated a rules-engine fact condition against the context record."
         return "Executes standard system logic."
 
     def scan_live_log_ssh(self, lines_to_read=5000, user_query=""):
@@ -669,8 +672,7 @@ class TririgaNLPRouter:
                     t_type = type_match.group(1) if type_match else "Unknown"
                     
                     if not t_name:
-                        type_map = {'1': 'Start', '9': 'End', '12': 'Unnamed Component', '14': 'Switch', '22': 'Query', '23': 'Modify Metadata', '25': 'Create Record', '28': 'Modify Records', '29': 'Retrieve', '39': 'Custom Task'}
-                        t_name = type_map.get(t_type, f"Task Type {t_type}")
+                        t_name = knowledge.type_display_name(t_type)
                     
                     status_match = re.search(r"Status='([^']+)'", line)
                     success_match = re.search(r"Success=([a-zA-Z]+)", line)
@@ -1009,8 +1011,16 @@ class TririgaNLPRouter:
         sec_mod_str = ", ".join(list(modified_gui_sections)[:10]) if modified_gui_sections else "None detected"
         act_str = f" Triggers actions: [{', '.join(list(actions_triggered))}]." if actions_triggered else ""
 
+        trigger_line = ""
+        if meta.get('EventName') or meta.get('Module') or meta.get('BO'):
+            event = meta.get('EventName') or 'an unspecified event'
+            module, bo = meta.get('Module'), meta.get('BO')
+            scope = f"{module}::{bo}" if module and bo else (module or bo or "an unknown scope")
+            trigger_line = f"Trigger: Runs on '{event}' of {scope}.\n"
+
         summary = (
             f"Workflow Name: {name}\n"
+            f"{trigger_line}"
             f"Manual Description: {desc}\n\n"
             f"--- Auto-Generated Universal Purpose ---\n"
             f"Based on comprehensive structural mapping, this workflow utilizes {len(task_types_found)} different types of task logic. "

@@ -113,6 +113,159 @@ TASK_TYPE_GLOSSARY = {
         'failures': "Failures surface as Java exceptions from the custom class; check the "
                     "server log stack trace for the implementing class name.",
     },
+    '17': {
+        'name': 'Schedule Task',
+        'shape': 'Rectangle',
+        'what': "Creates or manages a scheduled Event record (via the Mail/Event machinery) so "
+                "logic runs at a future date or on a recurrence pattern, rather than inline.",
+        'failures': "If scheduled logic never fires, verify the generated Event record exists, "
+                    "its date/recurrence values were mapped correctly, and the platform "
+                    "scheduler agent is running.",
+    },
+    '19': {
+        'name': 'Continue Task (loop control)',
+        'shape': 'Small circle (unlabeled in exports)',
+        'what': "Inside a loop/iterator body, immediately jumps to the next iteration, "
+                "skipping the remaining tasks of the current pass. Exports carry no TaskLabel "
+                "for it, so it appears unlabeled in raw XML.",
+        'failures': "Not a failure point itself; if iterations seem skipped, check the switch "
+                    "conditions that route execution into the Continue.",
+    },
+    '20': {
+        'name': 'Loop Task',
+        'shape': 'Rectangle with loop-back edge',
+        'what': "Repeats a block of tasks while its condition holds, creating a deliberate "
+                "cycle in the workflow graph back to the loop start.",
+        'failures': "Infinite loops (condition never turns false) show up as runaway WFIIDs "
+                    "in the server log; verify the loop's exit condition mutates on each pass.",
+    },
+    '21': {
+        'name': 'Break Task (loop control)',
+        'shape': 'Small circle',
+        'what': "Immediately exits the enclosing loop/iterator, resuming execution at the "
+                "loop's exit branch.",
+        'failures': "Not a failure point itself; premature loop exits usually trace back to "
+                    "the switch condition routing into the Break.",
+    },
+    '24': {
+        'name': 'Iter Task (record iterator)',
+        'shape': 'Rectangle with loop-back edge',
+        'what': "Iterates over a record set (typically a prior Retrieve/Query result), running "
+                "its body branch once per record. Like a Switch, it encodes its two branches in "
+                "TargetAssociation: the FIRST id is the LOOP BODY, the SECOND is the EXIT taken "
+                "when records are exhausted.",
+        'failures': "Zero iterations means the input record set was empty -- check the feeding "
+                    "Retrieve/Query task. Runaway iteration means the body re-queries and "
+                    "regrows the set it iterates.",
+    },
+    '26': {
+        'name': 'Save Permanent Record Task',
+        'shape': 'Rectangle',
+        'what': "Persists an in-memory (temp) record permanently to the database, making it a "
+                "real record with its own SPEC_ID and lifecycle.",
+        'failures': "Failures usually mean required fields were unmapped or a duplicate/"
+                    "validation rule on the BO rejected the save.",
+    },
+    '30': {
+        'name': 'Associate Records Task',
+        'shape': 'Rectangle',
+        'what': "Creates a named association link between two record sets (e.g. linking a "
+                "building to its status classification) in IBS_SPEC_ASSIGNMENTS.",
+        'failures': "If downstream Retrieves find nothing, verify this task ran and the "
+                    "association string matches exactly what the Retrieve traverses.",
+    },
+    '31': {
+        'name': 'Trigger Action Task',
+        'shape': 'Rectangle',
+        'what': "Fires a state-transition action (its EventName, e.g. 'triCreateDraft') on the "
+                "target records, driving them through their BO state machine and firing any "
+                "workflows bound to that action.",
+        'failures': "If the record does not transition, verify the action name is valid for "
+                    "the record's CURRENT state -- firing an action unavailable in that state "
+                    "is silently ignored or errors.",
+    },
+    '32': {
+        'name': 'Delete Reference Task',
+        'shape': 'Rectangle',
+        'what': "Removes an association link (or reference) between records without deleting "
+                "the records themselves.",
+        'failures': "No-ops usually mean the association name/direction did not match an "
+                    "existing link.",
+    },
+    '33': {
+        'name': 'Add Child Task',
+        'shape': 'Rectangle',
+        'what': "Adds a record as a child of another in a hierarchy (e.g. placing a space "
+                "under a floor), maintaining the platform's hierarchical path.",
+        'failures': "Failures typically mean the parent record was missing from context or "
+                    "the hierarchy module rejected the placement.",
+    },
+    '34': {
+        'name': 'Set Project Task',
+        'shape': 'Rectangle',
+        'what': "Switches the workflow's execution context into (or out of) a specific "
+                "Project, so subsequent tasks operate on project-scoped data.",
+        'failures': "Downstream tasks reading the wrong data set usually indicates the "
+                    "project context was not set or cleared as expected.",
+    },
+    '35': {
+        'name': 'Attach Format File Task',
+        'shape': 'Rectangle',
+        'what': "Attaches a format/template file (e.g. a document template) to the context "
+                "record for later population.",
+        'failures': "Verify the format file exists in the Document Manager path the task "
+                    "references.",
+    },
+    '36': {
+        'name': 'Populate File Task',
+        'shape': 'Rectangle',
+        'what': "Fills a previously attached template file with live record data (mail-merge "
+                "style document generation).",
+        'failures': "Blank or partial documents mean the template's merge fields no longer "
+                    "match the BO's field names.",
+    },
+    '37': {
+        'name': 'Distill File Task',
+        'shape': 'Rectangle',
+        'what': "Converts a populated document into its final distributable form (typically "
+                "rendering to PDF).",
+        'failures': "Check the server-side document conversion service if output files are "
+                    "missing or corrupt.",
+    },
+    '38': {
+        'name': 'Call Workflow Task',
+        'shape': 'Rectangle',
+        'what': "Synchronously invokes another workflow as a sub-routine, passing the current "
+                "record context (via its TaskRef module/object binding), then resumes here "
+                "when the sub-workflow completes.",
+        'failures': "Failures inside the callee surface under a DIFFERENT workflow name in the "
+                    "log but the same call chain; trace the callee's WFIID. Also verify the "
+                    "called workflow is Active in the target environment.",
+    },
+    '40': {
+        'name': 'Variable Definition Task',
+        'shape': 'Rectangle',
+        'what': "Declares a named workflow variable (with a type and optional initial value) "
+                "that later tasks can read or assign.",
+        'failures': "Referencing a variable before its definition task has executed yields "
+                    "null -- a classic NullPointerException source in switches.",
+    },
+    '41': {
+        'name': 'Variable Assignment Task',
+        'shape': 'Rectangle',
+        'what': "Assigns a new value (constant, field value, or expression result) to a "
+                "previously defined workflow variable.",
+        'failures': "Type mismatches between the assigned value and the variable's declared "
+                    "type, or assigning from an empty source field.",
+    },
+    '43': {
+        'name': 'Fact Condition Task (rules engine)',
+        'shape': 'Pentagon',
+        'what': "Evaluates a fact/rule condition against the rules engine (similar in spirit "
+                "to a Switch but driven by fact definitions rather than field expressions).",
+        'failures': "Verify the referenced fact definitions still exist and their inputs are "
+                    "populated on the context record.",
+    },
 }
 
 OPERATOR_GLOSSARY = {
@@ -201,7 +354,51 @@ CONCEPT_GLOSSARY = {
         "An instruction inside a Modify Metadata task describing one UI change: which "
         "Tab/Section/Field to target and which property (Visible, Read-Only, Required) to set."
     ),
+    'variable': (
+        "Workflow Variable",
+        "A named value scoped to one workflow execution: declared by a Variable Definition "
+        "task (Type 40), written by Variable Assignment tasks (Type 41), and readable in "
+        "switch expressions and mappings. Referencing one before its definition runs yields null."
+    ),
+    'loop': (
+        "Loop / Iteration",
+        "Repetition constructs in TRIRIGA workflows: a Loop task (Type 20) repeats while a "
+        "condition holds, an Iter task (Type 24) runs its body once per record in a record "
+        "set, and Break (21) / Continue (19) tasks exit or short-circuit the current pass. "
+        "These create legitimate cycles in the workflow graph."
+    ),
+    'iteration': (
+        "Loop / Iteration",
+        "Repetition constructs in TRIRIGA workflows: a Loop task (Type 20) repeats while a "
+        "condition holds, an Iter task (Type 24) runs its body once per record in a record "
+        "set, and Break (21) / Continue (19) tasks exit or short-circuit the current pass. "
+        "These create legitimate cycles in the workflow graph."
+    ),
+    'trigger action': (
+        "Trigger Action",
+        "A Trigger Action task (Type 31) fires a state-transition action (e.g. 'triCreateDraft') "
+        "on target records, moving them through their BO state machine and cascading any "
+        "workflows bound to that action."
+    ),
+    'fact': (
+        "Fact / Rule Condition",
+        "A Fact Condition task (Type 43) evaluates a rules-engine fact definition against the "
+        "context record -- rule-driven routing, as opposed to a Switch's field expression."
+    ),
 }
+
+
+def type_display_name(type_code):
+    """Short display name for a task type code; single source of truth for all UI maps."""
+    code = str(type_code).strip()
+    entry = TASK_TYPE_GLOSSARY.get(code)
+    if entry:
+        return entry['name']
+    if code in ('11', '12'):
+        return 'Junction'
+    if code.lower() in ('1', 'trigger', 'start'):
+        return 'Start Task'
+    return f"Type {code}"
 
 
 def _type_usage_in_graphs(graphs, type_code, get_type_str, limit=8):
