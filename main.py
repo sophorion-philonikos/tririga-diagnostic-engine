@@ -65,7 +65,14 @@ def load_configuration(offline_mode):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TRIRIGA Diagnostic Engine")
     parser.add_argument('--offline', action='store_true', help='Run in offline mode using local files.')
+    parser.add_argument('--web', action='store_true', help='Launch the local Web UI instead of the interactive CLI.')
+    parser.add_argument('--port', type=int, default=8000, help='Port for the Web UI (default: 8000, used with --web).')
     args = parser.parse_args()
+
+    if args.web:
+        from web.server import run_server
+        run_server(port=args.port)
+        sys.exit(0)
 
     config = load_configuration(args.offline)
 

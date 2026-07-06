@@ -255,9 +255,14 @@ class WorkflowVisualizer:
 
         return sections
 
-    def generate_html_map(self, wf_name, user_query, live_trace_ids=None):
+    def build_html(self, wf_name, live_trace_ids=None):
+        """Render the interactive blueprint for a loaded workflow and return the HTML string.
+
+        Renderer-only: no file writes, no browser launch. Raises ValueError when the
+        workflow is not loaded or the viewer template is missing.
+        """
         if wf_name not in self.engine.graphs:
-            return wrap_ascii(user_query, f"Cannot visualize: '{wf_name}' is not loaded in the engine.")
+            raise ValueError(f"Cannot visualize: '{wf_name}' is not loaded in the engine.")
 
         graph = self.engine.graphs[wf_name]
         
@@ -390,10 +395,17 @@ class WorkflowVisualizer:
             with open(template_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
         except FileNotFoundError:
-            return wrap_ascii(user_query, f"ERROR: Could not find template file at {template_path}. Ensure you created the cli/templates/ directory.")
+            raise ValueError(f"ERROR: Could not find template file at {template_path}. Ensure you created the cli/templates/ directory.")
 
         html_content = html_content.replace('GRAPH_NODES_DATA_PLACEHOLDER', json.dumps(dagre_nodes))
         html_content = html_content.replace('GRAPH_EDGES_DATA_PLACEHOLDER', json.dumps(dagre_edges))
+        return html_content
+
+    def generate_html_map(self, wf_name, user_query, live_trace_ids=None):
+        try:
+            html_content = self.build_html(wf_name, live_trace_ids)
+        except ValueError as e:
+            return wrap_ascii(user_query, str(e))
 
         file_name = f"blueprint_{wf_name.replace(' ', '_')}.html"
         file_path = os.path.join(os.getcwd(), file_name)

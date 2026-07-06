@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRIRIGA Diagnostic Engine — Web UI</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171e2e;
+    --panel-2: #1d2640;
+    --border: #2c3a5c;
+    --accent: #00c3a5;
+    --accent-dim: #00907a;
+    --text: #e8edf7;
+    --muted: #92a0bd;
+    --danger: #ff6b6b;
+    --zip: #4da6ff;
+    --log: #f1c232;
+    --xml: #b366ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 19px; letter-spacing: 0.4px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 28px;
+    gap: 18px;
+    max-width: 1500px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* --- Drop zone --- */
+  #dropZone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 34px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    outline: none;
+  }
+  #dropZone:focus-visible { border-color: var(--accent); }
+  #dropZone.dragover {
+    border-color: var(--accent);
+    background: var(--panel-2);
+  }
+  #dropZone .dz-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  #dropZone .dz-hint { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  #dropZone .dz-hint code {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+  }
+
+  /* --- Staged files --- */
+  #staging { display: none; flex-direction: column; gap: 12px; }
+  #staging.has-files { display: flex; }
+  .stage-group { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; }
+  .stage-group h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 8px 5px 12px;
+    font-size: 13px;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip.zip .dot { background: var(--zip); }
+  .chip.log .dot { background: var(--log); }
+  .chip.xml .dot { background: var(--xml); }
+  .chip .size { color: var(--muted); font-size: 11px; }
+  .chip button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 50%;
+  }
+  .chip button:hover { color: var(--danger); background: rgba(255, 107, 107, 0.12); }
+
+  /* --- Actions --- */
+  .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  #visualizeBtn {
+    background: var(--accent);
+    color: #06251f;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 30px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  #visualizeBtn:hover:not(:disabled) { background: #00e0bd; }
+  #visualizeBtn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  #clearBtn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #clearBtn:hover { color: var(--text); border-color: var(--muted); }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+  }
+  body.busy .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- Banners --- */
+  #errorBanner, #noteBanner {
+    display: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #errorBanner { background: rgba(255, 107, 107, 0.12); border: 1px solid var(--danger); color: #ffc2c2; }
+  #noteBanner { background: rgba(241, 194, 50, 0.1); border: 1px solid rgba(241, 194, 50, 0.55); color: #f5dc8e; }
+
+  /* --- Result --- */
+  #result { display: none; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+  #result.visible { display: flex; }
+  .result-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+  .result-head .wf-name { font-weight: 700; font-size: 15px; color: var(--accent); }
+  .result-head .meta { color: var(--muted); font-size: 13px; }
+  .result-head .spacer { flex: 1; }
+  #openTabBtn {
+    background: none;
+    border: 1px solid var(--accent-dim);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #openTabBtn:hover { background: rgba(0, 195, 165, 0.1); }
+  #mapFrame {
+    flex: 1;
+    min-height: 640px;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #ffffff;
+  }
+  details#traceDetails {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+  }
+  details#traceDetails summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  #traceList {
+    margin: 10px 0 4px;
+    padding: 0;
+    list-style: none;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text);
+    max-height: 260px;
+    overflow: auto;
+  }
+  #traceList li .ctx { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>TRIRIGA Diagnostic Engine</h1>
+  <span class="sub">Drop an OM Package (.zip), a server log (.log), and workflow XML/TXT exports — then Visualize.</span>
+</header>
+
+<main>
+  <div id="dropZone" tabindex="0" role="button" aria-label="Upload files">
+    <div class="dz-title">Drag &amp; drop files here, or click to browse</div>
+    <div class="dz-hint">
+      Accepted: <code>.zip</code> OM Package &nbsp;|&nbsp; <code>.log</code> server log &nbsp;|&nbsp;
+      <code>.xml</code> / <code>.txt</code> workflow export<br>
+      The workflow is identified by the <code>&lt;Name&gt;</code> tag inside each file's <code>&lt;Header&gt;</code>
+      and matched automatically against the live trace in your log.
+    </div>
+    <input type="file" id="fileInput" multiple accept=".zip,.log,.xml,.txt" hidden>
+  </div>
+
+  <div id="staging">
+    <div class="stage-group" id="groupZip" hidden>
+      <h3>OM Package (.zip)</h3><div class="chips"></div>
+    </div>
+    <div class="stage-group" id="groupLog" hidden>
+      <h3>Server Log (.log)</h3><div class="chips"></div>
+    </div>
+    <div class="stage-group" id="groupXml" hidden>
+      <h3>Workflow XML / TXT</h3><div class="chips"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="visualizeBtn" disabled>Visualize</button>
+    <button id="clearBtn" hidden>Clear all</button>
+    <div class="spinner" aria-label="Processing"></div>
+  </div>
+
+  <div id="errorBanner" role="alert"></div>
+  <div id="noteBanner"></div>
+
+  <section id="result">
+    <div class="result-head">
+      <span class="wf-name" id="resultWf"></span>
+      <span class="meta" id="resultMeta"></span>
+      <span class="spacer"></span>
+      <button id="openTabBtn">Open map in new tab</button>
+    </div>
+    <details id="traceDetails" hidden>
+      <summary>Chronological live execution trace</summary>
+      <ul id="traceList"></ul>
+    </details>
+    <iframe id="mapFrame" title="Workflow blueprint map"></iframe>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const ROLE = {
+    zip: { group: "groupZip", exts: [".zip"] },
+    log: { group: "groupLog", exts: [".log"] },
+    xml: { group: "groupXml", exts: [".xml", ".txt"] },
+  };
+
+  /** Staged files: Map<key, {file, role}> keyed by name+size to dedupe. */
+  const staged = new Map();
+  let lastMapHtml = null;
+
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const staging = document.getElementById("staging");
+  const visualizeBtn = document.getElementById("visualizeBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const errorBanner = document.getElementById("errorBanner");
+  const noteBanner = document.getElementById("noteBanner");
+  const result = document.getElementById("result");
+  const mapFrame = document.getElementById("mapFrame");
+
+  function roleFor(name) {
+    const lower = name.toLowerCase();
+    for (const [role, def] of Object.entries(ROLE)) {
+      if (def.exts.some((ext) => lower.endsWith(ext))) return role;
+    }
+    return null;
+  }
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.style.display = msg ? "block" : "none";
+  }
+
+  function showNote(msg) {
+    noteBanner.textContent = msg || "";
+    noteBanner.style.display = msg ? "block" : "none";
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+
+  function addFiles(fileList) {
+    const rejected = [];
+    for (const file of fileList) {
+      const role = roleFor(file.name);
+      if (!role) {
+        rejected.push(file.name);
+        continue;
+      }
+      // Only one server log is meaningful; replace any previously staged .log.
+      if (role === "log") {
+        for (const [key, entry] of staged) {
+          if (entry.role === "log") staged.delete(key);
+        }
+      }
+      staged.set(file.name + ":" + file.size, { file, role });
+    }
+    showError(rejected.length
+      ? "Ignored unsupported file(s): " + rejected.join(", ") +
+        ". Accepted: .zip, .log, .xml, .txt."
+      : "");
+    render();
+  }
+
+  function render() {
+    const groups = { zip: [], log: [], xml: [] };
+    for (const [key, entry] of staged) groups[entry.role].push([key, entry.file]);
+
+    for (const [role, def] of Object.entries(ROLE)) {
+      const groupEl = document.getElementById(def.group);
+      const chipsEl = groupEl.querySelector(".chips");
+      chipsEl.textContent = "";
+      const items = groups[role];
+      groupEl.hidden = items.length === 0;
+      for (const [key, file] of items) {
+        const chip = document.createElement("span");
+        chip.className = "chip " + role;
+
+        const dot = document.createElement("span");
+        dot.className = "dot";
+
+        const name = document.createElement("span");
+        name.textContent = file.name;
+
+        const size = document.createElement("span");
+        size.className = "size";
+        size.textContent = formatSize(file.size);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.setAttribute("aria-label", "Remove " + file.name);
+        remove.textContent = "\u00d7";
+        remove.addEventListener("click", () => {
+          staged.delete(key);
+          render();
+        });
+
+        chip.append(dot, name, size, remove);
+        chipsEl.appendChild(chip);
+      }
+    }
+
+    const hasBlueprint = [...staged.values()].some((e) => e.role === "zip" || e.role === "xml");
+    staging.classList.toggle("has-files", staged.size > 0);
+    clearBtn.hidden = staged.size === 0;
+    visualizeBtn.disabled = !hasBlueprint || document.body.classList.contains("busy");
+  }
+
+  /* --- Native HTML5 drag-and-drop --- */
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", (e) => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove("dragover");
+  });
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) addFiles(fileInput.files);
+    fileInput.value = "";
+  });
+
+  clearBtn.addEventListener("click", () => {
+    staged.clear();
+    showError("");
+    render();
+  });
+
+  /* --- Visualize --- */
+  visualizeBtn.addEventListener("click", async () => {
+    showError("");
+    showNote("");
+    result.classList.remove("visible");
+    document.body.classList.add("busy");
+    render();
+
+    const formData = new FormData();
+    for (const { file } of staged.values()) formData.append("files", file, file.name);
+
+    try {
+      const resp = await fetch("/api/visualize", { method: "POST", body: formData });
+      let payload;
+      try {
+        payload = await resp.json();
+      } catch {
+        throw new Error("Server returned an unreadable response (HTTP " + resp.status + ").");
+      }
+      if (!resp.ok) throw new Error(payload.error || "Visualization failed (HTTP " + resp.status + ").");
+      renderResult(payload);
+    } catch (err) {
+      showError(err.message || String(err));
+    } finally {
+      document.body.classList.remove("busy");
+      render();
+    }
+  });
+
+  function renderResult(payload) {
+    lastMapHtml = payload.map_html;
+
+    document.getElementById("resultWf").textContent = payload.workflow;
+
+    const metaParts = [];
+    if (payload.wfiid) metaParts.push("WFIID " + payload.wfiid);
+    metaParts.push(payload.trace_summary.length
+      ? payload.trace_summary.length + " live-traced steps highlighted"
+      : "static blueprint (no live trace)");
+    if (payload.detected_workflows.length > 1) {
+      metaParts.push(payload.detected_workflows.length + " workflows loaded");
+    }
+    document.getElementById("resultMeta").textContent = metaParts.join(" \u00b7 ");
+
+    const traceDetails = document.getElementById("traceDetails");
+    const traceList = document.getElementById("traceList");
+    traceList.textContent = "";
+    traceDetails.hidden = payload.trace_summary.length === 0;
+    payload.trace_summary.forEach((step, i) => {
+      const li = document.createElement("li");
+      const prefix = i === 0 ? "START: " : "\u2192 ";
+      li.textContent = prefix + "Task " + step.id + " | Type " + step.type + " | '" + step.name + "' ";
+      const ctx = document.createElement("span");
+      ctx.className = "ctx";
+      ctx.textContent = step.context;
+      li.appendChild(ctx);
+      traceList.appendChild(li);
+    });
+
+    mapFrame.srcdoc = payload.map_html;
+    showNote(payload.note);
+    result.classList.add("visible");
+    result.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  document.getElementById("openTabBtn").addEventListener("click", () => {
+    if (!lastMapHtml) return;
+    const blob = new Blob([lastMapHtml], { type: "text/html" });
+    window.open(URL.createObjectURL(blob), "_blank");
+  });
+})();
+</script>
+</body>
+</html>

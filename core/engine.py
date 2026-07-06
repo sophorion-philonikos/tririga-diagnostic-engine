@@ -260,10 +260,16 @@ class TririgaHybridEngine:
         self._record_payload_cache[cache_key] = result
         return result
 
-    def load_om_package(self, zip_file_path):
-        print(f"Analyzing blueprint from OM Package: {zip_file_path}...")
+    def load_om_package(self, zip_source):
+        """Load an OM Package from a filesystem path OR an in-memory file-like object.
+
+        ``zipfile.ZipFile`` natively accepts both, so the CLI keeps passing paths while
+        the Web UI passes ``io.BytesIO`` streams of the uploaded archive.
+        """
+        source_label = zip_source if isinstance(zip_source, str) else getattr(zip_source, 'name', '<in-memory upload>')
+        print(f"Analyzing blueprint from OM Package: {source_label}...")
         try:
-            with zipfile.ZipFile(zip_file_path, 'r') as z:
+            with zipfile.ZipFile(zip_source, 'r') as z:
                 xml_files = [f for f in z.namelist() if f.endswith('.xml') and not f.startswith('AllObjects') and not f.startswith('ObjectLabel')]
                 if not xml_files:
                     print("FAILED: No valid workflow/logic blueprints found inside the OM package.")
@@ -291,10 +297,10 @@ class TririgaHybridEngine:
                     
                 return True
         except FileNotFoundError:
-            print(f"CRITICAL: OM Package '{zip_file_path}' not found. Please check the path.")
+            print(f"CRITICAL: OM Package '{source_label}' not found. Please check the path.")
             return False
         except zipfile.BadZipFile:
-            print(f"CRITICAL: '{zip_file_path}' is corrupt or not a valid zip archive.")
+            print(f"CRITICAL: '{source_label}' is corrupt or not a valid zip archive.")
             return False
 
     def load_workflow_xml_file(self, file_path):
@@ -306,16 +312,20 @@ class TririgaHybridEngine:
             print(f"CRITICAL: Workflow XML file '{file_path}' not found.")
             return False
 
+        return self.load_workflow_xml_string(xml_string, source_label=file_path)
+
+    def load_workflow_xml_string(self, xml_string, source_label='<in-memory upload>'):
+        """Load a bare workflow (or query) XML payload already held in memory."""
         head = self._strip_namespaces(xml_string[:500])
         if '<Query>' in head:
             self._parse_query_xml(xml_string)
-            print(f"SUCCESS: Parsed query XML from '{file_path}'.")
+            print(f"SUCCESS: Parsed query XML from '{source_label}'.")
             return True
         if '<Workflow>' in head:
-            print(f"Analyzing blueprint from raw XML file: {file_path}...")
+            print(f"Analyzing blueprint from raw XML file: {source_label}...")
             return self._build_dynamic_graph(xml_string)
 
-        print(f"FAILED: '{file_path}' does not look like a TRIRIGA Workflow or Query XML export.")
+        print(f"FAILED: '{source_label}' does not look like a TRIRIGA Workflow or Query XML export.")
         return False
 
     def _parse_query_xml(self, xml_payload):

@@ -730,24 +730,16 @@ class TririgaNLPRouter:
             else:
                 print("\n[!] Please answer Yes or No.")
 
-    def trace_live_execution_ssh(self, lines_to_read=15000, user_query=""):
-        target_wf_name = None
-        if len(self.engine.loaded_workflow_names) > 1:
-            print(f"\n[?] Multiple workflows detected in the loaded OM Package:")
-            for idx, name in enumerate(self.engine.loaded_workflow_names):
-                print(f"    {idx + 1}) {name}")
-            selection = input(f"\nWhich workflow would you like to trace? (1-{len(self.engine.loaded_workflow_names)}): ")
-            try:
-                target_wf_name = self.engine.loaded_workflow_names[int(selection) - 1]
-            except (ValueError, IndexError):
-                print("\n[!] Invalid selection. Defaulting to first workflow.")
-                target_wf_name = self.engine.loaded_workflow_names[0]
-        elif len(self.engine.loaded_workflow_names) == 1:
-            target_wf_name = self.engine.loaded_workflow_names[0]
-            
-        log_lines = self.ssh_manager.fetch_remote_log(lines_to_read, show_workflow_note=True)
-        if isinstance(log_lines, str) and log_lines.startswith("ERROR:"): return wrap_ascii(user_query, log_lines)
+    def extract_execution_trace(self, log_lines, target_wf_name):
+        """Pure (non-interactive) trace extraction shared by the CLI and the Web UI.
 
+        Scans already-fetched log lines, isolates the most recent workflow instance
+        (WFIID) for ``target_wf_name`` (or any loaded workflow when None), and replays
+        its chronological task routing.
+
+        Returns ``(target_wfiid, execution_trace, live_records, record_counts)``;
+        ``target_wfiid`` is None when no matching execution exists in the log.
+        """
         relevant_wfiids = []
         for line in log_lines:
             if target_wf_name and f"Name='{target_wf_name}'" in line:
@@ -765,14 +757,13 @@ class TririgaNLPRouter:
                         if wfiid not in relevant_wfiids: relevant_wfiids.append(wfiid)
 
         if not relevant_wfiids:
-            return wrap_ascii(user_query, "Execution Profiler complete. No tasks from the targeted OM Package workflow were found in the recent log.\nEnsure Workflow Logging is enabled, trigger your workflow in the front end, and try again.")
+            return None, [], {}, {}
 
-        self.current_context_wf = target_wf_name 
         target_wfiid = relevant_wfiids[-1]
         execution_trace = []
-        self.last_live_records = {} 
-        self.last_live_record_counts = {}
-        
+        live_records = {}
+        record_counts = {}
+
         for line in log_lines:
             if f"WFIID={target_wfiid}" in line:
                 task_match = re.search(r'(?i)(?:TSID=|TaskId\s*=\s*)(\d{5,})', line)
@@ -784,14 +775,14 @@ class TririgaNLPRouter:
                         t_name = node_data.get('name', 'Unknown')
                         t_type = self._get_type_str(node_data)
                         
-                        if str(task_id) not in self.last_live_records:
-                            self.last_live_records[str(task_id)] = []
+                        if str(task_id) not in live_records:
+                            live_records[str(task_id)] = []
                             
                         so_match = re.search(r"SO=([-\d]+)", line)
                         if so_match:
                             spec_id = so_match.group(1)
-                            if spec_id != '-1' and spec_id not in self.last_live_records[str(task_id)]:
-                                self.last_live_records[str(task_id)].append(spec_id)
+                            if spec_id != '-1' and spec_id not in live_records[str(task_id)]:
+                                live_records[str(task_id)].append(spec_id)
 
                         status_match = re.search(r"Status='([^']+)'", line)
                         success_match = re.search(r"Success=([a-zA-Z]+)", line)
@@ -810,7 +801,7 @@ class TririgaNLPRouter:
                             if results_match: 
                                 r_val = int(results_match.group(1))
                                 context_parts.append(f"Records Retrieved: {r_val}")
-                                self.last_live_record_counts[str(task_id)] = r_val
+                                record_counts[str(task_id)] = r_val
 
                         context_str = "[" + " | ".join(context_parts) + "]"
                         
@@ -818,6 +809,34 @@ class TririgaNLPRouter:
                             if not execution_trace or execution_trace[-1]['id'] != task_id:
                                 execution_trace.append({'id': task_id, 'name': t_name, 'type': t_type, 'context': context_str})
 
+        return target_wfiid, execution_trace, live_records, record_counts
+
+    def trace_live_execution_ssh(self, lines_to_read=15000, user_query=""):
+        target_wf_name = None
+        if len(self.engine.loaded_workflow_names) > 1:
+            print(f"\n[?] Multiple workflows detected in the loaded OM Package:")
+            for idx, name in enumerate(self.engine.loaded_workflow_names):
+                print(f"    {idx + 1}) {name}")
+            selection = input(f"\nWhich workflow would you like to trace? (1-{len(self.engine.loaded_workflow_names)}): ")
+            try:
+                target_wf_name = self.engine.loaded_workflow_names[int(selection) - 1]
+            except (ValueError, IndexError):
+                print("\n[!] Invalid selection. Defaulting to first workflow.")
+                target_wf_name = self.engine.loaded_workflow_names[0]
+        elif len(self.engine.loaded_workflow_names) == 1:
+            target_wf_name = self.engine.loaded_workflow_names[0]
+            
+        log_lines = self.ssh_manager.fetch_remote_log(lines_to_read, show_workflow_note=True)
+        if isinstance(log_lines, str) and log_lines.startswith("ERROR:"): return wrap_ascii(user_query, log_lines)
+
+        target_wfiid, execution_trace, live_records, record_counts = self.extract_execution_trace(log_lines, target_wf_name)
+
+        if target_wfiid is None:
+            return wrap_ascii(user_query, "Execution Profiler complete. No tasks from the targeted OM Package workflow were found in the recent log.\nEnsure Workflow Logging is enabled, trigger your workflow in the front end, and try again.")
+
+        self.current_context_wf = target_wf_name 
+        self.last_live_records = live_records
+        self.last_live_record_counts = record_counts
         self.last_execution_trace_ids = [step['id'] for step in execution_trace]
 
         output = ["--- Chronological Live Execution Trace ---"]
