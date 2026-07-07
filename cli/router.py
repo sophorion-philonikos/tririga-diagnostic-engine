@@ -9,6 +9,7 @@ from cli import inventory
 from cli.intents import build_registry, render_help, suggest
 from integrations.ssh_client import SSHClientManager
 from cli.visualizer import WorkflowVisualizer
+from cli import simulation
 
 class TririgaNLPRouter:
     def __init__(self, diagnostic_engine, ssh_host=None, ssh_user=None, ssh_log_path=None, offline_mode=False, local_log_path=None):
@@ -18,6 +19,7 @@ class TririgaNLPRouter:
         self.last_live_record_counts = {} 
         self.current_context_wf = None 
         self.last_execution_trace_ids = [] # Added memory for the visualizer
+        self.last_simulation_trace_ids = [] # What-If overlay; cleared by a fresh live trace
         self.last_path_generation_truncated = False
         self.last_path_cycle_edges = []
 
@@ -59,8 +61,63 @@ class TririgaNLPRouter:
         wf_name, _graph, err = self._get_context_graph(q)
         if err: return err
 
+        # A What-If simulation (if one ran since the last live trace) takes
+        # precedence as the highlighted overlay; live traces reset it.
+        overlay_ids = self.last_simulation_trace_ids or self.last_execution_trace_ids
         visualizer = WorkflowVisualizer(self.engine)
-        return visualizer.generate_html_map(wf_name, q, live_trace_ids=self.last_execution_trace_ids)
+        return visualizer.generate_html_map(wf_name, q, live_trace_ids=overlay_ids)
+
+    def _cmd_simulate(self, q, match):
+        wf_name, _graph, err = self._get_context_graph(q)
+        if err: return err
+
+        try:
+            result = simulation.run_simulation(
+                self.engine, wf_name, q, trace_ids=self.last_execution_trace_ids)
+        except ValueError as e:
+            return wrap_ascii(q, str(e))
+
+        if result['mode'] == 'did_query':
+            return wrap_ascii(q, f"{result['answer']}\n{result['evidence']}")
+
+        self.last_simulation_trace_ids = list(result['path_node_ids'])
+
+        output = [f"--- What-If Simulation: {wf_name} ---", ""]
+        output.append("[Interpreted Conditions]")
+        for a in result.get('altered_tasks', []):
+            output.append(f"  - {a['node_type_name']} (Type {a['node_type']}) '{a['node_name']}' "
+                          f"(ID: {a['node_id']}) simulated with ZERO records / null object token")
+        if result['matched_conditions']:
+            for m in result['matched_conditions']:
+                output.append(f"  - Gate '{m['node_name']}' ({m['node_id']}) forced {m['verdict']}  ({m['reason']})")
+        if not result['matched_conditions'] and not result.get('altered_tasks'):
+            output.append("  - None matched; simulating the default (FALSE-spine) route.")
+        for phrase in result['unmatched_phrases']:
+            output.append(f"  - [?] Could not map: '{phrase}'")
+
+        if result.get('impacts'):
+            output.append("")
+            output.append("[Dataflow Impact Analysis]")
+            for imp in result['impacts']:
+                output.append(f"  - {imp['sentence']}")
+
+        output.append("")
+        output.append("[Decision Log]")
+        for d in result['decisions']:
+            output.append(f"  {d}")
+
+        output.append("")
+        output.append("[Simulated Execution Path]")
+        for idx, name in enumerate(result['executed_names']):
+            marker = "  START: " if idx == 0 else "  -> "
+            output.append(f"{marker}{name}")
+
+        output.append("")
+        for line in result['summary']:
+            output.append(line)
+        output.append("")
+        output.append("Type 'visualize' to see this simulated path highlighted on the map.")
+        return wrap_ascii(q, "\n".join(output))
 
     def _cmd_scan_log(self, q, match):
         if self.ssh_manager: return self.scan_live_log_ssh(user_query=q)
@@ -700,6 +757,7 @@ class TririgaNLPRouter:
                             execution_trace.append({'id': task_id, 'name': t_name, 'type': t_type, 'context': context_str})
                             
         self.last_execution_trace_ids = [step['id'] for step in execution_trace]
+        self.last_simulation_trace_ids = []
 
         output = [
             "--- Ad-Hoc Chronological Live Execution Trace (No OMP) ---",
@@ -838,6 +896,7 @@ class TririgaNLPRouter:
         self.last_live_records = live_records
         self.last_live_record_counts = record_counts
         self.last_execution_trace_ids = [step['id'] for step in execution_trace]
+        self.last_simulation_trace_ids = []  # fresh live trace supersedes any What-If overlay
 
         output = ["--- Chronological Live Execution Trace ---"]
         if target_wf_name: output.append(f"Target Workflow: {target_wf_name}")

@@ -8,6 +8,7 @@ import urllib.parse
 from cli.formatters import wrap_ascii
 from cli.models import TaskInsight, MechanicSection
 from cli.knowledge import type_display_name
+from cli import graph_utils
 
 class WorkflowVisualizer:
     def __init__(self, engine):
@@ -285,8 +286,7 @@ class WorkflowVisualizer:
             t_bo = data.get('BO', data.get('BoName', 'Context BO'))
             if isinstance(t_bo, list): t_bo = t_bo[0]
             
-            is_invisible = t_type in ['12', '11'] or (t_name.lower().startswith('unnamed') and t_type != '9') or t_type == 'generic'
-            if is_invisible and graph.out_degree(node_id) > 0:
+            if graph_utils.is_invisible(data) and graph.out_degree(node_id) > 0:
                 continue
 
             is_live = str(node_id) in live_trace_ids
@@ -306,21 +306,7 @@ class WorkflowVisualizer:
             })
 
         def get_visible_targets(start_id, visited=None):
-            if visited is None: visited = set()
-            targets = []
-            for succ in graph.successors(start_id):
-                succ_data = graph.nodes[succ]
-                s_type = self._get_type_str(succ_data)
-                s_name = succ_data.get('name', '').lower()
-                
-                is_inv = s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic'
-                if is_inv:
-                    if succ not in visited:
-                        visited.add(succ)
-                        targets.extend(get_visible_targets(succ, visited))
-                else:
-                    targets.append(succ)
-            return list(set(targets))
+            return graph_utils.visible_successors(graph, start_id, visited)
 
         edge_tracker = set()
         for node_id in graph.nodes():

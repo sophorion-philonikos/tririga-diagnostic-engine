@@ -206,6 +206,97 @@
     padding: 10px 16px;
   }
   details#traceDetails summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+
+  /* --- What-If simulation bar --- */
+  :root { --sim: #c341ff; }
+  .sim-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .sim-bar label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--sim);
+    font-weight: 700;
+    flex: none;
+  }
+  #simInput {
+    flex: 1;
+    min-width: 260px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  #simInput:focus { border-color: var(--sim); }
+  #simInput::placeholder { color: var(--muted); }
+  #simRunBtn {
+    background: var(--sim);
+    color: #23033a;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #simRunBtn:hover:not(:disabled) { background: #d574ff; }
+  #simRunBtn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  #simClearBtn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #simClearBtn:hover { color: var(--text); border-color: var(--muted); }
+
+  #simOutcome {
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(195, 65, 255, 0.5);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  #simOutcome.visible { display: block; }
+  #simOutcome h4 { margin: 0 0 6px; font-size: 13px; color: var(--sim); }
+  #simOutcome ul { margin: 6px 0 0; padding-left: 20px; }
+  #simOutcome li { margin-bottom: 4px; }
+  #simOutcome .sim-hint { color: var(--muted); }
+  #simOutcome .impact-list { margin: 8px 0 0; padding-left: 0; list-style: none; }
+  #simOutcome .impact-list li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin-bottom: 6px;
+    line-height: 1.55;
+  }
+  #simOutcome .badge {
+    flex: none;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    position: relative;
+    top: 1px;
+  }
+  #simOutcome .badge.altered { background: #ff9500; box-shadow: 0 0 6px rgba(255, 149, 0, 0.8); }
+  #simOutcome .badge.broken { background: #ff2d2d; box-shadow: 0 0 6px rgba(255, 45, 45, 0.8); }
+  #simOutcome .impact-legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  #simOutcome .impact-legend .badge { display: inline-block; margin-right: 4px; }
   #traceList {
     margin: 10px 0 4px;
     padding: 0;
@@ -270,6 +361,14 @@
       <summary>Chronological live execution trace</summary>
       <ul id="traceList"></ul>
     </details>
+    <div class="sim-bar">
+      <label for="simInput">What-If Simulation</label>
+      <input type="text" id="simInput"
+             placeholder='Try: "What if the operational status is DISP?" or "Did Modify Records trigger?"'>
+      <button id="simRunBtn">Simulate</button>
+      <button id="simClearBtn">Clear</button>
+    </div>
+    <div id="simOutcome"></div>
     <iframe id="mapFrame" title="Workflow blueprint map"></iframe>
   </section>
 </main>
@@ -482,6 +581,7 @@
 
     mapFrame.srcdoc = payload.map_html;
     showNote(payload.note);
+    showSimOutcome("");  // a fresh map invalidates any previous simulation overlay
     result.classList.add("visible");
     result.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -490,6 +590,136 @@
     if (!lastMapHtml) return;
     const blob = new Blob([lastMapHtml], { type: "text/html" });
     window.open(URL.createObjectURL(blob), "_blank");
+  });
+
+  /* --- What-If simulation --- */
+  const simInput = document.getElementById("simInput");
+  const simRunBtn = document.getElementById("simRunBtn");
+  const simClearBtn = document.getElementById("simClearBtn");
+  const simOutcome = document.getElementById("simOutcome");
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function showSimOutcome(html) {
+    simOutcome.innerHTML = html;
+    simOutcome.classList.toggle("visible", !!html);
+  }
+
+  function buildSimSummaryHtml(payload) {
+    // Rendered inside the viewer's side panel (dark theme) via postMessage.
+    let html = "<h3>What-If Simulation</h3>";
+    const impacts = payload.impacts || [];
+    if (impacts.length) {
+      html += "<ul>";
+      for (const imp of impacts) html += "<li class='sim-impact'>" + escapeHtml(imp.sentence) + "</li>";
+      html += "</ul><hr>";
+    }
+    html += "<ul>";
+    for (const line of payload.summary) html += "<li>" + escapeHtml(line) + "</li>";
+    html += "</ul>";
+    if (payload.decisions.length) {
+      html += "<hr><ul>";
+      for (const d of payload.decisions) {
+        html += "<li class='sim-decision'>" + escapeHtml(d) + "</li>";
+      }
+      html += "</ul>";
+    }
+    return html;
+  }
+
+  function postToMap(message) {
+    if (mapFrame.contentWindow) mapFrame.contentWindow.postMessage(message, "*");
+  }
+
+  async function runSimulation() {
+    const query = simInput.value.trim();
+    if (!query) return;
+    simRunBtn.disabled = true;
+
+    try {
+      const resp = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      let payload;
+      try {
+        payload = await resp.json();
+      } catch {
+        throw new Error("Server returned an unreadable response (HTTP " + resp.status + ").");
+      }
+      if (!resp.ok) throw new Error(payload.error || "Simulation failed (HTTP " + resp.status + ").");
+
+      if (payload.mode === "did_query") {
+        showSimOutcome(
+          "<h4>Query Answer</h4>" + escapeHtml(payload.answer) +
+          "<div class='sim-hint'>" + escapeHtml(payload.evidence) + "</div>"
+        );
+        return; // informational: leave the current highlight untouched
+      }
+
+      let html = "<h4>Simulated Outcome — " + escapeHtml(payload.workflow) + "</h4>";
+
+      const altered = payload.altered_tasks || [];
+      const impacts = payload.impacts || [];
+      if (altered.length || impacts.length) {
+        html += "<ul class='impact-list'>";
+        for (const a of altered) {
+          html += "<li><span class='badge altered'></span><span>" +
+            escapeHtml(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
+                       "' (ID: " + a.node_id + ") simulated with zero records / null object token.") +
+            "</span></li>";
+        }
+        for (const imp of impacts) {
+          html += "<li><span class='badge broken'></span><span>" + escapeHtml(imp.sentence) + "</span></li>";
+        }
+        html += "</ul>";
+        html += "<div class='impact-legend'><span class='badge altered'></span>altered source task" +
+                " &nbsp; <span class='badge broken'></span>starved dependent task</div>";
+      }
+
+      // Impact/altered narratives already render above with badges; keep only
+      // the remaining summary lines to avoid duplication.
+      const impactSentences = new Set(impacts.map((i) => i.sentence));
+      const rest = payload.summary.filter((line) =>
+        !impactSentences.has(line) && !line.startsWith("Simulated a zero-records"));
+      if (rest.length) {
+        html += "<ul>";
+        for (const line of rest) html += "<li>" + escapeHtml(line) + "</li>";
+        html += "</ul>";
+      }
+      if (payload.unmatched_phrases.length) {
+        html += "<div class='sim-hint'>Tip: name the decision gate or field as it appears on the map for unmatched phrases.</div>";
+      }
+      showSimOutcome(html);
+
+      postToMap({
+        type: "tririga-simulation",
+        nodeIds: payload.path_node_ids,
+        edgePairs: payload.path_edges,
+        summaryHtml: buildSimSummaryHtml(payload),
+        alteredIds: payload.altered_node_ids || [],
+        impactedIds: payload.impacted_node_ids || [],
+      });
+    } catch (err) {
+      showSimOutcome("<h4>Simulation Error</h4>" + escapeHtml(err.message || String(err)));
+    } finally {
+      simRunBtn.disabled = false;
+    }
+  }
+
+  simRunBtn.addEventListener("click", runSimulation);
+  simInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runSimulation();
+  });
+  simClearBtn.addEventListener("click", () => {
+    simInput.value = "";
+    showSimOutcome("");
+    postToMap({ type: "tririga-simulation-clear" });
   });
 })();
 </script>

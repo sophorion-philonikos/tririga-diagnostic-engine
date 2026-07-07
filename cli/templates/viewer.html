@@ -33,6 +33,25 @@
         .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
         .edgeLabel text { font-family: 'Segoe UI', sans-serif; font-size: 12px; font-weight: bold; fill: #d35400; }
 
+        /* --- What-If simulation state (pure class toggles via D3 data joins; no re-render) --- */
+        .node, .edgePath, .edgeLabel { transition: opacity 0.35s ease, filter 0.35s ease; }
+        .node.sim-dim, .edgePath.sim-dim, .edgeLabel.sim-dim { opacity: 0.12; }
+        .node.sim-active { filter: drop-shadow(0 0 5px #c341ff) drop-shadow(0 0 14px rgba(195, 65, 255, 0.65)); }
+        /* Dual-state dataflow highlighting: the ALTERED source task (simulated
+           zero-record state) glows orange; its BROKEN/starved dependents glow red.
+           Precedence (altered > broken > active) is enforced by the data join. */
+        .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); }
+        .node.sim-broken { filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 16px rgba(255, 45, 45, 0.75)); }
+        .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
+        .edgePath.sim-active marker path { fill: #c341ff !important; stroke: #c341ff !important; }
+        .edgePath.sim-broken path { stroke: #ff2d2d !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(255, 45, 45, 0.8)); }
+        .edgePath.sim-broken marker path { fill: #ff2d2d !important; stroke: #ff2d2d !important; }
+        .sim-summary h3 { color: #c341ff; margin-top: 0; }
+        .sim-summary ul { padding-left: 18px; margin: 8px 0; }
+        .sim-summary li { margin-bottom: 6px; font-size: 13px; line-height: 1.45; }
+        .sim-summary .sim-decision { color: #bbbbbb; font-family: Consolas, monospace; font-size: 12px; }
+        .sim-summary .sim-impact { color: #ffb3b3; }
+
         .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #333; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; }
         .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
         .legend-item:last-child { margin-bottom: 0; }
@@ -151,6 +170,79 @@
         
         svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
         document.getElementById('svg-canvas').style.opacity = 1;
+
+        // ================= What-If simulation state updates =================
+        // Pure D3 data joins over the selections dagre-d3 already rendered:
+        // each g.node carries its node id as datum, each g.edgePath / g.edgeLabel
+        // carries the {v, w} edge object. Highlighting is a class toggle only --
+        // no re-render, no coordinate math, no DOM mutation of the layout.
+        function edgeKey(d) { return String(d.v) + "->" + String(d.w); }
+
+        window.applySimulation = function(nodeIds, edgePairs, summaryHtml, alteredIds, impactedIds) {
+            var nodeSet = new Set((nodeIds || []).map(String));
+            var alteredSet = new Set((alteredIds || []).map(String));
+            var impactedSet = new Set((impactedIds || []).map(String));
+            var edgeSet = new Set((edgePairs || []).map(function(p) {
+                return String(p[0]) + "->" + String(p[1]);
+            }));
+
+            // Precedence per node: altered (orange) > broken (red) > active (purple) > dim.
+            inner.selectAll("g.node")
+                .classed("sim-altered", function(d) { return alteredSet.has(String(d)); })
+                .classed("sim-broken", function(d) {
+                    var id = String(d);
+                    return impactedSet.has(id) && !alteredSet.has(id);
+                })
+                .classed("sim-active", function(d) {
+                    var id = String(d);
+                    return nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id);
+                })
+                .classed("sim-dim", function(d) {
+                    var id = String(d);
+                    return !nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id);
+                });
+
+            // Edges INTO a broken dependent render red (the starved link);
+            // remaining on-path edges render purple.
+            function edgeBroken(d) {
+                return (alteredSet.has(String(d.v)) || impactedSet.has(String(d.v))) &&
+                       impactedSet.has(String(d.w));
+            }
+            inner.selectAll("g.edgePath")
+                .classed("sim-broken", edgeBroken)
+                .classed("sim-active", function(d) { return edgeSet.has(edgeKey(d)) && !edgeBroken(d); })
+                .classed("sim-dim", function(d) { return !edgeSet.has(edgeKey(d)) && !edgeBroken(d); });
+
+            inner.selectAll("g.edgeLabel")
+                .classed("sim-dim", function(d) { return !edgeSet.has(edgeKey(d)) && !edgeBroken(d); });
+
+            if (summaryHtml) {
+                document.getElementById('payloadData').innerHTML =
+                    "<div class='sim-summary'>" + summaryHtml + "</div>";
+            }
+        };
+
+        window.clearSimulation = function() {
+            inner.selectAll("g.node")
+                .classed("sim-active", false).classed("sim-dim", false)
+                .classed("sim-altered", false).classed("sim-broken", false);
+            inner.selectAll("g.edgePath")
+                .classed("sim-active", false).classed("sim-dim", false)
+                .classed("sim-broken", false);
+            inner.selectAll("g.edgeLabel").classed("sim-dim", false);
+            document.getElementById('payloadData').innerHTML =
+                "<p class='hint'>Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>";
+        };
+
+        window.addEventListener("message", function(ev) {
+            var msg = ev.data || {};
+            if (msg.type === "tririga-simulation") {
+                window.applySimulation(msg.nodeIds || [], msg.edgePairs || [], msg.summaryHtml || "",
+                                       msg.alteredIds || [], msg.impactedIds || []);
+            } else if (msg.type === "tririga-simulation-clear") {
+                window.clearSimulation();
+            }
+        });
 
     </script>
 </body>

@@ -17,10 +17,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from core.engine import TririgaHybridEngine
 from cli.router import TririgaNLPRouter
 from cli.visualizer import WorkflowVisualizer
+from cli import simulation
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 ALLOWED_EXTENSIONS = {'.zip', '.log', '.xml', '.txt'}
+
+# Last successful visualization, kept in memory so follow-up What-If queries
+# can run against the already-parsed graphs (single-user local tool).
+_session_lock = threading.Lock()
+_session = None  # dict(engine, router, workflow, trace_ids)
 
 
 def _classify_upload(filename):
@@ -139,6 +145,15 @@ def process_visualization_request(uploads):
     visualizer = WorkflowVisualizer(engine)
     map_html = visualizer.build_html(target_wf, live_trace_ids=live_trace_ids)
 
+    global _session
+    with _session_lock:
+        _session = {
+            'engine': engine,
+            'router': router,
+            'workflow': target_wf,
+            'trace_ids': live_trace_ids,
+        }
+
     trace_summary = [
         {'id': step['id'], 'name': step['name'], 'type': step['type'], 'context': step['context']}
         for step in target_trace
@@ -183,6 +198,9 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
         self._send_json(404, {'error': 'Not found'})
 
     def do_POST(self):
+        if self.path == '/api/simulate':
+            self._handle_simulate()
+            return
         if self.path != '/api/visualize':
             self._send_json(404, {'error': 'Not found'})
             return
@@ -212,6 +230,46 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
         except Exception as e:
             self._send_json(500, {'error': f'Unexpected server error: {e}'})
+            return
+
+        self._send_json(200, result)
+
+    def _handle_simulate(self):
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+        except ValueError:
+            length = 0
+        if length <= 0:
+            self._send_json(400, {'error': 'Empty request body.'})
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length).decode('utf-8'))
+        except (ValueError, UnicodeDecodeError):
+            self._send_json(400, {'error': 'Expected a JSON body: {"query": "..."}.'})
+            return
+
+        query = str(payload.get('query', '')).strip()
+        if not query:
+            self._send_json(400, {'error': 'Provide a simulation question, e.g. "What if the approval is denied?".'})
+            return
+
+        with _session_lock:
+            session = _session
+
+        if session is None:
+            self._send_json(400, {'error': 'No workflow is loaded yet. Upload files and click Visualize first.'})
+            return
+
+        try:
+            result = simulation.run_simulation(
+                session['engine'], session['workflow'], query,
+                trace_ids=session['trace_ids'])
+        except ValueError as e:
+            self._send_json(400, {'error': str(e)})
+            return
+        except Exception as e:
+            self._send_json(500, {'error': f'Unexpected simulation error: {e}'})
             return
 
         self._send_json(200, result)
