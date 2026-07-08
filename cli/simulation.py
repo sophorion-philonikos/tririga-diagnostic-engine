@@ -141,9 +141,12 @@ STATE_CODE_MAP = {
 # 2. QUERY PARSING
 # ============================================================
 
-_WHAT_IF_RE = re.compile(
-    r"(?:\bwhat[\s-]+if\b|\bsimulat\w*\b|\bsuppose\b|\bassum\w*\b|\bhypothetic\w*\b|\bpretend\b)",
+_HYPOTHETICAL_RE = re.compile(
+    r"(?:\bwhat[\s-]+if\b|\bwhat\s+happens\s+if\b|\bwhat\s+would\s+happen\s+if\b"
+    r"|\bsimulat\w*\b|\bsuppose\b|\bassum\w*\b|\bhypothetic\w*\b|\bpretend\b)",
     re.IGNORECASE)
+# Backwards-compatible alias used by did-query guard logic.
+_WHAT_IF_RE = _HYPOTHETICAL_RE
 _DID_QUERY_RE = re.compile(
     r"\b(?:did|has|have|was|were|is)\b\s+(.+?)\s*(?:\bget\b\s+|\bbeen\b\s+|\bever\b\s+)?"
     r"\b(?:trigger(?:ed)?|fire(?:d)?|run|ran|execute(?:d)?|happen(?:ed)?|occur(?:red)?|reached|invoked?)\b",
@@ -173,6 +176,21 @@ _DATA_STATE_STRONG_RE = re.compile(
     r")",
     re.IGNORECASE)
 _DATA_STATE_WEAK_RE = re.compile(r"(?:is|are|comes?\s+back)\s+(?:null|empty|blank)\b", re.IGNORECASE)
+
+# Generalized task execution failure / skip phrasings ("task 333433 fails").
+_FAILURE_VERBS_RE = (
+    r"(?:fails?|errors?|throws?\s+an?\s+error|is\s+skipped|is\s+not\s+executed"
+    r"|does\s+not\s+(?:run|execute)|abort(?:s|ed)?)"
+)
+_TASK_FAILURE_RES = [
+    re.compile(rf'\b(?:task\s+)?(\d{{5,}})\s+{_FAILURE_VERBS_RE}\b', re.I),
+    re.compile(r'\bwhat\s+happens\s+(?:to|with)?\s+task\s+(\d{5,})\b', re.I),
+    re.compile(
+        rf'\b(?:the\s+)?(?:modify|retrieve|query|create|switch|metadata|trigger|associate|'
+        rf'de-?associate|loop|iter|call|variable|get)?\s*task\s+["\']?(.+?)["\']?\s+'
+        rf'{_FAILURE_VERBS_RE}\b', re.I),
+    re.compile(rf'^(?:the\s+)?(.+?)\s+{_FAILURE_VERBS_RE}\s*$', re.I),
+]
 
 # Task-type words in the query -> TRIRIGA type codes, used to filter/boost
 # candidate tasks during resolution ("the retrieve task X" -> Type 29).
@@ -211,9 +229,10 @@ class Clause:
     verdict: str = 'TRUE'          # branch verdict the user asserts
     field_hint: str = ''
     value: str = ''
-    kind: str = 'gate'             # 'gate' | 'data_state'
+    kind: str = 'gate'             # 'gate' | 'data_state' | 'task_failure'
     target_hint: str = ''          # quoted task label, if the user supplied one
     type_hint: str = ''            # TRIRIGA type code inferred from "retrieve task", etc.
+    failure_mode: str = 'fail'     # 'fail' | 'skip' | 'error' for task_failure clauses
 
 
 @dataclass
@@ -293,6 +312,40 @@ def _extract_value(clause_text):
     return '', '', '', False
 
 
+def _detect_failure_mode(clause_text):
+    """Classify how the user described the task failure."""
+    low = clause_text.lower()
+    if re.search(r'\b(?:skip(?:ped)?|does\s+not\s+(?:run|execute)|is\s+not\s+executed)\b', low):
+        return 'skip'
+    if re.search(r'\b(?:error(?:s|ed)?|throws?\s+an?\s+error)\b', low):
+        return 'error'
+    return 'fail'
+
+
+def _parse_task_failure(part, target_hint):
+    """Return (is_task_failure, resolved_target_hint, failure_mode) for a clause."""
+    if _DATA_STATE_STRONG_RE.search(part) or _DATA_STATE_WEAK_RE.search(part):
+        return False, target_hint, 'fail'
+
+    for pat in _TASK_FAILURE_RES:
+        m = pat.search(part)
+        if not m:
+            continue
+        cap = (m.group(1) or '').strip()
+        if cap.isdigit():
+            resolved = cap
+        elif cap and not target_hint:
+            resolved = cap.strip('"\'')
+        else:
+            resolved = target_hint
+        return True, resolved, _detect_failure_mode(part)
+
+    if re.search(rf'\b{_FAILURE_VERBS_RE}\b', part, re.I):
+        if target_hint or re.search(r'\btask\b', part, re.I) or re.search(r'\b\d{5,}\b', part):
+            return True, target_hint, _detect_failure_mode(part)
+    return False, target_hint, 'fail'
+
+
 def parse_query(text):
     """Classify the question and decompose it into condition clauses."""
     raw = text.strip()
@@ -302,7 +355,7 @@ def parse_query(text):
         return SimulationRequest(mode='did_query', raw=raw, subject=did.group(1).strip())
 
     # Strip the hypothetical trigger words and polite framing, keep the condition body.
-    body = _WHAT_IF_RE.sub(' ', raw)
+    body = _HYPOTHETICAL_RE.sub(' ', raw)
     body = re.sub(r'^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?', ' ', body, flags=re.IGNORECASE)
     body = re.sub(r'\bplease\b', ' ', body, flags=re.IGNORECASE)
     body = re.sub(r'^\s*(?:that|the scenario where)\b', ' ', body, flags=re.IGNORECASE)
@@ -341,6 +394,13 @@ def parse_query(text):
             if pattern.search(part):
                 type_hint = code
                 break
+
+        is_task_failure, tf_target, failure_mode = _parse_task_failure(part, target_hint)
+        if is_task_failure:
+            clauses.append(Clause(text=part, kind='task_failure',
+                                  target_hint=tf_target, type_hint=type_hint,
+                                  failure_mode=failure_mode))
+            continue
 
         # A zero-record phrasing targets a task's DATA output, not a switch
         # verdict. Strong phrasings ("does not retrieve any records") always
@@ -598,13 +658,22 @@ def build_token_index(graph):
     return consumers
 
 
-def propagate_null_token(graph, altered_ids, token_index):
+def propagate_null_token(graph, altered_ids, token_index, starve_cause='zero_records'):
     """BFS the consumer index from the altered tasks, classifying each casualty.
+
+    ``starve_cause`` selects the narrative for why the producer's token is
+    missing: ``zero_records`` (Retrieve/Query empty set) or ``task_failure``
+    (Modify/Create or generic execution failure).
 
     Returns (impacted, impacts): ``impacted`` maps task id -> fatal flag;
     ``impacts`` is an ordered list of structured impact records with the
     context-aware narrative sentence.
     """
+    cause_phrases = {
+        'zero_records': 'were it to not retrieve any records',
+        'task_failure': 'were it to fail or be skipped during execution',
+    }
+    origin_cause = cause_phrases.get(starve_cause, starve_cause)
     impacted = {}
     impacts = []
     queue = [(aid, aid) for aid in altered_ids]
@@ -627,7 +696,7 @@ def propagate_null_token(graph, altered_ids, token_index):
             consequence, fatal = _TOKEN_CONSEQUENCES.get(c_type, _DEFAULT_CONSEQUENCE)
 
             if producer_id == origin_id:
-                cause = "were it to not retrieve any records"
+                cause = origin_cause
             else:
                 cause = f"starved of records by upstream task {origin_id}"
 
@@ -657,6 +726,357 @@ def propagate_null_token(graph, altered_ids, token_index):
                 queue.append((consumer_id, origin_id))
 
     return impacted, impacts
+
+
+# ============================================================
+# 3c. TASK FAILURE PROFILES (execution failure / skip)
+# ============================================================
+
+def extract_modify_ledger(data):
+    """Field ledger for Modify/Create tasks from ObjMappingRecords metadata."""
+    target_bo = ''
+    fields = []
+    sources = []
+    seen = set()
+
+    for rec in data.get('ObjMappingRecords', []) or []:
+        t_bo = str(rec.get('TrgtBo') or rec.get('TrgtBoName') or '').strip()
+        t_fld = str(rec.get('TrgtFld') or '').strip()
+        if t_bo and not target_bo:
+            target_bo = t_bo
+        if t_fld and t_fld not in seen:
+            seen.add(t_fld)
+            fields.append(t_fld)
+        src_bo = str(rec.get('SrcBo') or '').strip()
+        src_fld = str(rec.get('SrcFld') or '').strip()
+        if src_bo or src_fld:
+            sources.append({'bo': src_bo, 'field': src_fld})
+
+    for f in data.get('TrgtFld', []) or []:
+        fld = str(f).strip()
+        if fld and fld not in seen:
+            seen.add(fld)
+            fields.append(fld)
+
+    return {'target_bo': target_bo, 'fields': fields, 'sources': sources}
+
+
+def extract_query_ledger(data):
+    """Filter/BO context for Retrieve/Query tasks."""
+    filters = []
+    for key in ('LFldName', 'RFldName', 'ConstantValue', 'Expression'):
+        for val in data.get(key, []) or []:
+            v = str(val).strip()
+            if v:
+                filters.append(v)
+    return {
+        'filter_bo': str(data.get('FilterBo') or data.get('Bo') or '').strip(),
+        'filters': filters,
+        'bo': str(data.get('Bo') or '').strip(),
+    }
+
+
+def extract_associations(data):
+    """Association names referenced by Associate/De-Associate tasks."""
+    names = []
+    for key in ('AssociationName', 'Association'):
+        for val in data.get(key, []) or []:
+            v = str(val).strip()
+            if v:
+                names.append(v)
+    for rec in data.get('TaskRefRecords', []) or []:
+        v = str(rec.get('AssociationName') or '').strip()
+        if v:
+            names.append(v)
+    return names
+
+
+def _node_field_text(data):
+    """Concatenate field-bearing metadata on a node for substring scans."""
+    parts = []
+    for key in ('LFldName', 'PField', 'Expression', 'ConstantValue', 'TrgtFld', 'SrcFld', 'Field'):
+        for val in data.get(key, []) or []:
+            parts.append(str(val))
+    for rec in data.get('ObjMappingRecords', []) or []:
+        for k in ('TrgtFld', 'SrcFld', 'TrgtBo', 'SrcBo', 'FldVal'):
+            if rec.get(k):
+                parts.append(str(rec[k]))
+    return ' '.join(parts)
+
+
+def find_field_dependent_nodes(graph, field_names, failed_id, failed_name):
+    """Informational impacts: downstream nodes referencing failed Modify fields."""
+    if not field_names:
+        return []
+    notes = []
+    for nid, data in sorted(graph.nodes(data=True), key=lambda x: str(x[0])):
+        if graph_utils.is_invisible(data) and graph.out_degree(nid) > 0:
+            continue
+        if str(nid) == str(failed_id):
+            continue
+        blob = _node_field_text(data).lower()
+        hits = [f for f in field_names if f and f.lower() in blob]
+        if not hits:
+            continue
+        t_type = graph_utils.get_type_str(data)
+        t_name = type_display_name(t_type)
+        node_name = str(data.get('name', f'Task {nid}'))
+        sentence = (
+            f"{t_name} '{node_name}' ({nid}) evaluates or references field "
+            f"'{hits[0]}' which would remain unmodified if task {failed_id} "
+            f"('{failed_name}') fails."
+        )
+        notes.append({
+            'producer_id': failed_id,
+            'consumer_id': str(nid),
+            'consumer_name': node_name,
+            'consumer_type': t_type,
+            'ref_kind': 'field_reference',
+            'fatal': False,
+            'informational': True,
+            'sentence': sentence,
+        })
+    return notes
+
+
+def analyze_task_failures(engine, wf_name, clauses):
+    """Resolve task-failure clauses and apply type-specific operational profiles."""
+    graph = engine.graphs[wf_name]
+    failed_tasks = []
+    failed_ids = []
+    altered_from_failure = []
+    field_impacts = []
+    impacts = []
+    forced_overrides = {}
+    unmatched = []
+    impacted_map = {}
+
+    if not clauses:
+        return {
+            'failed_tasks': failed_tasks,
+            'failed_ids': failed_ids,
+            'altered_from_failure': altered_from_failure,
+            'field_impacts': field_impacts,
+            'impacts': impacts,
+            'forced_overrides': forced_overrides,
+            'impacted_map': impacted_map,
+            'unmatched': unmatched,
+        }
+
+    token_index = build_token_index(graph)
+
+    for clause in clauses:
+        nid, data, score = match_task(engine, wf_name, clause)
+        if nid is None:
+            unmatched.append(clause.text)
+            continue
+
+        t_type = graph_utils.get_type_str(data)
+        t_type_name = type_display_name(t_type)
+        name = str(data.get('name', f'Task {nid}'))
+        mode = clause.failure_mode
+
+        if t_type in ('28', '26'):
+            ledger = extract_modify_ledger(data)
+            fields = ledger['fields']
+            bo = ledger['target_bo']
+            failed_tasks.append({
+                'node_id': nid,
+                'node_name': name,
+                'node_type': t_type,
+                'node_type_name': t_type_name,
+                'failure_mode': mode,
+                'clause': clause.text,
+                'score': round(score, 2),
+                'fields': fields,
+                'bo': bo,
+            })
+            failed_ids.append(nid)
+            if fields:
+                field_impacts.append({'task_id': nid, 'bo': bo, 'fields': fields})
+                fld_str = ', '.join(fields)
+                bo_part = f" on BO '{bo}'" if bo else ''
+                impacts.append({
+                    'producer_id': nid,
+                    'producer_name': name,
+                    'producer_type': t_type,
+                    'consumer_id': None,
+                    'consumer_name': '',
+                    'consumer_type': '',
+                    'ref_kind': 'field_ledger',
+                    'fatal': False,
+                    'sentence': (
+                        f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                        f"will result in the failure to update the target field(s) ({fld_str}){bo_part}. "
+                        f"Any downstream tasks relying on this task's output object token will be affected."
+                    ),
+                })
+            else:
+                impacts.append({
+                    'producer_id': nid,
+                    'producer_name': name,
+                    'producer_type': t_type,
+                    'consumer_id': None,
+                    'consumer_name': '',
+                    'consumer_type': '',
+                    'ref_kind': 'execution_failure',
+                    'fatal': False,
+                    'sentence': (
+                        f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) "
+                        f"would not execute successfully."
+                    ),
+                })
+            imp_map, tok_impacts = propagate_null_token(
+                graph, [nid], token_index, starve_cause='task_failure')
+            for cid, fatal in imp_map.items():
+                impacted_map[cid] = impacted_map.get(cid, False) or fatal
+            impacts.extend(tok_impacts)
+            impacts.extend(find_field_dependent_nodes(graph, fields, nid, name))
+
+        elif t_type in ('29', '22'):
+            altered_from_failure.append({
+                'node_id': nid,
+                'node_name': name,
+                'node_type': t_type,
+                'node_type_name': t_type_name,
+                'clause': clause.text,
+                'score': round(score, 2),
+            })
+            impacts.append({
+                'producer_id': nid,
+                'producer_name': name,
+                'producer_type': t_type,
+                'consumer_id': None,
+                'consumer_name': '',
+                'consumer_type': '',
+                'ref_kind': 'execution_failure',
+                'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                    f"would produce no record token for downstream consumers."
+                ),
+            })
+            imp_map, tok_impacts = propagate_null_token(graph, [nid], token_index)
+            for cid, fatal in imp_map.items():
+                impacted_map[cid] = impacted_map.get(cid, False) or fatal
+            impacts.extend(tok_impacts)
+
+        elif t_type == '14':
+            forced_overrides[nid] = 'FALSE'
+            failed_tasks.append({
+                'node_id': nid,
+                'node_name': name,
+                'node_type': t_type,
+                'node_type_name': t_type_name,
+                'failure_mode': mode,
+                'clause': clause.text,
+                'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid,
+                'producer_name': name,
+                'producer_type': t_type,
+                'consumer_id': None,
+                'consumer_name': '',
+                'consumer_type': '',
+                'ref_kind': 'switch_failure',
+                'fatal': False,
+                'sentence': (
+                    f"The Switch (Type 14) '{name}' (ID: {nid}) would fail to evaluate; "
+                    f"simulation forces the FALSE/default branch."
+                ),
+            })
+
+        elif t_type == '31':
+            actions = data.get('Action', []) or []
+            action_str = ', '.join(str(a) for a in actions[:3]) if actions else 'state transition'
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'trigger_failure', 'fatal': False,
+                'sentence': (
+                    f"The Trigger Action (Type 31) '{name}' (ID: {nid}) would be skipped; "
+                    f"action(s) not fired: {action_str}."
+                ),
+            })
+
+        elif t_type in ('32', '33'):
+            assocs = extract_associations(data)
+            assoc_str = ', '.join(assocs[:3]) if assocs else 'association'
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            verb = 'not formed' if t_type == '32' else 'not removed'
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'association_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) would fail; "
+                    f"{assoc_str} {verb}."
+                ),
+            })
+
+        elif t_type in ('24', '20'):
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'loop_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) would fail; "
+                    f"loop body would never be entered."
+                ),
+            })
+
+        else:
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'execution_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) "
+                    f"would be skipped during execution."
+                ),
+            })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
+
+    return {
+        'failed_tasks': failed_tasks,
+        'failed_ids': failed_ids,
+        'altered_from_failure': altered_from_failure,
+        'field_impacts': field_impacts,
+        'impacts': impacts,
+        'forced_overrides': forced_overrides,
+        'impacted_map': impacted_map,
+        'unmatched': unmatched,
+    }
 
 
 # ============================================================
@@ -841,14 +1261,23 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
     graph = engine.graphs[wf_name]
     gate_clauses = [c for c in request.clauses if c.kind == 'gate']
     data_clauses = [c for c in request.clauses if c.kind == 'data_state']
+    failure_clauses = [c for c in request.clauses if c.kind == 'task_failure']
 
     matched, unmatched = match_clauses(engine, wf_name, gate_clauses)
+
+    # --- Task failure simulation ---
+    failure_result = analyze_task_failures(engine, wf_name, failure_clauses)
+    failed_tasks = failure_result['failed_tasks']
+    failed_ids = failure_result['failed_ids']
+    field_impacts = failure_result['field_impacts']
+    impacts = list(failure_result['impacts'])
+    impacted_map = dict(failure_result['impacted_map'])
+    unmatched.extend(failure_result['unmatched'])
     forced = {m['node_id']: m['verdict'] for m in matched}
+    forced.update(failure_result['forced_overrides'])
 
     # --- Dataflow token simulation for zero-record clauses ---
-    altered = []           # [{node_id, node_name, node_type, clause, score}]
-    impacts = []
-    impacted_map = {}
+    altered = list(failure_result['altered_from_failure'])
     for clause in data_clauses:
         nid, data, score = match_task(engine, wf_name, clause)
         if nid is None:
@@ -866,8 +1295,11 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
 
     if altered:
         token_index = build_token_index(graph)
-        impacted_map, impacts = propagate_null_token(
+        extra_map, extra_impacts = propagate_null_token(
             graph, [a['node_id'] for a in altered], token_index)
+        for cid, fatal in extra_map.items():
+            impacted_map[cid] = impacted_map.get(cid, False) or fatal
+        impacts.extend(extra_impacts)
 
     altered_ids = [a['node_id'] for a in altered]
     impacted_ids = sorted(impacted_map.keys())
@@ -875,8 +1307,18 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
 
     walk = simulate(engine, wf_name, forced)
 
-    # --- Narrative summary: impact sentences lead ---
+    # --- Narrative summary: failure + impact sentences lead ---
     summary = []
+    for ft in failed_tasks:
+        fld_part = ''
+        if ft.get('fields'):
+            fld_part = f" — fields not updated: {', '.join(ft['fields'])}"
+            if ft.get('bo'):
+                fld_part += f" on {ft['bo']}"
+        summary.append(
+            f"Simulated execution failure for {ft['node_type_name']} (Type {ft['node_type']}) "
+            f"'{ft['node_name']}' (ID: {ft['node_id']}){fld_part}."
+        )
     for a in altered:
         summary.append(f"Simulated a zero-records / null-token state for the "
                        f"{a['node_type_name']} (Type {a['node_type']}) '{a['node_name']}' (ID: {a['node_id']}).")
@@ -884,7 +1326,7 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
         summary.append(imp['sentence'])
     for m in matched:
         summary.append(f"Gate '{m['node_name']}' ({m['node_id']}) forced {m['verdict']} - {m['reason']}.")
-    if not matched and not altered:
+    if not matched and not altered and not failed_tasks:
         summary.append("No specific condition matched a decision gate or task; showing the default (FALSE-spine) route.")
     if unmatched:
         summary.append("Unmatched phrase(s): " + '; '.join(f"'{u}'" for u in unmatched))
@@ -912,6 +1354,9 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
         'unmatched_phrases': unmatched,
         'altered_tasks': altered,
         'altered_node_ids': altered_ids,
+        'failed_tasks': failed_tasks,
+        'failed_node_ids': failed_ids,
+        'field_impacts': field_impacts,
         'impacted_node_ids': impacted_ids,
         'impacts': impacts,
         'path_node_ids': walk['path_node_ids'],

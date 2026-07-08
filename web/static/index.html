@@ -295,6 +295,7 @@
   }
   #simOutcome .badge.altered { background: #ff9500; box-shadow: 0 0 6px rgba(255, 149, 0, 0.8); }
   #simOutcome .badge.broken { background: #ff2d2d; box-shadow: 0 0 6px rgba(255, 45, 45, 0.8); }
+  #simOutcome .badge.failed { background: #cc0000; box-shadow: 0 0 8px rgba(204, 0, 0, 0.9); }
   #simOutcome .impact-legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
   #simOutcome .impact-legend .badge { display: inline-block; margin-right: 4px; }
   #traceList {
@@ -665,9 +666,19 @@
       let html = "<h4>Simulated Outcome — " + escapeHtml(payload.workflow) + "</h4>";
 
       const altered = payload.altered_tasks || [];
+      const failed = payload.failed_tasks || [];
       const impacts = payload.impacts || [];
-      if (altered.length || impacts.length) {
+      if (failed.length || altered.length || impacts.length) {
         html += "<ul class='impact-list'>";
+        for (const ft of failed) {
+          let line = ft.node_type_name + " (Type " + ft.node_type + ") '" + ft.node_name +
+                     "' (ID: " + ft.node_id + ") FAILED / skipped.";
+          if (ft.fields && ft.fields.length) {
+            line += " Fields not updated: " + ft.fields.join(", ");
+            if (ft.bo) line += " on " + ft.bo;
+          }
+          html += "<li><span class='badge failed'></span><span>" + escapeHtml(line) + "</span></li>";
+        }
         for (const a of altered) {
           html += "<li><span class='badge altered'></span><span>" +
             escapeHtml(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
@@ -678,7 +689,8 @@
           html += "<li><span class='badge broken'></span><span>" + escapeHtml(imp.sentence) + "</span></li>";
         }
         html += "</ul>";
-        html += "<div class='impact-legend'><span class='badge altered'></span>altered source task" +
+        html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
+                " &nbsp; <span class='badge altered'></span>altered source task" +
                 " &nbsp; <span class='badge broken'></span>starved dependent task</div>";
       }
 
@@ -686,7 +698,9 @@
       // the remaining summary lines to avoid duplication.
       const impactSentences = new Set(impacts.map((i) => i.sentence));
       const rest = payload.summary.filter((line) =>
-        !impactSentences.has(line) && !line.startsWith("Simulated a zero-records"));
+        !impactSentences.has(line) &&
+        !line.startsWith("Simulated a zero-records") &&
+        !line.startsWith("Simulated execution failure"));
       if (rest.length) {
         html += "<ul>";
         for (const line of rest) html += "<li>" + escapeHtml(line) + "</li>";
@@ -704,6 +718,7 @@
         summaryHtml: buildSimSummaryHtml(payload),
         alteredIds: payload.altered_node_ids || [],
         impactedIds: payload.impacted_node_ids || [],
+        failedIds: payload.failed_node_ids || [],
       });
     } catch (err) {
       showSimOutcome("<h4>Simulation Error</h4>" + escapeHtml(err.message || String(err)));

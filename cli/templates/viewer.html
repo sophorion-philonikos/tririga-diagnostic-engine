@@ -37,9 +37,12 @@
         .node, .edgePath, .edgeLabel { transition: opacity 0.35s ease, filter 0.35s ease; }
         .node.sim-dim, .edgePath.sim-dim, .edgeLabel.sim-dim { opacity: 0.12; }
         .node.sim-active { filter: drop-shadow(0 0 5px #c341ff) drop-shadow(0 0 14px rgba(195, 65, 255, 0.65)); }
-        /* Dual-state dataflow highlighting: the ALTERED source task (simulated
-           zero-record state) glows orange; its BROKEN/starved dependents glow red.
-           Precedence (altered > broken > active) is enforced by the data join. */
+        /* Dual-state dataflow highlighting: the FAILED task glows deep red;
+           the ALTERED source task (simulated zero-record state) glows orange;
+           its BROKEN/starved dependents glow red.
+           Precedence (failed > altered > broken > active) is enforced by the data join. */
+        .node.sim-failed { filter: drop-shadow(0 0 8px #cc0000) drop-shadow(0 0 20px rgba(204, 0, 0, 0.9)); animation: sim-pulse 1.8s ease-in-out infinite; }
+        @keyframes sim-pulse { 0%, 100% { filter: drop-shadow(0 0 6px #cc0000) drop-shadow(0 0 16px rgba(204, 0, 0, 0.75)); } 50% { filter: drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 24px rgba(255, 0, 0, 0.95)); } }
         .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); }
         .node.sim-broken { filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 16px rgba(255, 45, 45, 0.75)); }
         .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
@@ -178,34 +181,39 @@
         // no re-render, no coordinate math, no DOM mutation of the layout.
         function edgeKey(d) { return String(d.v) + "->" + String(d.w); }
 
-        window.applySimulation = function(nodeIds, edgePairs, summaryHtml, alteredIds, impactedIds) {
+        window.applySimulation = function(nodeIds, edgePairs, summaryHtml, alteredIds, impactedIds, failedIds) {
             var nodeSet = new Set((nodeIds || []).map(String));
             var alteredSet = new Set((alteredIds || []).map(String));
             var impactedSet = new Set((impactedIds || []).map(String));
+            var failedSet = new Set((failedIds || []).map(String));
             var edgeSet = new Set((edgePairs || []).map(function(p) {
                 return String(p[0]) + "->" + String(p[1]);
             }));
 
-            // Precedence per node: altered (orange) > broken (red) > active (purple) > dim.
+            // Precedence per node: failed (deep red) > altered (orange) > broken (red) > active (purple) > dim.
             inner.selectAll("g.node")
-                .classed("sim-altered", function(d) { return alteredSet.has(String(d)); })
+                .classed("sim-failed", function(d) { return failedSet.has(String(d)); })
+                .classed("sim-altered", function(d) {
+                    var id = String(d);
+                    return alteredSet.has(id) && !failedSet.has(id);
+                })
                 .classed("sim-broken", function(d) {
                     var id = String(d);
-                    return impactedSet.has(id) && !alteredSet.has(id);
+                    return impactedSet.has(id) && !alteredSet.has(id) && !failedSet.has(id);
                 })
                 .classed("sim-active", function(d) {
                     var id = String(d);
-                    return nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id);
+                    return nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id) && !failedSet.has(id);
                 })
                 .classed("sim-dim", function(d) {
                     var id = String(d);
-                    return !nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id);
+                    return !nodeSet.has(id) && !alteredSet.has(id) && !impactedSet.has(id) && !failedSet.has(id);
                 });
 
-            // Edges INTO a broken dependent render red (the starved link);
+            // Edges FROM a failed/altered task INTO a broken dependent render red;
             // remaining on-path edges render purple.
             function edgeBroken(d) {
-                return (alteredSet.has(String(d.v)) || impactedSet.has(String(d.v))) &&
+                return (failedSet.has(String(d.v)) || alteredSet.has(String(d.v)) || impactedSet.has(String(d.v))) &&
                        impactedSet.has(String(d.w));
             }
             inner.selectAll("g.edgePath")
@@ -225,7 +233,7 @@
         window.clearSimulation = function() {
             inner.selectAll("g.node")
                 .classed("sim-active", false).classed("sim-dim", false)
-                .classed("sim-altered", false).classed("sim-broken", false);
+                .classed("sim-altered", false).classed("sim-broken", false).classed("sim-failed", false);
             inner.selectAll("g.edgePath")
                 .classed("sim-active", false).classed("sim-dim", false)
                 .classed("sim-broken", false);
@@ -238,7 +246,7 @@
             var msg = ev.data || {};
             if (msg.type === "tririga-simulation") {
                 window.applySimulation(msg.nodeIds || [], msg.edgePairs || [], msg.summaryHtml || "",
-                                       msg.alteredIds || [], msg.impactedIds || []);
+                                       msg.alteredIds || [], msg.impactedIds || [], msg.failedIds || []);
             } else if (msg.type === "tririga-simulation-clear") {
                 window.clearSimulation();
             }

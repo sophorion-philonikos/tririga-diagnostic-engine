@@ -197,11 +197,13 @@ def build_registry():
             id='simulate', category='Logic Tracing', handler='_cmd_simulate', priority=45,
             # The did-query alternative excludes bare pronoun subjects ("how did it
             # execute") so live_trace keeps owning that phrasing.
-            patterns=[r"\bwhat[\s-]+if\b", r"\bsimulat\w*\b", r"\bsuppose\b", r"\bassume\b",
+            patterns=[r"\bwhat[\s-]+if\b", r"\bwhat\s+happens\s+if\b", r"\bwhat\s+would\s+happen\s+if\b",
+                      r"\bsimulat\w*\b", r"\bsuppose\b", r"\bassume\b",
                       r"\b(?:did|has|have|was|were)\b\s+(?!it\b)\S.*?\s+\b(?:trigger(?:ed)?|fire(?:d)?|run|ran|execute(?:d)?|happen(?:ed)?|occur(?:red)?)\b"],
             help_line="Simulate a hypothetical data state and see the resulting execution path, or ask if a task ran.",
-            examples=["what if the operational status is DISP?", "did Modify Records trigger?"],
-            keywords=['simulate', 'what if', 'hypothetical', 'scenario', 'suppose', 'assume', 'did', 'trigger'],
+            examples=["what if the operational status is DISP?", "what happens if task 333433 fails?",
+                      "did Modify Records trigger?"],
+            keywords=['simulate', 'what if', 'what happens if', 'hypothetical', 'scenario', 'suppose', 'assume', 'did', 'trigger'],
         ),
 
         # ---------- Existing capabilities ----------

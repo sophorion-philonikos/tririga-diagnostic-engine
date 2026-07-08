@@ -84,13 +84,21 @@ class TririgaNLPRouter:
 
         output = [f"--- What-If Simulation: {wf_name} ---", ""]
         output.append("[Interpreted Conditions]")
+        for ft in result.get('failed_tasks', []):
+            line = (f"  - {ft['node_type_name']} (Type {ft['node_type']}) '{ft['node_name']}' "
+                    f"(ID: {ft['node_id']}) FAILED / skipped")
+            if ft.get('fields'):
+                line += f" — fields not updated: {', '.join(ft['fields'])}"
+                if ft.get('bo'):
+                    line += f" on {ft['bo']}"
+            output.append(line)
         for a in result.get('altered_tasks', []):
             output.append(f"  - {a['node_type_name']} (Type {a['node_type']}) '{a['node_name']}' "
                           f"(ID: {a['node_id']}) simulated with ZERO records / null object token")
         if result['matched_conditions']:
             for m in result['matched_conditions']:
                 output.append(f"  - Gate '{m['node_name']}' ({m['node_id']}) forced {m['verdict']}  ({m['reason']})")
-        if not result['matched_conditions'] and not result.get('altered_tasks'):
+        if not result['matched_conditions'] and not result.get('altered_tasks') and not result.get('failed_tasks'):
             output.append("  - None matched; simulating the default (FALSE-spine) route.")
         for phrase in result['unmatched_phrases']:
             output.append(f"  - [?] Could not map: '{phrase}'")
