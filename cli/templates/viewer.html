@@ -57,6 +57,31 @@
         .sim-summary li { margin-bottom: 6px; font-size: 13px; line-height: 1.45; }
         .sim-summary .sim-decision { color: #bbbbbb; font-family: Consolas, monospace; font-size: 12px; }
         .sim-summary .sim-impact { color: #ffb3b3; }
+        .sim-summary .impact-tree { margin: 8px 0; }
+        .sim-summary details.impact-group {
+            margin: 4px 0; border-left: 2px solid rgba(255,255,255,0.12); padding-left: 8px;
+        }
+        .sim-summary details.impact-group > summary {
+            cursor: pointer; list-style: none; display: flex; gap: 8px;
+            align-items: baseline; line-height: 1.4; padding: 2px 0; color: #eee;
+        }
+        .sim-summary details.impact-group > summary::-webkit-details-marker { display: none; }
+        .sim-summary details.impact-group > summary::before {
+            content: "▸"; flex: none; color: #888; font-size: 11px; width: 12px;
+        }
+        .sim-summary details.impact-group[open] > summary::before { content: "▾"; }
+        .sim-summary .badge {
+            flex: none; width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; position: relative; top: -1px;
+        }
+        .sim-summary .badge.altered { background: #ff9500; box-shadow: 0 0 5px rgba(255,149,0,0.8); }
+        .sim-summary .badge.broken { background: #ff2d2d; box-shadow: 0 0 5px rgba(255,45,45,0.8); }
+        .sim-summary .badge.failed { background: #cc0000; box-shadow: 0 0 5px rgba(204,0,0,0.9); }
+        .sim-summary .badge.info { background: #4da6ff; box-shadow: 0 0 5px rgba(77,166,255,0.7); }
+        .sim-summary .impact-summary-text { flex: 1; min-width: 0; font-size: 13px; }
+        .sim-summary .impact-counts { flex: none; color: #888; font-size: 11px; white-space: nowrap; }
+        .sim-summary .impact-body { margin: 2px 0 6px 20px; color: #ffb3b3; font-size: 12px; line-height: 1.45; }
+        .sim-summary .impact-children { margin-left: 6px; }
 
         .zoom-toolbar {
             position: absolute; top: 16px; left: 16px; z-index: 1001;

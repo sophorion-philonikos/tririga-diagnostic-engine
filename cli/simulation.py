@@ -732,6 +732,7 @@ def propagate_null_token(graph, altered_ids, token_index, starve_cause='zero_rec
                 'consumer_type': c_type,
                 'ref_kind': ref_kind,
                 'fatal': fatal,
+                'origin_id': origin_id,
                 'sentence': sentence,
             })
 
@@ -1381,6 +1382,154 @@ def _dedupe_impacts(impacts):
     return out
 
 
+def _task_label(type_name, t_type, name, tid):
+    if not type_name:
+        type_name = type_display_name(t_type) if t_type else 'Task'
+    if t_type:
+        return f"{type_name} (Type {t_type}) '{name}' (ID: {tid})"
+    return f"{type_name} '{name}' (ID: {tid})"
+
+
+def build_impact_tree(impacts, root_ids, failed_tasks=None, altered_tasks=None):
+    """Nest flat impacts by producer→consumer under altered/failed root ids.
+
+    Returns a list of tree nodes:
+      {task_id, task_name, task_type, task_type_name, label, badge, sentence,
+       ref_kind, fatal, informational, direct_count, nested_count, children}
+    """
+    failed_tasks = failed_tasks or []
+    altered_tasks = altered_tasks or []
+    meta = {}
+
+    for ft in failed_tasks:
+        tid = str(ft['node_id'])
+        meta[tid] = {
+            'task_name': ft.get('node_name', f'Task {tid}'),
+            'task_type': ft.get('node_type', ''),
+            'task_type_name': ft.get('node_type_name', ''),
+            'badge': 'failed',
+        }
+    for a in altered_tasks:
+        tid = str(a['node_id'])
+        if tid not in meta:
+            meta[tid] = {
+                'task_name': a.get('node_name', f'Task {tid}'),
+                'task_type': a.get('node_type', ''),
+                'task_type_name': a.get('node_type_name', ''),
+                'badge': 'altered',
+            }
+
+    for imp in impacts:
+        for id_key, name_key, type_key in (
+            ('producer_id', 'producer_name', 'producer_type'),
+            ('consumer_id', 'consumer_name', 'consumer_type'),
+        ):
+            tid = imp.get(id_key)
+            if not tid:
+                continue
+            tid = str(tid)
+            if tid in meta:
+                continue
+            t_type = str(imp.get(type_key) or '')
+            meta[tid] = {
+                'task_name': imp.get(name_key) or f'Task {tid}',
+                'task_type': t_type,
+                'task_type_name': type_display_name(t_type) if t_type else 'Task',
+                'badge': 'broken',
+            }
+
+    children_map = {}
+    root_sentences = {}
+    for imp in impacts:
+        pid = str(imp.get('producer_id') or '')
+        if not pid:
+            continue
+        cid = imp.get('consumer_id')
+        if cid is None or cid == '':
+            root_sentences.setdefault(pid, imp)
+            continue
+        children_map.setdefault(pid, []).append(imp)
+
+    def _count_descendants(node):
+        total = 0
+        for child in node.get('children') or []:
+            total += 1 + _count_descendants(child)
+        return total
+
+    def _make_node(task_id, edge_imp=None, depth=0):
+        tid = str(task_id)
+        m = meta.get(tid, {})
+        if edge_imp and depth > 0:
+            t_type = str(edge_imp.get('consumer_type') or m.get('task_type') or '')
+            name = edge_imp.get('consumer_name') or m.get('task_name') or f'Task {tid}'
+        else:
+            t_type = str(m.get('task_type') or '')
+            name = m.get('task_name') or f'Task {tid}'
+        type_name = m.get('task_type_name') or (type_display_name(t_type) if t_type else 'Task')
+
+        if depth == 0:
+            badge = m.get('badge', 'info')
+        elif (edge_imp or {}).get('informational'):
+            badge = 'info'
+        else:
+            badge = 'broken'
+
+        node = {
+            'task_id': tid,
+            'task_name': name,
+            'task_type': t_type,
+            'task_type_name': type_name,
+            'label': _task_label(type_name, t_type, name, tid),
+            'badge': badge,
+            'sentence': '',
+            'ref_kind': (edge_imp or {}).get('ref_kind') or '',
+            'fatal': (edge_imp or {}).get('fatal'),
+            'informational': (edge_imp or {}).get('informational'),
+            'children': [],
+        }
+        if depth == 0 and tid in root_sentences:
+            rs = root_sentences[tid]
+            node['sentence'] = rs.get('sentence') or ''
+            node['ref_kind'] = rs.get('ref_kind') or node['ref_kind']
+            node['informational'] = rs.get('informational')
+        elif edge_imp:
+            node['sentence'] = edge_imp.get('sentence') or ''
+
+        for child_imp in children_map.get(tid, []):
+            child_id = str(child_imp['consumer_id'])
+            node['children'].append(_make_node(child_id, child_imp, depth + 1))
+
+        node['direct_count'] = len(node['children'])
+        node['nested_count'] = _count_descendants(node)
+        return node
+
+    roots = []
+    seen_roots = set()
+    for rid in root_ids:
+        rid = str(rid)
+        if not rid or rid in seen_roots:
+            continue
+        seen_roots.add(rid)
+        roots.append(_make_node(rid, None, 0))
+
+    reachable = set()
+
+    def _collect(node):
+        reachable.add(node['task_id'])
+        for child in node.get('children') or []:
+            _collect(child)
+
+    for root in roots:
+        _collect(root)
+
+    for pid in sorted(children_map.keys()):
+        if pid not in reachable and pid not in seen_roots:
+            seen_roots.add(pid)
+            roots.append(_make_node(pid, None, 0))
+
+    return roots
+
+
 def force_verdicts_for_path(engine, wf_name, path_ids):
     """Derive Switch/Iter forced verdicts so ``simulate`` follows ``path_ids``.
 
@@ -1756,6 +1905,10 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
         summary.append("Bypassed: " + ', '.join(f"'{b}'" for b in shown)
                        + (f" (+{more} more)" if more > 0 else "") + ".")
 
+    root_ids = list(failed_ids) + [a for a in altered_ids if a not in failed_ids]
+    impact_tree = build_impact_tree(
+        impacts, root_ids, failed_tasks=failed_tasks, altered_tasks=altered)
+
     return {
         'mode': 'what_if',
         'workflow': wf_name,
@@ -1768,6 +1921,7 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
         'field_impacts': field_impacts,
         'impacted_node_ids': impacted_ids,
         'impacts': impacts,
+        'impact_tree': impact_tree,
         'path_node_ids': walk['path_node_ids'],
         'path_edges': walk['path_edges'],
         'decisions': walk['decisions'],

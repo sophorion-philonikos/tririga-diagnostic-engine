@@ -297,6 +297,46 @@
   #simOutcome .badge.broken { background: #ff2d2d; box-shadow: 0 0 6px rgba(255, 45, 45, 0.8); }
   #simOutcome .badge.failed { background: #cc0000; box-shadow: 0 0 8px rgba(204, 0, 0, 0.9); }
   #simOutcome .badge.info { background: #4da6ff; box-shadow: 0 0 6px rgba(77, 166, 255, 0.7); }
+  #simOutcome .impact-tree { margin: 8px 0 0; }
+  #simOutcome details.impact-group {
+    margin: 4px 0 4px 0;
+    border-left: 2px solid rgba(255, 255, 255, 0.08);
+    padding-left: 8px;
+  }
+  #simOutcome details.impact-group.depth-0 { border-left-color: rgba(255, 149, 0, 0.35); }
+  #simOutcome details.impact-group > summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    line-height: 1.45;
+    padding: 3px 0;
+    user-select: none;
+  }
+  #simOutcome details.impact-group > summary::-webkit-details-marker { display: none; }
+  #simOutcome details.impact-group > summary::before {
+    content: "▸";
+    flex: none;
+    color: var(--muted);
+    font-size: 11px;
+    width: 12px;
+  }
+  #simOutcome details.impact-group[open] > summary::before { content: "▾"; }
+  #simOutcome .impact-summary-text { flex: 1; min-width: 0; }
+  #simOutcome .impact-counts {
+    flex: none;
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  #simOutcome .impact-body {
+    margin: 2px 0 6px 20px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  #simOutcome .impact-children { margin-left: 8px; }
   #simOutcome .impact-legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
   #simOutcome .impact-legend .badge { display: inline-block; margin-right: 4px; }
   #traceList {
@@ -624,11 +664,78 @@
     simOutcome.classList.toggle("visible", !!html);
   }
 
+  function impactNodeCounts(node) {
+    const direct = (node.children && node.children.length) || node.direct_count || 0;
+    const nested = node.nested_count != null
+      ? node.nested_count
+      : (function count(n) {
+          let t = 0;
+          for (const c of (n.children || [])) t += 1 + count(c);
+          return t;
+        })(node);
+    return { direct, nested };
+  }
+
+  function renderImpactTreeNode(node, depth) {
+    const children = node.children || [];
+    const { direct, nested } = impactNodeCounts(node);
+    const openAttr = depth < 2 ? " open" : "";
+    const badge = node.badge || (depth === 0 ? "altered" : "broken");
+    const shortLabel = (node.task_type_name || "Task") +
+      (node.task_type ? " (Type " + node.task_type + ")" : "") +
+      " '" + (node.task_name || node.task_id) + "' (" + node.task_id + ")";
+    let counts = "";
+    if (direct > 0) {
+      counts = "<span class='impact-counts'>" + direct + " direct";
+      if (nested > direct) counts += " · " + nested + " nested";
+      counts += "</span>";
+    }
+    let html = "<details class='impact-group depth-" + depth + "'" + openAttr + ">";
+    html += "<summary><span class='badge " + badge + "'></span>";
+    html += "<span class='impact-summary-text'>" + escapeHtml(shortLabel) + "</span>";
+    html += counts + "</summary>";
+    if (node.sentence) {
+      html += "<div class='impact-body'>" + escapeHtml(node.sentence) + "</div>";
+    }
+    if (children.length) {
+      html += "<div class='impact-children'>";
+      for (const child of children) html += renderImpactTreeNode(child, depth + 1);
+      html += "</div>";
+    }
+    html += "</details>";
+    return html;
+  }
+
+  function renderImpactTree(tree) {
+    if (!tree || !tree.length) return "";
+    let html = "<div class='impact-tree'>";
+    for (const root of tree) html += renderImpactTreeNode(root, 0);
+    html += "</div>";
+    return html;
+  }
+
+  function renderFlatImpacts(impacts) {
+    let html = "<ul class='impact-list'>";
+    for (const imp of impacts) {
+      const isStarved = !!imp.consumer_id && imp.informational !== true &&
+        imp.ref_kind !== "field_reference";
+      const badge = isStarved ? "broken" : "info";
+      html += "<li><span class='badge " + badge + "'></span><span>" +
+        escapeHtml(imp.sentence) + "</span></li>";
+    }
+    html += "</ul>";
+    return html;
+  }
+
   function buildSimSummaryHtml(payload) {
     // Rendered inside the viewer's side panel (dark theme) via postMessage.
     let html = "<h3>What-If Simulation</h3>";
+    const tree = payload.impact_tree || [];
     const impacts = payload.impacts || [];
-    if (impacts.length) {
+    if (tree.length) {
+      html += renderImpactTree(tree);
+      html += "<hr>";
+    } else if (impacts.length) {
       html += "<ul>";
       for (const imp of impacts) html += "<li class='sim-impact'>" + escapeHtml(imp.sentence) + "</li>";
       html += "</ul><hr>";
@@ -700,7 +807,15 @@
       const altered = payload.altered_tasks || [];
       const failed = payload.failed_tasks || [];
       const impacts = payload.impacts || [];
-      if (failed.length || altered.length || impacts.length) {
+      const impactTree = payload.impact_tree || [];
+      if (impactTree.length) {
+        html += renderImpactTree(impactTree);
+        html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
+                " &nbsp; <span class='badge altered'></span>altered source task" +
+                " &nbsp; <span class='badge broken'></span>starved dependent task" +
+                " &nbsp; <span class='badge info'></span>field / ledger note" +
+                "<br>Groups are expandable — root and direct dependents open by default.</div>";
+      } else if (failed.length || altered.length || impacts.length) {
         html += "<ul class='impact-list'>";
         for (const ft of failed) {
           let line = ft.node_type_name + " (Type " + ft.node_type + ") '" + ft.node_name +
@@ -726,15 +841,8 @@
                        "' (ID: " + a.node_id + ") simulated with zero records / null object token.") +
             "</span></li>";
         }
-        for (const imp of impacts) {
-          // Token-starved dependents have a real consumer and are not informational field notes.
-          const isStarved = !!imp.consumer_id && imp.informational !== true &&
-            imp.ref_kind !== "field_reference";
-          const badge = isStarved ? "broken" : "info";
-          html += "<li><span class='badge " + badge + "'></span><span>" +
-            escapeHtml(imp.sentence) + "</span></li>";
-        }
         html += "</ul>";
+        if (impacts.length) html += renderFlatImpacts(impacts);
         html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
                 " &nbsp; <span class='badge altered'></span>altered source task" +
                 " &nbsp; <span class='badge broken'></span>starved dependent task" +

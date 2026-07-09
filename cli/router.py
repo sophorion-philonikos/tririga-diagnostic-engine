@@ -115,7 +115,33 @@ class TririgaNLPRouter:
         for phrase in result['unmatched_phrases']:
             output.append(f"  - [?] Could not map: '{phrase}'")
 
-        if result.get('impacts'):
+        if result.get('impact_tree'):
+            output.append("")
+            output.append("[Dataflow Impact Analysis]")
+
+            def _print_impact_node(node, depth=0):
+                indent = "  " + ("    " * depth)
+                badge = node.get('badge') or ''
+                badge_tag = f" [{badge}]" if badge and depth == 0 else ""
+                label = node.get('label') or (
+                    f"{node.get('task_type_name', 'Task')} "
+                    f"'{node.get('task_name', '')}' ({node.get('task_id')})"
+                )
+                sentence = node.get('sentence') or ''
+                if depth == 0:
+                    output.append(f"{indent}- {label}{badge_tag}")
+                    if sentence:
+                        output.append(f"{indent}    {sentence}")
+                elif sentence:
+                    output.append(f"{indent}- {label}: {sentence}")
+                else:
+                    output.append(f"{indent}- {label}")
+                for child in node.get('children') or []:
+                    _print_impact_node(child, depth + 1)
+
+            for root in result['impact_tree']:
+                _print_impact_node(root, 0)
+        elif result.get('impacts'):
             output.append("")
             output.append("[Dataflow Impact Analysis]")
             for imp in result['impacts']:
