@@ -46,10 +46,17 @@
         .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); animation: sim-pulse-altered 1.8s ease-in-out infinite; }
         @keyframes sim-pulse-altered { 0%, 100% { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 14px rgba(255, 149, 0, 0.7)); } 50% { filter: drop-shadow(0 0 10px #ffb84d) drop-shadow(0 0 22px rgba(255, 149, 0, 0.95)); } }
         .node.sim-broken { filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 16px rgba(255, 45, 45, 0.75)); }
+        .node.search-hit { filter: drop-shadow(0 0 8px #00e6c3) drop-shadow(0 0 18px rgba(0, 230, 195, 0.95)) !important; }
         .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
         .edgePath.sim-active marker path { fill: #c341ff !important; stroke: #c341ff !important; }
         .edgePath.sim-broken path { stroke: #ff2d2d !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; filter: drop-shadow(0 0 4px rgba(255, 45, 45, 0.8)); }
         .edgePath.sim-broken marker path { fill: #ff2d2d !important; stroke: #ff2d2d !important; }
+        .edgePath.live-trace path {
+            stroke: #00e6c3 !important;
+            stroke-width: 6.5px !important;
+            filter: drop-shadow(0 0 5px rgba(0, 230, 195, 0.85));
+        }
+        .edgePath.live-trace marker path { fill: #00e6c3 !important; stroke: #00e6c3 !important; }
         .edgeLabel.sim-active text { fill: #c341ff !important; }
         .edgeLabel.sim-broken text { fill: #ff2d2d !important; }
         .sim-summary h3 { color: #c341ff; margin-top: 0; }
@@ -85,7 +92,7 @@
 
         .zoom-toolbar {
             position: absolute; top: 16px; left: 16px; z-index: 1001;
-            display: flex; gap: 4px; background: rgba(255,255,255,0.95);
+            display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.95);
             border: 1px solid #ccc; border-radius: 8px; padding: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         }
@@ -96,6 +103,22 @@
         }
         .zoom-toolbar button:hover { background: #eef3ff; border-color: #4da6ff; }
         .zoom-toolbar button.wide { width: auto; padding: 0 10px; font-size: 11px; letter-spacing: 0.3px; }
+        .zoom-toolbar .search-wrap {
+            display: flex; align-items: center; gap: 4px;
+            margin-left: 4px; padding-left: 8px; border-left: 1px solid #ddd;
+        }
+        .zoom-toolbar #taskSearch {
+            width: 160px; height: 28px; box-sizing: border-box;
+            border: 1px solid #bbb; border-radius: 5px; padding: 0 8px;
+            font-size: 12px; color: #333; background: #fff;
+        }
+        .zoom-toolbar #taskSearch:focus { outline: none; border-color: #00c3a5; box-shadow: 0 0 0 2px rgba(0,195,165,0.2); }
+        .zoom-toolbar #searchStatus {
+            min-width: 36px; font-size: 11px; color: #666; white-space: nowrap;
+        }
+        .zoom-toolbar #searchClear {
+            width: 28px; font-size: 14px; color: #666;
+        }
 
         .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #333; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; }
         .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
@@ -127,6 +150,11 @@
             <button type="button" class="wide" id="zoomReset" title="Reset view">Reset</button>
             <button type="button" id="zoomIn" title="Zoom in">+</button>
             <button type="button" id="zoomOut" title="Zoom out">−</button>
+            <div class="search-wrap">
+                <input type="search" id="taskSearch" placeholder="Find task name or ID" autocomplete="off" spellcheck="false" title="Search tasks by name or ID">
+                <span id="searchStatus"></span>
+                <button type="button" id="searchClear" title="Clear search">×</button>
+            </div>
         </div>
         <div class="legend">
             <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">Routing Tracks</div>
@@ -267,6 +295,115 @@
         document.getElementById('zoomReset').addEventListener('click', resetView);
         document.getElementById('zoomIn').addEventListener('click', function() { zoomBy(1.25); });
         document.getElementById('zoomOut').addEventListener('click', function() { zoomBy(0.8); });
+
+        // Mark live-trace edges via data join (no re-render). Prefer the baked
+        // `live` flag from the visualizer; fall back to teal stroke color.
+        var liveEdgeKeys = {};
+        edgesData.forEach(function(e) {
+            if (e.live || e.color === '#00c3a5' || e.color === '#00e6c3') {
+                liveEdgeKeys[String(e.from) + "->" + String(e.to)] = true;
+            }
+        });
+        inner.selectAll("g.edgePath")
+            .classed("live-trace", function(d) {
+                return !!liveEdgeKeys[String(d.v) + "->" + String(d.w)];
+            });
+
+        // ================= Task search (nodesData index + existing zoom API) =================
+        var searchMatches = [];
+        var searchIndex = -1;
+
+        function findMatches(q) {
+            var term = (q || "").trim().toLowerCase();
+            if (!term) return [];
+            return nodesData.filter(function(n) {
+                var id = String(n.id || "").toLowerCase();
+                var name = String(n.name || "").toLowerCase();
+                return id.indexOf(term) !== -1 || name.indexOf(term) !== -1;
+            });
+        }
+
+        function clearSearchHit() {
+            inner.selectAll("g.node").classed("search-hit", false);
+            searchMatches = [];
+            searchIndex = -1;
+            var status = document.getElementById('searchStatus');
+            if (status) status.textContent = "";
+        }
+
+        function focusNode(id) {
+            var nid = String(id);
+            var n = g.node(nid);
+            if (!n) return;
+            var cw = container.clientWidth || 1;
+            var ch = container.clientHeight || 1;
+            var current = d3.zoomTransform(svg.node());
+            var scale = current.k || 1;
+            if (scale < 0.6) scale = 0.6;
+            if (scale > 1.4) scale = 1.4;
+            var nx = (cw / 2) - (n.x * scale);
+            var ny = (ch / 2) - (n.y * scale);
+            applyZoomTransform(d3.zoomIdentity.translate(nx, ny).scale(scale));
+            inner.selectAll("g.node").classed("search-hit", function(d) {
+                return String(d) === nid;
+            });
+            if (window.handleNodeClick) window.handleNodeClick(nid);
+        }
+
+        function updateSearchStatus() {
+            var status = document.getElementById('searchStatus');
+            if (!status) return;
+            if (!searchMatches.length) {
+                status.textContent = document.getElementById('taskSearch').value.trim() ? "0" : "";
+                return;
+            }
+            status.textContent = (searchIndex + 1) + "/" + searchMatches.length;
+        }
+
+        function runSearch(cycle) {
+            var input = document.getElementById('taskSearch');
+            var q = input ? input.value : "";
+            var matches = findMatches(q);
+            if (!matches.length) {
+                inner.selectAll("g.node").classed("search-hit", false);
+                searchMatches = [];
+                searchIndex = -1;
+                updateSearchStatus();
+                return;
+            }
+            if (cycle && searchMatches.length &&
+                searchMatches.length === matches.length &&
+                searchMatches.every(function(m, i) { return m.id === matches[i].id; })) {
+                searchIndex = (searchIndex + 1) % searchMatches.length;
+            } else {
+                searchMatches = matches;
+                searchIndex = 0;
+            }
+            focusNode(searchMatches[searchIndex].id);
+            updateSearchStatus();
+        }
+
+        var searchInput = document.getElementById('taskSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() { runSearch(false); });
+            searchInput.addEventListener('keydown', function(ev) {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    runSearch(true);
+                } else if (ev.key === 'Escape') {
+                    ev.preventDefault();
+                    searchInput.value = "";
+                    clearSearchHit();
+                }
+            });
+        }
+        var searchClearBtn = document.getElementById('searchClear');
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', function() {
+                if (searchInput) searchInput.value = "";
+                clearSearchHit();
+            });
+        }
 
         // ================= What-If simulation state updates =================
         // Pure D3 data joins over the selections dagre-d3 already rendered:

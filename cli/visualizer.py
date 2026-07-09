@@ -110,7 +110,7 @@ class WorkflowVisualizer:
         stroke_width = 2
         if is_live:
             border_color = '#00c3a5'
-            stroke_width = 4
+            stroke_width = 6
         elif is_critical:
             border_color = '#e67e22'
             stroke_width = 3
@@ -298,6 +298,8 @@ class WorkflowVisualizer:
 
             dagre_nodes.append({
                 'id': str(node_id),
+                'name': str(t_name),
+                'type': str(t_type),
                 'image': svg_data_uri,
                 'width': node_width,
                 'height': node_height,
@@ -347,7 +349,7 @@ class WorkflowVisualizer:
                     
                     if is_edge_live:
                         e_color = '#00c3a5'
-                        e_width = 4
+                        e_width = 6
                     elif is_edge_critical:
                         e_color = '#e67e22'
                         e_width = 3
@@ -357,7 +359,8 @@ class WorkflowVisualizer:
                         'to': str(t),
                         'label': label,
                         'color': e_color,
-                        'width': e_width
+                        'width': e_width,
+                        'live': bool(is_edge_live),
                     })
 
             # Declare each switch's edges in a CONSISTENT order (FALSE/default first, then
