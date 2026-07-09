@@ -296,6 +296,7 @@
   #simOutcome .badge.altered { background: #ff9500; box-shadow: 0 0 6px rgba(255, 149, 0, 0.8); }
   #simOutcome .badge.broken { background: #ff2d2d; box-shadow: 0 0 6px rgba(255, 45, 45, 0.8); }
   #simOutcome .badge.failed { background: #cc0000; box-shadow: 0 0 8px rgba(204, 0, 0, 0.9); }
+  #simOutcome .badge.info { background: #4da6ff; box-shadow: 0 0 6px rgba(77, 166, 255, 0.7); }
   #simOutcome .impact-legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
   #simOutcome .impact-legend .badge { display: inline-block; margin-right: 4px; }
   #traceList {
@@ -397,6 +398,8 @@
   const noteBanner = document.getElementById("noteBanner");
   const result = document.getElementById("result");
   const mapFrame = document.getElementById("mapFrame");
+  let viewerReady = false;
+  let pendingMapMessage = null;
 
   function roleFor(name) {
     const lower = name.toLowerCase();
@@ -518,6 +521,15 @@
   clearBtn.addEventListener("click", () => {
     staged.clear();
     showError("");
+    showNote("");
+    showSimOutcome("");
+    if (simInput) simInput.value = "";
+    result.classList.remove("visible");
+    lastMapHtml = "";
+    mapFrame.removeAttribute("srcdoc");
+    mapFrame.src = "about:blank";
+    viewerReady = false;
+    pendingMapMessage = null;
     render();
   });
 
@@ -581,6 +593,8 @@
     });
 
     mapFrame.srcdoc = payload.map_html;
+    viewerReady = false;
+    pendingMapMessage = null;
     showNote(payload.note);
     showSimOutcome("");  // a fresh map invalidates any previous simulation overlay
     result.classList.add("visible");
@@ -633,13 +647,30 @@
   }
 
   function postToMap(message) {
+    if (!viewerReady) {
+      pendingMapMessage = message;
+      return;
+    }
     if (mapFrame.contentWindow) mapFrame.contentWindow.postMessage(message, "*");
   }
+
+  window.addEventListener("message", (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "tririga-viewer-ready") {
+      viewerReady = true;
+      if (pendingMapMessage) {
+        const queued = pendingMapMessage;
+        pendingMapMessage = null;
+        postToMap(queued);
+      }
+    }
+  });
 
   async function runSimulation() {
     const query = simInput.value.trim();
     if (!query) return;
     simRunBtn.disabled = true;
+    document.body.classList.add("busy");
 
     try {
       const resp = await fetch("/api/simulate", {
@@ -656,11 +687,12 @@
       if (!resp.ok) throw new Error(payload.error || "Simulation failed (HTTP " + resp.status + ").");
 
       if (payload.mode === "did_query") {
+        postToMap({ type: "tririga-simulation-clear" });
         showSimOutcome(
           "<h4>Query Answer</h4>" + escapeHtml(payload.answer) +
           "<div class='sim-hint'>" + escapeHtml(payload.evidence) + "</div>"
         );
-        return; // informational: leave the current highlight untouched
+        return;
       }
 
       let html = "<h4>Simulated Outcome — " + escapeHtml(payload.workflow) + "</h4>";
@@ -673,7 +705,16 @@
         for (const ft of failed) {
           let line = ft.node_type_name + " (Type " + ft.node_type + ") '" + ft.node_name +
                      "' (ID: " + ft.node_id + ") FAILED / skipped.";
-          if (ft.fields && ft.fields.length) {
+          if (ft.node_type === "23") {
+            const meta = [];
+            if (ft.sections && ft.sections.length) meta.push("sections: " + ft.sections.join(", "));
+            if (ft.tabs && ft.tabs.length) meta.push("tabs: " + ft.tabs.join(", "));
+            if (ft.fields && ft.fields.length) meta.push("fields: " + ft.fields.join(", "));
+            if (meta.length) {
+              line += " UI not updated (" + meta.join("; ") + ")";
+              if (ft.bo) line += " on " + ft.bo;
+            }
+          } else if (ft.fields && ft.fields.length) {
             line += " Fields not updated: " + ft.fields.join(", ");
             if (ft.bo) line += " on " + ft.bo;
           }
@@ -686,12 +727,18 @@
             "</span></li>";
         }
         for (const imp of impacts) {
-          html += "<li><span class='badge broken'></span><span>" + escapeHtml(imp.sentence) + "</span></li>";
+          // Token-starved dependents have a real consumer and are not informational field notes.
+          const isStarved = !!imp.consumer_id && imp.informational !== true &&
+            imp.ref_kind !== "field_reference";
+          const badge = isStarved ? "broken" : "info";
+          html += "<li><span class='badge " + badge + "'></span><span>" +
+            escapeHtml(imp.sentence) + "</span></li>";
         }
         html += "</ul>";
         html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
                 " &nbsp; <span class='badge altered'></span>altered source task" +
-                " &nbsp; <span class='badge broken'></span>starved dependent task</div>";
+                " &nbsp; <span class='badge broken'></span>starved dependent task" +
+                " &nbsp; <span class='badge info'></span>field / ledger note</div>";
       }
 
       // Impact/altered narratives already render above with badges; keep only
@@ -706,8 +753,10 @@
         for (const line of rest) html += "<li>" + escapeHtml(line) + "</li>";
         html += "</ul>";
       }
-      if (payload.unmatched_phrases.length) {
-        html += "<div class='sim-hint'>Tip: name the decision gate or field as it appears on the map for unmatched phrases.</div>";
+      if (payload.unmatched_phrases && payload.unmatched_phrases.length) {
+        html += "<div class='sim-hint'>Unmatched phrase(s): " +
+          escapeHtml(payload.unmatched_phrases.map((p) => "'" + p + "'").join(", ")) +
+          ". Tip: name the decision gate, task, or field as it appears on the map.</div>";
       }
       showSimOutcome(html);
 
@@ -724,6 +773,7 @@
       showSimOutcome("<h4>Simulation Error</h4>" + escapeHtml(err.message || String(err)));
     } finally {
       simRunBtn.disabled = false;
+      document.body.classList.remove("busy");
     }
   }
 

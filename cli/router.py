@@ -74,8 +74,8 @@ class TririgaNLPRouter:
         try:
             result = simulation.run_simulation(
                 self.engine, wf_name, q, trace_ids=self.last_execution_trace_ids)
-        except ValueError as e:
-            return wrap_ascii(q, str(e))
+        except Exception as e:
+            return wrap_ascii(q, f"Simulation failed: {e}")
 
         if result['mode'] == 'did_query':
             return wrap_ascii(q, f"{result['answer']}\n{result['evidence']}")
@@ -87,10 +87,22 @@ class TririgaNLPRouter:
         for ft in result.get('failed_tasks', []):
             line = (f"  - {ft['node_type_name']} (Type {ft['node_type']}) '{ft['node_name']}' "
                     f"(ID: {ft['node_id']}) FAILED / skipped")
-            if ft.get('fields'):
+            if ft.get('fields') and ft.get('node_type') != '23':
                 line += f" — fields not updated: {', '.join(ft['fields'])}"
                 if ft.get('bo'):
                     line += f" on {ft['bo']}"
+            elif ft.get('node_type') == '23':
+                meta_parts = []
+                if ft.get('sections'):
+                    meta_parts.append(f"sections: {', '.join(ft['sections'])}")
+                if ft.get('tabs'):
+                    meta_parts.append(f"tabs: {', '.join(ft['tabs'])}")
+                if ft.get('fields'):
+                    meta_parts.append(f"fields: {', '.join(ft['fields'])}")
+                if meta_parts:
+                    line += f" — UI not updated ({'; '.join(meta_parts)})"
+                    if ft.get('bo'):
+                        line += f" on {ft['bo']}"
             output.append(line)
         for a in result.get('altered_tasks', []):
             output.append(f"  - {a['node_type_name']} (Type {a['node_type']}) '{a['node_name']}' "
@@ -120,9 +132,26 @@ class TririgaNLPRouter:
             marker = "  START: " if idx == 0 else "  -> "
             output.append(f"{marker}{name}")
 
-        output.append("")
-        for line in result['summary']:
-            output.append(line)
+        # Keep route/bypass lines from summary; skip impact sentences already printed above.
+        impact_sentences = {imp['sentence'] for imp in result.get('impacts', [])}
+        skip_prefixes = (
+            'Simulated execution failure for ',
+            'Simulated a zero-records / null-token state for the ',
+            "Gate '",
+            'Unmatched phrase(s):',
+            'No specific condition matched',
+        )
+        route_lines = []
+        for line in result.get('summary', []):
+            if line in impact_sentences:
+                continue
+            if any(line.startswith(p) for p in skip_prefixes):
+                continue
+            route_lines.append(line)
+        if route_lines:
+            output.append("")
+            for line in route_lines:
+                output.append(line)
         output.append("")
         output.append("Type 'visualize' to see this simulated path highlighted on the map.")
         return wrap_ascii(q, "\n".join(output))
@@ -1344,7 +1373,7 @@ class TririgaNLPRouter:
                 else:
                     state_changes, target_sections, target_fields, target_tabs = [], set(), set(), set()
                     for gm in gui_mappings:
-                        tab, sec, fld = gm.get('Tab', ''), gm.get('Field', '')
+                        tab, sec, fld = gm.get('Tab', ''), gm.get('Section', ''), gm.get('Field', '')
                         p_type, p_val = gm.get('PropType', ''), gm.get('PropVal', '').lower()
                         if tab and tab != '^^': target_tabs.add(tab)
                         if sec and sec != '^^': target_sections.add(sec)

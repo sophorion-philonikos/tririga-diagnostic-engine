@@ -43,22 +43,47 @@
            Precedence (failed > altered > broken > active) is enforced by the data join. */
         .node.sim-failed { filter: drop-shadow(0 0 8px #cc0000) drop-shadow(0 0 20px rgba(204, 0, 0, 0.9)); animation: sim-pulse 1.8s ease-in-out infinite; }
         @keyframes sim-pulse { 0%, 100% { filter: drop-shadow(0 0 6px #cc0000) drop-shadow(0 0 16px rgba(204, 0, 0, 0.75)); } 50% { filter: drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 24px rgba(255, 0, 0, 0.95)); } }
-        .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); }
+        .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); animation: sim-pulse-altered 1.8s ease-in-out infinite; }
+        @keyframes sim-pulse-altered { 0%, 100% { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 14px rgba(255, 149, 0, 0.7)); } 50% { filter: drop-shadow(0 0 10px #ffb84d) drop-shadow(0 0 22px rgba(255, 149, 0, 0.95)); } }
         .node.sim-broken { filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 16px rgba(255, 45, 45, 0.75)); }
         .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
         .edgePath.sim-active marker path { fill: #c341ff !important; stroke: #c341ff !important; }
-        .edgePath.sim-broken path { stroke: #ff2d2d !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(255, 45, 45, 0.8)); }
+        .edgePath.sim-broken path { stroke: #ff2d2d !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; filter: drop-shadow(0 0 4px rgba(255, 45, 45, 0.8)); }
         .edgePath.sim-broken marker path { fill: #ff2d2d !important; stroke: #ff2d2d !important; }
+        .edgeLabel.sim-active text { fill: #c341ff !important; }
+        .edgeLabel.sim-broken text { fill: #ff2d2d !important; }
         .sim-summary h3 { color: #c341ff; margin-top: 0; }
         .sim-summary ul { padding-left: 18px; margin: 8px 0; }
         .sim-summary li { margin-bottom: 6px; font-size: 13px; line-height: 1.45; }
         .sim-summary .sim-decision { color: #bbbbbb; font-family: Consolas, monospace; font-size: 12px; }
         .sim-summary .sim-impact { color: #ffb3b3; }
 
+        .zoom-toolbar {
+            position: absolute; top: 16px; left: 16px; z-index: 1001;
+            display: flex; gap: 4px; background: rgba(255,255,255,0.95);
+            border: 1px solid #ccc; border-radius: 8px; padding: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        .zoom-toolbar button {
+            width: 32px; height: 28px; border: 1px solid #bbb; border-radius: 5px;
+            background: #fff; color: #333; font-size: 14px; font-weight: 600;
+            cursor: pointer; line-height: 1;
+        }
+        .zoom-toolbar button:hover { background: #eef3ff; border-color: #4da6ff; }
+        .zoom-toolbar button.wide { width: auto; padding: 0 10px; font-size: 11px; letter-spacing: 0.3px; }
+
         .legend { position: absolute; bottom: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #333; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; }
         .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
         .legend-item:last-child { margin-bottom: 0; }
         .color-box { width: 16px; height: 16px; margin-right: 10px; border-radius: 3px; }
+        #simLegend { display: none; margin-top: 12px; padding-top: 10px; border-top: 1px solid #ddd; }
+        #simLegend.visible { display: block; }
+        .glow-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+        .glow-failed { background: #cc0000; box-shadow: 0 0 6px #cc0000; }
+        .glow-altered { background: #ff9500; box-shadow: 0 0 6px #ff9500; }
+        .glow-broken { background: #ff2d2d; box-shadow: 0 0 6px #ff2d2d; }
+        .glow-path { background: #c341ff; box-shadow: 0 0 6px #c341ff; }
+        .glow-dim { background: #999; opacity: 0.35; }
         
         .shape-icon { display: inline-block; width: 20px; height: 15px; margin-right: 10px; border: 1px solid #777; }
         .s-scalene { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
@@ -72,6 +97,12 @@
 <body>
     <div id="canvas-container">
         <svg id="svg-canvas"><g/></svg>
+        <div class="zoom-toolbar" id="zoomToolbar">
+            <button type="button" class="wide" id="zoomFit" title="Fit to view">Fit</button>
+            <button type="button" class="wide" id="zoomReset" title="Reset view">Reset</button>
+            <button type="button" id="zoomIn" title="Zoom in">+</button>
+            <button type="button" id="zoomOut" title="Zoom out">−</button>
+        </div>
         <div class="legend">
             <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">Routing Tracks</div>
             <div class="legend-item"><div class="color-box" style="background: #e67e22;"></div> Critical Path</div>
@@ -84,6 +115,15 @@
             <div class="legend-item"><div class="shape-icon s-pill"></div> Retrieve Task</div>
             <div class="legend-item"><div class="shape-icon s-rect-p"></div> Modify Records</div>
             <div class="legend-item"><div class="shape-icon s-notch"></div> Modify Metadata</div>
+
+            <div id="simLegend">
+                <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">What-If Simulation</div>
+                <div class="legend-item"><div class="glow-dot glow-failed"></div> Failed / skipped task</div>
+                <div class="legend-item"><div class="glow-dot glow-altered"></div> Altered (zero records)</div>
+                <div class="legend-item"><div class="glow-dot glow-broken"></div> Starved dependent</div>
+                <div class="legend-item"><div class="glow-dot glow-path"></div> Simulated path</div>
+                <div class="legend-item"><div class="glow-dot glow-dim"></div> Off-path (dimmed)</div>
+            </div>
         </div>
     </div>
     <div id="sidepanel">
@@ -174,12 +214,46 @@
         svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
         document.getElementById('svg-canvas').style.opacity = 1;
 
+        function applyZoomTransform(transform) {
+            svg.transition().duration(250).call(zoom.transform, transform);
+        }
+
+        function fitToView() {
+            var graph = g.graph();
+            var gw = graph.width || 1;
+            var gh = graph.height || 1;
+            var cw = container.clientWidth || 1;
+            var ch = container.clientHeight || 1;
+            var scale = Math.min(cw / (gw + 80), ch / (gh + 80), 1.2) * 0.92;
+            var nx = (cw - gw * scale) / 2;
+            var ny = Math.max(40, (ch - gh * scale) / 2);
+            applyZoomTransform(d3.zoomIdentity.translate(nx, ny).scale(scale));
+        }
+
+        function resetView() {
+            applyZoomTransform(d3.zoomIdentity.translate(tx, ty).scale(initialScale));
+        }
+
+        function zoomBy(factor) {
+            svg.transition().duration(200).call(zoom.scaleBy, factor);
+        }
+
+        document.getElementById('zoomFit').addEventListener('click', fitToView);
+        document.getElementById('zoomReset').addEventListener('click', resetView);
+        document.getElementById('zoomIn').addEventListener('click', function() { zoomBy(1.25); });
+        document.getElementById('zoomOut').addEventListener('click', function() { zoomBy(0.8); });
+
         // ================= What-If simulation state updates =================
         // Pure D3 data joins over the selections dagre-d3 already rendered:
         // each g.node carries its node id as datum, each g.edgePath / g.edgeLabel
         // carries the {v, w} edge object. Highlighting is a class toggle only --
         // no re-render, no coordinate math, no DOM mutation of the layout.
         function edgeKey(d) { return String(d.v) + "->" + String(d.w); }
+
+        function setSimLegendVisible(on) {
+            var el = document.getElementById('simLegend');
+            if (el) el.classList.toggle('visible', !!on);
+        }
 
         window.applySimulation = function(nodeIds, edgePairs, summaryHtml, alteredIds, impactedIds, failedIds) {
             var nodeSet = new Set((nodeIds || []).map(String));
@@ -222,7 +296,11 @@
                 .classed("sim-dim", function(d) { return !edgeSet.has(edgeKey(d)) && !edgeBroken(d); });
 
             inner.selectAll("g.edgeLabel")
+                .classed("sim-broken", edgeBroken)
+                .classed("sim-active", function(d) { return edgeSet.has(edgeKey(d)) && !edgeBroken(d); })
                 .classed("sim-dim", function(d) { return !edgeSet.has(edgeKey(d)) && !edgeBroken(d); });
+
+            setSimLegendVisible(true);
 
             if (summaryHtml) {
                 document.getElementById('payloadData').innerHTML =
@@ -237,12 +315,18 @@
             inner.selectAll("g.edgePath")
                 .classed("sim-active", false).classed("sim-dim", false)
                 .classed("sim-broken", false);
-            inner.selectAll("g.edgeLabel").classed("sim-dim", false);
+            inner.selectAll("g.edgeLabel")
+                .classed("sim-active", false).classed("sim-dim", false).classed("sim-broken", false);
+            setSimLegendVisible(false);
             document.getElementById('payloadData').innerHTML =
                 "<p class='hint'>Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>";
         };
 
         window.addEventListener("message", function(ev) {
+            if (ev.origin && ev.origin !== "null" && window.location.origin &&
+                window.location.origin !== "null" && ev.origin !== window.location.origin) {
+                return;
+            }
             var msg = ev.data || {};
             if (msg.type === "tririga-simulation") {
                 window.applySimulation(msg.nodeIds || [], msg.edgePairs || [], msg.summaryHtml || "",
@@ -251,6 +335,12 @@
                 window.clearSimulation();
             }
         });
+
+        try {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: "tririga-viewer-ready" }, "*");
+            }
+        } catch (e) { /* ignore cross-origin */ }
 
     </script>
 </body>

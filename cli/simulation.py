@@ -21,6 +21,8 @@ import re
 import difflib
 from dataclasses import dataclass, field
 
+import networkx as nx
+
 from cli import graph_utils
 from cli.knowledge import type_display_name
 
@@ -198,12 +200,14 @@ _TYPE_HINTS = [
     (re.compile(r"\bretrieve(?:\s+records?)?\s+task\b|\bretrieve\s+task\b|\bget\s+task\b", re.I), '29'),
     (re.compile(r"\bquery\s+task\b", re.I), '22'),
     (re.compile(r"\bmodify(?:\s+records?)?\s+task\b|\bmodify\s+task\b|\bupdate\s+task\b", re.I), '28'),
-    (re.compile(r"\bcreate(?:\s+records?)?\s+task\b|\bcreate\s+task\b", re.I), '26'),
+    (re.compile(r"\bcreate(?:\s+records?)?\s+task\b|\bcreate\s+task\b|\btemp\s+record\s+task\b", re.I), '25'),
+    (re.compile(r"\bsave\s+permanent(?:\s+record)?(?:\s+task)?\b|\bpermanent\s+record\s+task\b", re.I), '26'),
     (re.compile(r"\bswitch(?:\s+task)?\b|\bdecision\s+gate\b", re.I), '14'),
     (re.compile(r"\bmodify\s+metadata\s+task\b|\bmetadata\s+task\b", re.I), '23'),
     (re.compile(r"\btrigger\s+action(?:\s+task)?\b", re.I), '31'),
-    (re.compile(r"\bassociate\s+task\b|\bassociation\s+task\b", re.I), '32'),
-    (re.compile(r"\bde-?associate\s+task\b", re.I), '33'),
+    (re.compile(r"\bassociate(?:\s+records?)?(?:\s+task)?\b|\bassociation\s+task\b", re.I), '30'),
+    (re.compile(r"\bde-?associate(?:\s+task)?\b|\bdelete\s+reference(?:\s+task)?\b", re.I), '32'),
+    (re.compile(r"\badd\s+child(?:\s+task)?\b", re.I), '33'),
     (re.compile(r"\biter(?:ator|ation)?\s+task\b", re.I), '24'),
     (re.compile(r"\bloop\s+task\b", re.I), '20'),
     (re.compile(r"\bcall\s+workflow\s+task\b|\bsub-?workflow\s+task\b", re.I), '38'),
@@ -619,20 +623,28 @@ def match_task(engine, wf_name, clause):
 # fatal=True means the task cannot perform its work and is bypassed.
 _TOKEN_CONSEQUENCES = {
     '28': ('fail/bypass execution because it lacks the required target record context', True),
-    '26': ('fail/bypass execution because there is no source record to create from', True),
-    '30': ('fail/bypass execution because there is no record to save', True),
-    '32': ('be unable to form the association because the record token is missing', True),
-    '33': ('be unable to remove the association because the record token is missing', True),
+    '25': ('produce an empty temporary record context for its own consumers', True),
+    '26': ('fail/bypass execution because there is no source record to save permanently', True),
+    '30': ('be unable to form the association because the record token is missing', True),
+    '32': ('be unable to remove the association because the record token is missing', True),
+    '33': ('be unable to add the child record because the parent token is missing', True),
     '31': ('skip the state transition because there is no record to act on', True),
     '23': ('skip its metadata changes because the target record context is empty', True),
-    '25': ('produce an empty temporary record context for its own consumers', True),
     '29': ('retrieve against an empty source context and likely return zero records itself', True),
     '22': ('run its query over an empty source context and likely return zero records itself', True),
     '24': ('iterate zero times, so its LOOP BODY branch is never entered', True),
     '20': ('loop zero times, so its body is never entered', True),
     '14': ('evaluate its condition over a null token, so its verdict may flip to the FALSE/default branch', False),
     '38': ('invoke the sub-workflow with an empty record context', False),
+    '40': ('define a workflow variable without a usable source value', False),
     '41': ('assign a null value to its workflow variable', False),
+    '43': ('evaluate its fact condition over a null token', False),
+    '17': ('schedule an event without a usable record context', False),
+    '34': ('set the project context without a usable record token', False),
+    '35': ('attach a format file without a usable record context', False),
+    '36': ('populate a file without a usable record context', False),
+    '37': ('distill a file without a usable record context', False),
+    '39': ('invoke custom logic with an empty record context', False),
 }
 _DEFAULT_CONSEQUENCE = ('receive an empty object token from its source task', False)
 
@@ -640,19 +652,22 @@ _DEFAULT_CONSEQUENCE = ('receive an empty object token from its source task', Fa
 def build_token_index(graph):
     """Map producer task id -> [(consumer id, ref kind)] from parsed TaskRefs.
 
-    ``FromTask`` (TaskRef UseType=1) is the consumer's primary record context;
-    ``FilterTask`` (UseType=2) is its source/filter record token.
+    ``FromTask`` (UseType=1) is the consumer's primary record context;
+    ``FilterTask`` (UseType=2) is its source/filter record token;
+    ``AuxTask`` (UseType=3) is a tertiary context (e.g. Populate File).
+    ``RefTaskId="0"`` is the workflow Start / trigger record and is indexed.
     """
     consumers = {}
     for nid, data in graph.nodes(data=True):
         for key, kind in (('FromTask', 'primary record context'),
-                          ('FilterTask', 'source record token')):
+                          ('FilterTask', 'source record token'),
+                          ('AuxTask', 'auxiliary record context')):
             refs = data.get(key, [])
             if isinstance(refs, str):
                 refs = [refs]
             for ref in refs:
                 ref = str(ref)
-                if ref in ('-1', '0', ''):
+                if ref in ('-1', ''):
                     continue
                 consumers.setdefault(ref, []).append((str(nid), kind))
     return consumers
@@ -791,30 +806,97 @@ def extract_associations(data):
     return names
 
 
-def _node_field_text(data):
-    """Concatenate field-bearing metadata on a node for substring scans."""
+_PROP_TYPE_LABELS = {
+    '1': 'Visible',
+    '3': 'Read-Only',
+    '8': 'Required',
+}
+
+
+def _format_prop_value(val):
+    low = str(val or '').strip().lower()
+    if low == 'false':
+        return 'No'
+    if low == 'true':
+        return 'Yes'
+    return str(val or '').strip()
+
+
+def extract_metadata_ledger(data):
+    """UI/metadata ledger for Modify Metadata (Type 23) tasks from GUIMappings."""
+    tabs, sections, fields = set(), set(), set()
+    property_changes = []
+    bo = str(data.get('BO') or data.get('Bo') or '').strip()
+
+    for gm in data.get('GUIMappings', []) or []:
+        tab = str(gm.get('Tab') or '').strip()
+        sec = str(gm.get('Section') or '').strip()
+        fld = str(gm.get('Field') or '').strip()
+        if tab and tab != '^^':
+            tabs.add(tab)
+        if sec and sec != '^^':
+            sections.add(sec)
+        if fld and fld != '^^':
+            fields.add(fld)
+        p_type = str(gm.get('PropType') or '').strip()
+        p_val = str(gm.get('PropVal') or '').strip()
+        prop_label = _PROP_TYPE_LABELS.get(p_type, f'Property {p_type}' if p_type else 'Property')
+        property_changes.append({
+            'prop_type': p_type,
+            'prop_label': prop_label,
+            'value': p_val,
+            'tab': tab,
+            'section': sec,
+            'field': fld,
+        })
+
+    return {
+        'bo': bo,
+        'tabs': sorted(tabs),
+        'sections': sorted(sections),
+        'fields': sorted(fields),
+        'property_changes': property_changes,
+    }
+
+
+def _node_read_field_text(data):
+    """Concatenate read-side field metadata only (excludes TrgtFld write targets)."""
     parts = []
-    for key in ('LFldName', 'PField', 'Expression', 'ConstantValue', 'TrgtFld', 'SrcFld', 'Field'):
+    for key in ('LFldName', 'PField', 'Expression', 'ConstantValue', 'SrcFld'):
         for val in data.get(key, []) or []:
             parts.append(str(val))
     for rec in data.get('ObjMappingRecords', []) or []:
-        for k in ('TrgtFld', 'SrcFld', 'TrgtBo', 'SrcBo', 'FldVal'):
-            if rec.get(k):
-                parts.append(str(rec[k]))
+        if rec.get('SrcFld'):
+            parts.append(str(rec['SrcFld']))
     return ' '.join(parts)
 
 
 def find_field_dependent_nodes(graph, field_names, failed_id, failed_name):
-    """Informational impacts: downstream nodes referencing failed Modify fields."""
+    """Informational impacts: graph-descendant nodes that READ failed Modify fields.
+
+    Peer Modifies that only write the same TrgtFld are excluded. Results are
+    never added to impacted_map — they are informational only.
+    """
     if not field_names:
         return []
+    failed_id = str(failed_id)
+    if not graph.has_node(failed_id):
+        return []
+    try:
+        reachable = {str(n) for n in nx.descendants(graph, failed_id)}
+    except Exception:
+        reachable = set()
+    if not reachable:
+        return []
+
     notes = []
-    for nid, data in sorted(graph.nodes(data=True), key=lambda x: str(x[0])):
+    for nid in sorted(reachable):
+        if not graph.has_node(nid):
+            continue
+        data = graph.nodes[nid]
         if graph_utils.is_invisible(data) and graph.out_degree(nid) > 0:
             continue
-        if str(nid) == str(failed_id):
-            continue
-        blob = _node_field_text(data).lower()
+        blob = _node_read_field_text(data).lower()
         hits = [f for f in field_names if f and f.lower() in blob]
         if not hits:
             continue
@@ -876,7 +958,7 @@ def analyze_task_failures(engine, wf_name, clauses):
         name = str(data.get('name', f'Task {nid}'))
         mode = clause.failure_mode
 
-        if t_type in ('28', '26'):
+        if t_type == '28':
             ledger = extract_modify_ledger(data)
             fields = ledger['fields']
             bo = ledger['target_bo']
@@ -932,6 +1014,50 @@ def analyze_task_failures(engine, wf_name, clauses):
                 impacted_map[cid] = impacted_map.get(cid, False) or fatal
             impacts.extend(tok_impacts)
             impacts.extend(find_field_dependent_nodes(graph, fields, nid, name))
+
+        elif t_type == '25':
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'create_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                    f"would not create a temporary record token for downstream consumers."
+                ),
+            })
+            imp_map, tok_impacts = propagate_null_token(
+                graph, [nid], token_index, starve_cause='task_failure')
+            for cid, fatal in imp_map.items():
+                impacted_map[cid] = impacted_map.get(cid, False) or fatal
+            impacts.extend(tok_impacts)
+
+        elif t_type == '26':
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'save_permanent_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                    f"would not persist the temporary record to a permanent record."
+                ),
+            })
+            imp_map, tok_impacts = propagate_null_token(
+                graph, [nid], token_index, starve_cause='task_failure')
+            for cid, fatal in imp_map.items():
+                impacted_map[cid] = impacted_map.get(cid, False) or fatal
+            impacts.extend(tok_impacts)
 
         elif t_type in ('29', '22'):
             altered_from_failure.append({
@@ -1006,8 +1132,14 @@ def analyze_task_failures(engine, wf_name, clauses):
                     f"action(s) not fired: {action_str}."
                 ),
             })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
 
-        elif t_type in ('32', '33'):
+        elif t_type == '30':
             assocs = extract_associations(data)
             assoc_str = ', '.join(assocs[:3]) if assocs else 'association'
             failed_tasks.append({
@@ -1016,16 +1148,69 @@ def analyze_task_failures(engine, wf_name, clauses):
                 'clause': clause.text, 'score': round(score, 2),
             })
             failed_ids.append(nid)
-            verb = 'not formed' if t_type == '32' else 'not removed'
             impacts.append({
                 'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
                 'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
                 'ref_kind': 'association_failure', 'fatal': False,
                 'sentence': (
                     f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) would fail; "
-                    f"{assoc_str} {verb}."
+                    f"{assoc_str} not formed."
                 ),
             })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
+
+        elif t_type == '32':
+            assocs = extract_associations(data)
+            assoc_str = ', '.join(assocs[:3]) if assocs else 'association'
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'association_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) would fail; "
+                    f"{assoc_str} not removed."
+                ),
+            })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
+
+        elif t_type == '33':
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'add_child_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}) would fail; "
+                    f"child record would not be added."
+                ),
+            })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
 
         elif t_type in ('24', '20'):
             failed_tasks.append({
@@ -1043,6 +1228,71 @@ def analyze_task_failures(engine, wf_name, clauses):
                     f"loop body would never be entered."
                 ),
             })
+
+        elif t_type == '23':
+            ledger = extract_metadata_ledger(data)
+            tabs = ledger['tabs']
+            sections = ledger['sections']
+            fields = ledger['fields']
+            bo = ledger['bo']
+            failed_tasks.append({
+                'node_id': nid,
+                'node_name': name,
+                'node_type': t_type,
+                'node_type_name': t_type_name,
+                'failure_mode': mode,
+                'clause': clause.text,
+                'score': round(score, 2),
+                'tabs': tabs,
+                'sections': sections,
+                'fields': fields,
+                'bo': bo,
+                'property_changes': ledger['property_changes'],
+            })
+            failed_ids.append(nid)
+            field_impacts.append({
+                'task_id': nid,
+                'bo': bo,
+                'tabs': tabs,
+                'sections': sections,
+                'fields': fields,
+                'kind': 'metadata',
+            })
+            target_parts = []
+            if sections:
+                target_parts.append(f"section(s) ({', '.join(sections)})")
+            if fields:
+                target_parts.append(f"field(s) ({', '.join(fields)})")
+            if tabs and not target_parts:
+                target_parts.append(f"tab(s) ({', '.join(tabs)})")
+            targets_str = ' and '.join(target_parts) if target_parts else 'form properties'
+            bo_part = f" on BO '{bo}'" if bo else ''
+            prop_labels = sorted({
+                f"{pc['prop_label']}={_format_prop_value(pc['value'])}"
+                for pc in ledger['property_changes']
+            })
+            prop_part = f" ({', '.join(prop_labels)})" if prop_labels else ''
+            impacts.append({
+                'producer_id': nid,
+                'producer_name': name,
+                'producer_type': t_type,
+                'consumer_id': None,
+                'consumer_name': '',
+                'consumer_type': '',
+                'ref_kind': 'metadata_ledger',
+                'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                    f"will not apply UI changes to {targets_str}{bo_part}{prop_part}. "
+                    f"Visibility, read-only, and required states will not propagate."
+                ),
+            })
+            if token_index.get(nid):
+                imp_map, tok_impacts = propagate_null_token(
+                    graph, [nid], token_index, starve_cause='task_failure')
+                for cid, fatal in imp_map.items():
+                    impacted_map[cid] = impacted_map.get(cid, False) or fatal
+                impacts.extend(tok_impacts)
 
         else:
             failed_tasks.append({
@@ -1088,6 +1338,88 @@ def _start_nodes(graph):
     starters = [n for n in roots
                 if graph_utils.get_type_str(graph.nodes[n]) in ('1', 'Trigger', 'Start')]
     return sorted(starters or roots)
+
+
+def path_to_task(graph, target_id):
+    """Shortest simple path from a Start node to ``target_id`` (string node ids).
+
+    Returns a list of node ids including start and target, or [] if unreachable.
+    """
+    target_id = str(target_id)
+    if not graph.has_node(target_id):
+        return []
+    best = None
+    for start in _start_nodes(graph):
+        start = str(start)
+        if start == target_id:
+            return [start]
+        try:
+            path = nx.shortest_path(graph, start, target_id)
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            continue
+        path = [str(n) for n in path]
+        if best is None or len(path) < len(best):
+            best = path
+    return best or []
+
+
+def path_edges_from_nodes(path_ids):
+    """Consecutive [from, to] pairs for a node id list."""
+    return [[path_ids[i], path_ids[i + 1]] for i in range(len(path_ids) - 1)]
+
+
+def _dedupe_impacts(impacts):
+    """Keep each discrete impact relationship exactly once (by sentence)."""
+    seen, out = set(), []
+    for imp in impacts:
+        key = imp.get('sentence') or (
+            imp.get('producer_id'), imp.get('consumer_id'), imp.get('ref_kind'))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(imp)
+    return out
+
+
+def force_verdicts_for_path(engine, wf_name, path_ids):
+    """Derive Switch/Iter forced verdicts so ``simulate`` follows ``path_ids``.
+
+    For each branching node on the path, pick the branch label whose resolved
+    visible target continues along the path. Returns node_id -> verdict map.
+    """
+    graph = engine.graphs[wf_name]
+    path_set = {str(n) for n in path_ids}
+    path_list = [str(n) for n in path_ids]
+    forced = {}
+
+    for i, nid in enumerate(path_list):
+        if not graph.has_node(nid):
+            continue
+        data = graph.nodes[nid]
+        t_type = graph_utils.get_type_str(data)
+        if t_type not in ('14', '24'):
+            continue
+        # Prefer the next path node after this gate (skipping invisible hops).
+        remaining = set(path_list[i + 1:])
+        branch_map = engine.get_branch_map(data)
+        chosen_label = None
+        for raw_target, label in branch_map.items():
+            visibles = graph_utils.resolve_to_visible(graph, raw_target)
+            if any(str(v) in remaining or str(v) in path_set for v in visibles):
+                # Prefer a visible successor that is the immediate next on path.
+                if any(str(v) in remaining for v in visibles):
+                    chosen_label = label
+                    break
+                if chosen_label is None:
+                    chosen_label = label
+        if chosen_label is None:
+            continue
+        if t_type == '14':
+            forced[nid] = chosen_label if chosen_label in ('TRUE', 'FALSE') else chosen_label
+        else:
+            # Iter: TRUE means LOOP BODY, FALSE/other means EXIT
+            forced[nid] = 'TRUE' if chosen_label == 'LOOP BODY' else 'FALSE'
+    return forced
 
 
 def simulate(engine, wf_name, forced):
@@ -1277,7 +1609,11 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
     forced.update(failure_result['forced_overrides'])
 
     # --- Dataflow token simulation for zero-record clauses ---
-    altered = list(failure_result['altered_from_failure'])
+    # Type 29/22 task_failure already propagated inside analyze_task_failures;
+    # only data_state clauses need a fresh propagate_null_token pass.
+    altered_from_failure = list(failure_result['altered_from_failure'])
+    altered_from_failure_ids = {a['node_id'] for a in altered_from_failure}
+    altered = list(altered_from_failure)
     for clause in data_clauses:
         nid, data, score = match_task(engine, wf_name, clause)
         if nid is None:
@@ -1293,25 +1629,89 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
             'score': round(score, 2),
         })
 
-    if altered:
+    data_state_altered = [a for a in altered if a['node_id'] not in altered_from_failure_ids]
+    if data_state_altered:
         token_index = build_token_index(graph)
         extra_map, extra_impacts = propagate_null_token(
-            graph, [a['node_id'] for a in altered], token_index)
+            graph, [a['node_id'] for a in data_state_altered], token_index)
         for cid, fatal in extra_map.items():
             impacted_map[cid] = impacted_map.get(cid, False) or fatal
         impacts.extend(extra_impacts)
+
+    impacts = _dedupe_impacts(impacts)
 
     altered_ids = [a['node_id'] for a in altered]
     impacted_ids = sorted(impacted_map.keys())
     fatal_ids = {nid for nid, fatal in impacted_map.items() if fatal}
 
+    # Path overlay target: explicit failed task, else primary altered (Retrieve/Query).
+    path_forced_note = None
+    failure_path = []
+    path_target = None
+    path_kind = 'failed'
+    if failed_ids:
+        path_target = str(failed_ids[0])
+        path_kind = 'failed'
+    elif altered:
+        path_target = str(altered[0]['node_id'])
+        path_kind = 'altered'
+
+    if path_target:
+        failure_path = path_to_task(graph, path_target)
+        if failure_path:
+            path_forced = force_verdicts_for_path(engine, wf_name, failure_path)
+            for nid, verdict in path_forced.items():
+                if nid not in forced:
+                    forced[nid] = verdict
+
     walk = simulate(engine, wf_name, forced)
+
+    # Ensure the highlighted path reaches the simulation target (failed or altered).
+    if path_target and failure_path:
+        if path_target not in {str(n) for n in walk['path_node_ids']}:
+            walk = {
+                'path_node_ids': list(failure_path),
+                'path_edges': path_edges_from_nodes(failure_path),
+                'decisions': walk['decisions'] + [
+                    f"Highlighted path to {path_kind} task {path_target}; "
+                    f"structural FALSE-spine may differ."
+                ],
+                'bypassed': walk['bypassed'],
+            }
+            path_forced_note = (
+                f"Highlighted path to {path_kind} task {path_target}; "
+                f"structural FALSE-spine may differ."
+            )
+        else:
+            ids = [str(n) for n in walk['path_node_ids']]
+            cut = ids.index(path_target) + 1
+            trimmed = ids[:cut]
+            walk['path_node_ids'] = trimmed
+            walk['path_edges'] = path_edges_from_nodes(trimmed)
+            visible_ids = {str(n) for n, d in graph.nodes(data=True)
+                           if not (graph_utils.is_invisible(d) and graph.out_degree(n) > 0)}
+            walk['bypassed'] = sorted(
+                str(graph.nodes[n].get('name', f'Task {n}'))
+                for n in visible_ids - set(trimmed)
+            )
 
     # --- Narrative summary: failure + impact sentences lead ---
     summary = []
     for ft in failed_tasks:
         fld_part = ''
-        if ft.get('fields'):
+        if ft.get('node_type') == '23':
+            meta_parts = []
+            if ft.get('sections'):
+                meta_parts.append(f"sections: {', '.join(ft['sections'])}")
+            if ft.get('tabs'):
+                meta_parts.append(f"tabs: {', '.join(ft['tabs'])}")
+            if ft.get('fields'):
+                meta_parts.append(f"fields: {', '.join(ft['fields'])}")
+            if meta_parts:
+                fld_part = f" — UI not updated ({'; '.join(meta_parts)})"
+                if ft.get('bo'):
+                    fld_part += f" on {ft['bo']}"
+        elif ft.get('fields'):
             fld_part = f" — fields not updated: {', '.join(ft['fields'])}"
             if ft.get('bo'):
                 fld_part += f" on {ft['bo']}"
@@ -1326,20 +1726,29 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
         summary.append(imp['sentence'])
     for m in matched:
         summary.append(f"Gate '{m['node_name']}' ({m['node_id']}) forced {m['verdict']} - {m['reason']}.")
+    if path_forced_note:
+        summary.append(path_forced_note)
     if not matched and not altered and not failed_tasks:
         summary.append("No specific condition matched a decision gate or task; showing the default (FALSE-spine) route.")
     if unmatched:
         summary.append("Unmatched phrase(s): " + '; '.join(f"'{u}'" for u in unmatched))
 
-    executed_names = [str(graph.nodes[n].get('name', n)) for n in walk['path_node_ids']]
+    executed_names = [str(graph.nodes[n].get('name', n)) for n in walk['path_node_ids']
+                      if graph.has_node(n)]
     end_reached = any(graph_utils.get_type_str(graph.nodes[n]) in ('9', '13')
-                      for n in walk['path_node_ids'])
+                      for n in walk['path_node_ids'] if graph.has_node(n))
     on_path_fatal = [n for n in walk['path_node_ids'] if n in fatal_ids]
-    route_line = f"Simulated route executes {len(walk['path_node_ids'])} task(s)"
-    if on_path_fatal:
-        route_line += (f", of which {len(on_path_fatal)} would fail or bypass "
-                       f"due to the missing record token")
-    route_line += " and reaches an End task." if end_reached else " and stops before any End task."
+    if path_target and path_target in {str(n) for n in walk['path_node_ids']}:
+        route_line = (
+            f"Highlighted path to {path_kind} task {path_target} "
+            f"({len(walk['path_node_ids'])} task(s) from Start)."
+        )
+    else:
+        route_line = f"Simulated route executes {len(walk['path_node_ids'])} task(s)"
+        if on_path_fatal:
+            route_line += (f", of which {len(on_path_fatal)} would fail or bypass "
+                           f"due to the missing record token")
+        route_line += " and reaches an End task." if end_reached else " and stops before any End task."
     summary.append(route_line)
     if walk['bypassed']:
         shown = walk['bypassed'][:8]

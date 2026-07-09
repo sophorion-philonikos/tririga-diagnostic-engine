@@ -431,10 +431,14 @@ class TririgaHybridEngine:
                     if element.tag == 'TaskRef':
                         u_type = element.get('UseType')
                         r_id = element.get('RefTaskId')
-                        if u_type == '1' and r_id and r_id not in ['-1', '0', '']:
-                            node_data.setdefault('FromTask', []).append(r_id)
-                        elif u_type == '2' and r_id and r_id not in ['-1', '0', '']:
-                            node_data.setdefault('FilterTask', []).append(r_id)
+                        # RefTaskId "0" is the Start/trigger record and must be kept.
+                        if r_id and r_id not in ['-1', '']:
+                            if u_type == '1':
+                                node_data.setdefault('FromTask', []).append(r_id)
+                            elif u_type == '2':
+                                node_data.setdefault('FilterTask', []).append(r_id)
+                            elif u_type == '3':
+                                node_data.setdefault('AuxTask', []).append(r_id)
 
                     if element.text and element.text.strip() and element.tag not in ['TaskLabel']:
                         tag, val = element.tag, element.text.strip()
