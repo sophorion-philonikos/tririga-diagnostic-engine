@@ -200,8 +200,10 @@ _TYPE_HINTS = [
     (re.compile(r"\bretrieve(?:\s+records?)?\s+task\b|\bretrieve\s+task\b|\bget\s+task\b", re.I), '29'),
     (re.compile(r"\bquery\s+task\b", re.I), '22'),
     (re.compile(r"\bmodify(?:\s+records?)?\s+task\b|\bmodify\s+task\b|\bupdate\s+task\b", re.I), '28'),
-    (re.compile(r"\bcreate(?:\s+records?)?\s+task\b|\bcreate\s+task\b|\btemp\s+record\s+task\b", re.I), '25'),
+    (re.compile(r"\bcreate(?:\s+records?)?\s+task\b|\bcreate\s+task\b", re.I), '27'),
+    (re.compile(r"\bget\s+temp(?:\s+record)?(?:\s+task)?\b|\btemp\s+record\s+task\b", re.I), '25'),
     (re.compile(r"\bsave\s+permanent(?:\s+record)?(?:\s+task)?\b|\bpermanent\s+record\s+task\b", re.I), '26'),
+    (re.compile(r"\bfork(?:\s+task)?\b", re.I), '10'),
     (re.compile(r"\bswitch(?:\s+task)?\b|\bdecision\s+gate\b", re.I), '14'),
     (re.compile(r"\bmodify\s+metadata\s+task\b|\bmetadata\s+task\b", re.I), '23'),
     (re.compile(r"\btrigger\s+action(?:\s+task)?\b", re.I), '31'),
@@ -623,7 +625,8 @@ def match_task(engine, wf_name, clause):
 # fatal=True means the task cannot perform its work and is bypassed.
 _TOKEN_CONSEQUENCES = {
     '28': ('fail/bypass execution because it lacks the required target record context', True),
-    '25': ('produce an empty temporary record context for its own consumers', True),
+    '25': ('fail to expose temporary form data, leaving consumers without a usable temp token', True),
+    '27': ('produce no created record token for its own consumers', True),
     '26': ('fail/bypass execution because there is no source record to save permanently', True),
     '30': ('be unable to form the association because the record token is missing', True),
     '32': ('be unable to remove the association because the record token is missing', True),
@@ -635,6 +638,7 @@ _TOKEN_CONSEQUENCES = {
     '24': ('iterate zero times, so its LOOP BODY branch is never entered', True),
     '20': ('loop zero times, so its body is never entered', True),
     '14': ('evaluate its condition over a null token, so its verdict may flip to the FALSE/default branch', False),
+    '10': ('pass through as a structural fork/join without producing a record token', False),
     '38': ('invoke the sub-workflow with an empty record context', False),
     '40': ('define a workflow variable without a usable source value', False),
     '41': ('assign a null value to its workflow variable', False),
@@ -1026,10 +1030,32 @@ def analyze_task_failures(engine, wf_name, clauses):
             impacts.append({
                 'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
                 'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
+                'ref_kind': 'get_temp_failure', 'fatal': False,
+                'sentence': (
+                    f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
+                    f"would not load temporary form data for downstream consumers."
+                ),
+            })
+            imp_map, tok_impacts = propagate_null_token(
+                graph, [nid], token_index, starve_cause='task_failure')
+            for cid, fatal in imp_map.items():
+                impacted_map[cid] = impacted_map.get(cid, False) or fatal
+            impacts.extend(tok_impacts)
+
+        elif t_type == '27':
+            failed_tasks.append({
+                'node_id': nid, 'node_name': name, 'node_type': t_type,
+                'node_type_name': t_type_name, 'failure_mode': mode,
+                'clause': clause.text, 'score': round(score, 2),
+            })
+            failed_ids.append(nid)
+            impacts.append({
+                'producer_id': nid, 'producer_name': name, 'producer_type': t_type,
+                'consumer_id': None, 'consumer_name': '', 'consumer_type': '',
                 'ref_kind': 'create_failure', 'fatal': False,
                 'sentence': (
                     f"The {t_type_name} (Type {t_type}) '{name}' (ID: {nid}), were it to fail, "
-                    f"would not create a temporary record token for downstream consumers."
+                    f"would not create a record token for downstream consumers."
                 ),
             })
             imp_map, tok_impacts = propagate_null_token(

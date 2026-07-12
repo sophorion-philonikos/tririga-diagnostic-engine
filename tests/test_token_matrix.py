@@ -23,9 +23,13 @@ def _load(path):
 
 
 class TestTypeHints(unittest.TestCase):
-    def test_create_maps_to_25(self):
+    def test_create_maps_to_27(self):
         req = simulation.parse_query('what if the create task fails')
         self.assertEqual(req.clauses[0].kind, 'task_failure')
+        self.assertEqual(req.clauses[0].type_hint, '27')
+
+    def test_get_temp_maps_to_25(self):
+        req = simulation.parse_query('what if the get temp task fails')
         self.assertEqual(req.clauses[0].type_hint, '25')
 
     def test_associate_maps_to_30(self):
@@ -46,10 +50,15 @@ class TestTypeHints(unittest.TestCase):
 
 
 class TestTokenConsequences(unittest.TestCase):
-    def test_create_25_is_fatal_producer(self):
+    def test_get_temp_25_is_fatal_producer(self):
         msg, fatal = simulation._TOKEN_CONSEQUENCES['25']
         self.assertTrue(fatal)
-        self.assertIn('temporary', msg.lower())
+        self.assertIn('temp', msg.lower())
+
+    def test_create_27_is_fatal_producer(self):
+        msg, fatal = simulation._TOKEN_CONSEQUENCES['27']
+        self.assertTrue(fatal)
+        self.assertIn('creat', msg.lower())
 
     def test_save_permanent_26(self):
         msg, fatal = simulation._TOKEN_CONSEQUENCES['26']
@@ -130,17 +139,19 @@ class TestAllTasksTokenIndex(unittest.TestCase):
         data = graph.nodes['330923']
         from_tasks = [str(x) for x in (data.get('FromTask') or [])]
         self.assertIn('330894', from_tasks)
+        self.assertEqual(str(graph.nodes['330894'].get('type')), '25')
+        self.assertIn('Get Temp', str(graph.nodes['330894'].get('name')))
         idx = simulation.build_token_index(graph)
         consumers = [c for c, _ in idx.get('330894', [])]
         self.assertIn('330923', consumers)
 
-    def test_create_failure_propagates_to_save(self):
+    def test_get_temp_failure_propagates_to_save(self):
         result = simulation.run_simulation(
             self.engine, self.wf, 'What happens if task 330894 fails?')
         self.assertEqual(result['failed_node_ids'], ['330894'])
         self.assertIn('330923', result['impacted_node_ids'])
         sentences = ' '.join(i['sentence'] for i in result['impacts'])
-        self.assertIn('temporary', sentences.lower())
+        self.assertIn('temp', sentences.lower())
 
     def test_ref_task_id_zero_indexed(self):
         graph = self.engine.graphs[self.wf]

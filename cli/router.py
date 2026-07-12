@@ -10,6 +10,7 @@ from cli.intents import build_registry, render_help, suggest
 from integrations.ssh_client import SSHClientManager
 from cli.visualizer import WorkflowVisualizer
 from cli import simulation
+from cli import graph_utils
 
 class TririgaNLPRouter:
     def __init__(self, diagnostic_engine, ssh_host=None, ssh_user=None, ssh_log_path=None, offline_mode=False, local_log_path=None):
@@ -527,7 +528,7 @@ class TririgaNLPRouter:
 
     def _resolve_visible_successors(self, graph, node_id, cache):
         """Resolve the nearest *visible* successors of a node, hopping over invisible
-        junction tasks (Type 11/12/generic/unnamed connectors) exactly once.
+        junction tasks (Type 11/12/generic connectors) exactly once.
 
         Results are memoized per node because visibility resolution is purely
         topological (path-independent). This is the "junction-once / shared subgraph"
@@ -547,11 +548,7 @@ class TririgaNLPRouter:
             succ = queue[i]
             i += 1
             s_node = graph.nodes[succ]
-            s_type = self._get_type_str(s_node)
-            s_name = s_node.get('name', '').lower()
-            is_invisible = s_type in ['12', '11'] or (s_name.startswith('unnamed') and s_type != '9') or s_type == 'generic'
-
-            if is_invisible:
+            if graph_utils.is_invisible(s_node):
                 if succ not in visited_invisible:
                     visited_invisible.add(succ)
                     queue.extend(graph.successors(succ))
@@ -670,10 +667,15 @@ class TririgaNLPRouter:
         t_type = self._get_type_str(data)
         if t_type == '1': return "Initiates workflow execution."
         if t_type in ['9', '13']: return "Ends workflow execution and finalizes logic."
+        if t_type == '10': return "Forks into parallel branches; continues only after all branches complete."
         if t_type == '25':
             bo = data.get('BO', 'Record')
             if isinstance(bo, list): bo = bo[0]
-            return f"Instantiated a temporary '{bo}' record in memory."
+            return f"Loaded temporary form data for '{bo}' into the workflow context."
+        if t_type == '27':
+            bo = data.get('BO', 'Record')
+            if isinstance(bo, list): bo = bo[0]
+            return f"Created a '{bo}' record token for downstream tasks."
         if t_type == '14':
             exp = data.get('Expression', [])
             exp_str = ', '.join(exp) if exp else 'decision gate'
@@ -1486,7 +1488,7 @@ class TririgaNLPRouter:
                     c_name = child_data.get('name', n)
                     c_type = self._get_type_str(child_data)
                     
-                    if c_type in ['12', '11'] or (c_name.lower().startswith('unnamed') and c_type != '9') or c_type == 'generic':
+                    if graph_utils.is_invisible(child_data):
                         pass
                     else:
                         target_strings.append(c_name)

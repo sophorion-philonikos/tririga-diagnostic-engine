@@ -9,15 +9,14 @@ two-workflow comparison. Kept out of the router to avoid monolith growth.
 import re
 import networkx as nx
 from cli import knowledge
+from cli import graph_utils
 
 
 def _visible_nodes(graph, get_type_str):
     for node, data in graph.nodes(data=True):
-        t = get_type_str(data)
-        name = str(data.get('name', '')).lower()
-        if t in ['12', '11'] or (name.startswith('unnamed') and t != '9') or t == 'generic':
+        if graph_utils.is_invisible(data):
             continue
-        yield node, data, t
+        yield node, data, get_type_str(data)
 
 
 def build_inventory(q, engine, wf_name, graph, get_type_str):

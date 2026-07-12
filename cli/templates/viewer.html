@@ -136,10 +136,24 @@
         .shape-icon { display: inline-block; width: 20px; height: 15px; margin-right: 10px; border: 1px solid #777; }
         .s-scalene { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
         .s-oval { background: #00b050; border-radius: 50%; }
+        .s-end-oct { background: #ff0000; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
         .s-pill { background: #bbf3ff; border-radius: 8px; }
         .s-query-chevron { background: #ccffcc; clip-path: polygon(0 0, 80% 0, 100% 50%, 80% 100%, 0 100%); }
-        .s-rect-p { background: #ffcccc; border-radius: 2px; }
-        .s-notch { background: #e6ccff; clip-path: polygon(0 0, 100% 0, 100% 20%, 80% 30%, 100% 40%, 100% 60%, 80% 70%, 100% 80%, 100% 100%, 0 100%, 0 80%, 20% 70%, 0 60%, 0 40%, 20% 30%, 0 20%); }
+        .s-rect-p { background: #E9C2E9; border-radius: 2px; }
+        .s-notch { background: #6F5DA4; clip-path: polygon(0 0, 100% 0, 100% 20%, 80% 30%, 100% 40%, 100% 60%, 80% 70%, 100% 80%, 100% 100%, 0 100%, 0 80%, 20% 70%, 0 60%, 0 40%, 20% 30%, 0 20%); }
+        .s-fork { background: #eceff4; border-radius: 2px; height: 8px; margin-top: 4px; margin-bottom: 4px; }
+        .s-temp { background: #86A690; border-radius: 2px; }
+        .s-create { background: #c4a574; border-radius: 2px; border: 1px solid #8b6914; }
+        .s-iter { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+        .s-del-ref { background: #BAE7BA; clip-path: polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%); }
+        .s-call-wf { background: #87A690; clip-path: polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%, 12% 50%); }
+        .s-add-child { background: #CC9CFD; clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%); }
+        .s-break { background: #BAE7BA; border-radius: 50%; width: 14px; height: 14px; }
+        .s-associate { background: #9191D8; clip-path: polygon(0 0, 100% 0, 80% 50%, 100% 100%, 0 100%, 20% 50%); }
+        .s-populate { background: #7B92A8; clip-path: polygon(15% 0, 90% 0, 100% 50%, 90% 100%, 15% 100%, 0 50%); }
+        .s-distill { background: #9E6C85; clip-path: polygon(10% 0, 85% 0, 100% 50%, 85% 100%, 10% 100%, 0 50%); }
+        .s-save-perm { background: #7B5F96; clip-path: polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 80%, 10% 50%, 0 20%); border-radius: 0 8px 8px 0; }
+        .s-var { background: #9093B8; clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%); }
     </style>
 </head>
 <body>
@@ -162,12 +176,26 @@
             <div class="legend-item"><div class="color-box" style="background: #00c3a5;"></div> Live Trace Log</div>
 
             <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">TRIRIGA Task Legend</div>
-            <div class="legend-item"><div class="shape-icon s-oval"></div> Start / End Task</div>
+            <div class="legend-item"><div class="shape-icon s-oval"></div> Start Task</div>
+            <div class="legend-item"><div class="shape-icon s-end-oct"></div> End Task</div>
             <div class="legend-item"><div class="shape-icon s-scalene"></div> Switch (Decision Gate)</div>
             <div class="legend-item"><div class="shape-icon s-query-chevron"></div> Query Task</div>
             <div class="legend-item"><div class="shape-icon s-pill"></div> Retrieve Task</div>
             <div class="legend-item"><div class="shape-icon s-rect-p"></div> Modify Records</div>
             <div class="legend-item"><div class="shape-icon s-notch"></div> Modify Metadata</div>
+            <div class="legend-item"><div class="shape-icon s-fork"></div> Fork / Join</div>
+            <div class="legend-item"><div class="shape-icon s-temp"></div> Get Temp Record</div>
+            <div class="legend-item"><div class="shape-icon s-create"></div> Create Record</div>
+            <div class="legend-item"><div class="shape-icon s-iter"></div> Iter / Loop</div>
+            <div class="legend-item"><div class="shape-icon s-del-ref"></div> Delete Reference</div>
+            <div class="legend-item"><div class="shape-icon s-call-wf"></div> Call Workflow</div>
+            <div class="legend-item"><div class="shape-icon s-add-child"></div> Add Child</div>
+            <div class="legend-item"><div class="shape-icon s-break"></div> Break</div>
+            <div class="legend-item"><div class="shape-icon s-associate"></div> Associate</div>
+            <div class="legend-item"><div class="shape-icon s-populate"></div> Populate File</div>
+            <div class="legend-item"><div class="shape-icon s-distill"></div> Distill File</div>
+            <div class="legend-item"><div class="shape-icon s-save-perm"></div> Save Permanent</div>
+            <div class="legend-item"><div class="shape-icon s-var"></div> Variables</div>
 
             <div id="simLegend">
                 <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">What-If Simulation</div>

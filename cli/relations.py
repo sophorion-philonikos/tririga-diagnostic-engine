@@ -11,6 +11,7 @@ the topology into one line.
 """
 
 import networkx as nx
+from cli import graph_utils
 
 # Bounds for route enumeration between two specific tasks. Enumerating every
 # simple path is exponential in the worst case, so we sample a bounded set and
@@ -19,10 +20,8 @@ MAX_ROUTES_TO_SHOW = 5
 MAX_ROUTES_TO_COUNT = 200
 
 
-def _is_invisible(data, get_type_str):
-    t = get_type_str(data)
-    name = str(data.get('name', '')).lower()
-    return t in ['12', '11'] or (name.startswith('unnamed') and t != '9') or t == 'generic'
+def _is_invisible(data, get_type_str=None):
+    return graph_utils.is_invisible(data)
 
 
 def _display_name(graph, node, get_type_str):

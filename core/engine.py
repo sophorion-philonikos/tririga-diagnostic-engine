@@ -4,6 +4,7 @@ import networkx as nx
 import oracledb
 import re
 import sys
+from cli.graph_utils import default_task_name
 
 class TririgaHybridEngine:
     def __init__(self, db_username, db_password, db_dsn, offline_mode=False):
@@ -422,10 +423,9 @@ class TririgaHybridEngine:
                 if label_element is not None and label_element.text and label_element.text.strip():
                     node_data['name'] = label_element.text.strip()
                 else:
-                    if str(t_type) == '9':
-                        node_data['name'] = 'End'
-                    elif 'name' not in node_data:
-                        node_data['name'] = f"Unnamed Component ({node_id})"
+                    fallback = default_task_name(t_type, node_id)
+                    if 'name' not in node_data or str(node_data.get('name', '')).lower().startswith('unnamed'):
+                        node_data['name'] = fallback
 
                 def traverse(element):
                     if element.tag == 'TaskRef':
@@ -522,7 +522,7 @@ class TririgaHybridEngine:
                 step_type = step.get('Type')
                 
                 if step_id and not self.graphs[wf_name].has_node(step_id):
-                    name = "End" if str(step_type) == '9' else f"Unnamed Component ({step_id})"
+                    name = default_task_name(step_type, step_id)
                     self.graphs[wf_name].add_node(step_id, name=name, type=step_type or 'Generic')
                 if par_id and par_id not in ["-1", ""] and not self.graphs[wf_name].has_node(par_id):
                     self.graphs[wf_name].add_node(par_id, name=f"Unnamed Component ({par_id})", type='Generic')

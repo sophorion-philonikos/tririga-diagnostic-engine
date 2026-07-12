@@ -5,6 +5,14 @@ It consolidates the operator map previously duplicated in the router's
 `_translate_operator` and the engine's SQL branches, and powers the interactive
 "What does Type 14 mean?" style questions with definitions PLUS live usage
 scanned from the currently loaded workflow graphs.
+
+OOB_TASK_TYPE_MATRIX (code -> name -> token role; empirical XML + IBM App Building):
+  1 Start structural/producer | 9 End structural | 10 Fork structural |
+  11/12 Junction invisible | 13 Stop | 14 Switch gate | 17 Schedule consumer |
+  19 Continue | 20 Loop | 21 Break | 22 Query producer | 23 Modify Metadata |
+  24 Iter | 25 Get Temp producer | 26 Save Permanent | 27 Create producer |
+  28 Modify | 29 Retrieve producer | 30-33 linkage | 34-37 files/project |
+  38 Call Workflow | 39 Custom | 40/41 Variables | 43 Fact Condition gate
 """
 
 TASK_TYPE_GLOSSARY = {
@@ -24,6 +32,14 @@ TASK_TYPE_GLOSSARY = {
                 "eventually converge on an End task.",
         'failures': "Does not fail on its own. If execution never reaches End, a task upstream "
                     "threw an exception or a Stop task halted the flow.",
+    },
+    '10': {
+        'name': 'Fork Task',
+        'shape': 'Compact join rectangle',
+        'what': "Defines parallel sequences of tasks that run concurrently; execution continues "
+                "past the fork only after all branches complete (IBM Fork task).",
+        'failures': "Not a data producer. Path issues usually mean a branch never completed or "
+                    "a join edge was mis-wired in the workflow export.",
     },
     '11': {
         'name': 'Junction / Connector (invisible)',
@@ -79,10 +95,21 @@ TASK_TYPE_GLOSSARY = {
                     "mappings still match the current form layout exactly.",
     },
     '25': {
+        'name': 'Get Temp Record Task',
+        'shape': 'Rectangle',
+        'what': "Loads the temporary (in-session) form data for a record so synchronous "
+                "workflows can read or modify values before they are saved permanently "
+                "(IBM Temporary data / Get temp record task).",
+        'failures': "If downstream Save Permanent or Modify tasks see stale/empty data, verify "
+                    "the workflow Temporary Data property and that this task ran against the "
+                    "correct record context.",
+    },
+    '27': {
         'name': 'Create Record Task',
         'shape': 'Rectangle',
-        'what': "Instantiates a record of the specified Business Object in memory (a 'temp' "
-                "record) or permanently, which downstream tasks can populate and reference.",
+        'what': "Instantiates a record of the specified Business Object (often with object "
+                "mappings), producing a record token that downstream tasks can populate, "
+                "associate, or save.",
         'failures': "Failures usually stem from required fields not being mapped, or the BO "
                     "definition having changed since the workflow was built.",
     },

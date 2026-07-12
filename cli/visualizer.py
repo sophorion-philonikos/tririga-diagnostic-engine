@@ -10,6 +10,306 @@ from cli.models import TaskInsight, MechanicSection
 from cli.knowledge import type_display_name
 from cli import graph_utils
 
+# Exact fills from the precision SVG registry (hex for compact SVG attrs).
+_SWITCH_BLUE = '#00b0f0'
+_FILL = {
+    '28': '#E9C2E9',   # Modify rgb(233,194,233)
+    '23': '#6F5DA4',   # Modify Metadata rgb(111,93,164)
+    '32': '#BAE7BA',   # Delete Reference rgb(186,231,186)
+    '25': '#86A690',   # Get Temp rgb(134,166,144)
+    '38': '#87A690',   # Call Workflow rgb(135,166,144)
+    '33': '#CC9CFD',   # Add Child rgb(204,156,253)
+    '21': '#BAE7BA',   # Break
+    '34': '#FDFDD3',   # Set Project rgb(253,253,211)
+    '24': _SWITCH_BLUE,
+    '30': '#9191D8',   # Associate rgb(145,145,216)
+    '36': '#7B92A8',   # Populate File rgb(123,146,168)
+    '20': _SWITCH_BLUE,
+    '17': '#C4A484',   # Schedule light brown
+    '37': '#9E6C85',   # Distill File rgb(158,108,133)
+    '43': '#FFE600',   # Fact Condition
+    '26': '#7B5F96',   # Save Permanent rgb(123,95,150)
+    '40': '#9093B8',   # Variable Definition rgb(144,147,184)
+    '41': '#9093B8',   # Variable Assignment
+}
+_DARK_FILLS = {'23', '26', '37'}
+
+
+def _stroke_for(fill, darken=0.35):
+    """Derive a slightly darker border from a #RRGGBB fill."""
+    fill = fill.lstrip('#')
+    r, g, b = int(fill[0:2], 16), int(fill[2:4], 16), int(fill[4:6], 16)
+    r = max(0, int(r * (1 - darken)))
+    g = max(0, int(g * (1 - darken)))
+    b = max(0, int(b * (1 - darken)))
+    return f'#{r:02x}{g:02x}{b:02x}'
+
+
+def _poly(points, fill, border, stroke_width):
+    pts = ' '.join(f'{x},{y}' for x, y in points)
+    return (
+        f'<polygon points="{pts}" fill="{fill}" stroke="{border}" '
+        f'stroke-width="{stroke_width}"/>'
+    )
+
+
+def _rect_default(w, h, fill, border, stroke_width, rx=4):
+    return (
+        f'<rect x="2" y="2" width="{w - 2}" height="{h - 2}" rx="{rx}" '
+        f'fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+    )
+
+
+def _bite_all_corners(w, h, fill, border, stroke_width, bite=14):
+    """12-gon: rectangular with all four corners bitten (cut) off."""
+    b = bite
+    pts = [
+        (2 + b, 2), (w - b, 2), (w, 2 + b),
+        (w, h * 0.35), (w, h * 0.65),
+        (w, h - b), (w - b, h), (2 + b, h), (2, h - b),
+        (2, h * 0.65), (2, h * 0.35), (2, 2 + b),
+    ]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _chevron_right(w, h, fill, border, stroke_width, tip=22):
+    pts = [(2, 2), (w - tip, 2), (w, h / 2), (w - tip, h), (2, h), (2 + tip * 0.45, h / 2)]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _chevron_inward(w, h, fill, border, stroke_width, notch=18):
+    """Associate: both left and right sides point inward."""
+    mid = h / 2
+    pts = [
+        (2, 2), (w, 2), (w - notch, mid), (w, h),
+        (2, h), (2 + notch, mid),
+    ]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _add_child_hex(w, h, fill, border, stroke_width, cut=18):
+    """Thin rect with top-left and bottom-right corners diagonally cut."""
+    pts = [(2 + cut, 2), (w, 2), (w, h - cut), (w - cut, h), (2, h), (2, 2 + cut)]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _set_project_path(w, h, fill, border, stroke_width, r=10):
+    """Thin rect with TR and BL corners rounded slightly inward."""
+    d = (
+        f'M 2 2 '
+        f'L {w - r} 2 '
+        f'Q {w - r * 0.3} {2 + r * 0.7} {w} {2 + r} '
+        f'L {w} {h} '
+        f'L {2 + r} {h} '
+        f'Q {2 + r * 0.3} {h - r * 0.7} 2 {h - r} Z'
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+
+
+def _populate_path(w, h, fill, border, stroke_width):
+    """Concave left, convex right."""
+    mid = h / 2
+    d = (
+        f'M 18 2 '
+        f'Q 2 {mid} 18 {h} '
+        f'L {w - 8} {h} '
+        f'Q {w + 6} {mid} {w - 8} 2 Z'
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+
+
+def _distill_path(w, h, fill, border, stroke_width):
+    """Convex left, concave right."""
+    mid = h / 2
+    d = (
+        f'M 8 2 '
+        f'Q -6 {mid} 8 {h} '
+        f'L {w - 18} {h} '
+        f'Q {w} {mid} {w - 18} 2 Z'
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+
+
+def _parallelogram(w, h, fill, border, stroke_width, skew=22):
+    pts = [(2 + skew, 2), (w, 2), (w - skew, h), (2, h)]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _fact_octagon(w, h, fill, border, stroke_width):
+    """Asymmetric elongated octagon: shorter top half than bottom."""
+    top_cut_x, top_cut_y = 28, h * 0.18
+    bot_cut_x, bot_cut_y = 36, h * 0.78
+    pts = [
+        (2 + top_cut_x, 2), (w - top_cut_x, 2),
+        (w, 2 + top_cut_y), (w, bot_cut_y),
+        (w - bot_cut_x, h), (2 + bot_cut_x, h),
+        (2, bot_cut_y), (2, 2 + top_cut_y),
+    ]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _save_permanent_path(w, h, fill, border, stroke_width, bite=12):
+    """Left-side bites only; right side fully rounded."""
+    mid = h / 2
+    r = min(28, h / 2 - 2)
+    d = (
+        f'M {2 + bite} 2 '
+        f'L {w - r} 2 '
+        f'A {r} {r} 0 0 1 {w - r} {h} '
+        f'L {2 + bite} {h} '
+        f'L 2 {h - bite} '
+        f'L {2 + bite * 0.6} {mid + bite} '
+        f'L 2 {mid} '
+        f'L {2 + bite * 0.6} {mid - bite} '
+        f'L 2 {2 + bite} Z'
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+
+
+def _var_hex(w, h, fill, border, stroke_width, tip=16, body_fill=None, tip_fill=None):
+    """Thin hex with outward side triangles. Optional split tip coloring for Assignment."""
+    mid = h / 2
+    body_fill = body_fill or fill
+    if tip_fill is None:
+        pts = [
+            (2 + tip, 2), (w - tip, 2), (w, mid), (w - tip, h),
+            (2 + tip, h), (2, mid),
+        ]
+        return _poly(pts, body_fill, border, stroke_width)
+    # Composite: body rectangle-ish + black tips
+    body = _poly(
+        [(2 + tip, 2), (w - tip, 2), (w - tip, h), (2 + tip, h)],
+        body_fill, border, stroke_width,
+    )
+    left = _poly([(2 + tip, 2), (2 + tip, h), (2, mid)], tip_fill, tip_fill, stroke_width)
+    right = _poly([(w - tip, 2), (w, mid), (w - tip, h)], tip_fill, tip_fill, stroke_width)
+    return body + left + right
+
+
+def _break_composite(w, h, fill, border, stroke_width):
+    """Small circular ring with rectangular arrow right then 90° down."""
+    cx, cy = 36, h / 2
+    r_outer, r_inner = min(22, h / 2 - 4), min(14, h / 2 - 10)
+    ring = (
+        f'<circle cx="{cx}" cy="{cy}" r="{r_outer}" fill="{fill}" '
+        f'stroke="{border}" stroke-width="{stroke_width}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="{r_inner}" fill="#f8f9fa" '
+        f'stroke="{border}" stroke-width="1"/>'
+    )
+    ax = cx + r_outer - 2
+    arrow = _poly(
+        [
+            (ax, cy - 5), (w - 28, cy - 5), (w - 28, cy + 18),
+            (w - 18, cy + 18), (w - 18, cy + 5), (ax + 8, cy + 5),
+        ],
+        fill, border, stroke_width,
+    )
+    return ring + arrow
+
+
+def _end_octagon(w, h, fill, border, stroke_width):
+    """Symmetrical stop-sign octagon."""
+    cut = min(28, w * 0.12, h * 0.22)
+    pts = [
+        (2 + cut, 2), (w - cut, 2), (w, 2 + cut), (w, h - cut),
+        (w - cut, h), (2 + cut, h), (2, h - cut), (2, 2 + cut),
+    ]
+    return _poly(pts, fill, border, stroke_width)
+
+
+def _switch_scalene(w, h, fill, border, stroke_width):
+    return _poly(
+        [(2, 2), (w, 2), (w, h - 20), (w / 2, h), (2, h - 20)],
+        fill, border, stroke_width,
+    )
+
+
+def _metadata_notch(w, h, fill, border, stroke_width):
+    r = 14
+    y1 = h * 0.35
+    y2 = h * 0.65
+    d = (
+        f'M 2 2 L {w} 2 L {w} {y1 - r} A {r} {r} 0 0 0 {w} {y1 + r} '
+        f'L {w} {y2 - r} A {r} {r} 0 0 0 {w} {y2 + r} L {w} {h} '
+        f'L 2 {h} L 2 {y2 + r} A {r} {r} 0 0 0 2 {y2 - r} '
+        f'L 2 {y1 + r} A {r} {r} 0 0 0 2 {y1 - r} Z'
+    )
+    return f'<path d="{d}" fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+
+
+def _build_shape_markup(t_type, width, total_h, fill, border, stroke_width):
+    """Return SVG shape element(s) for a task type inside the node bbox."""
+    w = width - 2
+    h = total_h - 2
+    mid = total_h / 2
+    t = str(t_type)
+
+    if t in ('1', 'Trigger', 'Start'):
+        return (
+            f'<ellipse cx="{width / 2}" cy="{mid}" rx="{width / 2 - 2}" ry="{mid - 2}" '
+            f'fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+        )
+    if t == '13':
+        return (
+            f'<ellipse cx="{width / 2}" cy="{mid}" rx="{width / 2 - 2}" ry="{mid - 2}" '
+            f'fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+        )
+    if t == '9':
+        return _end_octagon(w, h, fill, border, stroke_width)
+    if t == '10':
+        return (
+            f'<rect x="2" y="{mid - 10}" width="{width - 4}" height="20" rx="4" '
+            f'fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+        )
+    if t in ('14', '24'):
+        return _switch_scalene(w, h, fill, border, stroke_width)
+    if t == '22':
+        return _poly(
+            [(2, 2), (w - 15, 2), (w, mid), (w - 15, h), (2, h)],
+            fill, border, stroke_width,
+        )
+    if t == '29':
+        return (
+            f'<rect x="2" y="2" width="{width - 4}" height="{total_h - 4}" rx="20" ry="20" '
+            f'fill="{fill}" stroke="{border}" stroke-width="{stroke_width}"/>'
+        )
+    if t == '23':
+        return _metadata_notch(w, h, fill, border, stroke_width)
+    if t == '32':
+        return _bite_all_corners(w, h, fill, border, stroke_width)
+    if t == '38':
+        return _chevron_right(w, h, fill, border, stroke_width)
+    if t == '33':
+        return _add_child_hex(w, h, fill, border, stroke_width)
+    if t == '21':
+        return _break_composite(w, h, fill, border, stroke_width)
+    if t == '34':
+        return _set_project_path(w, h, fill, border, stroke_width)
+    if t == '30':
+        return _chevron_inward(w, h, fill, border, stroke_width)
+    if t == '36':
+        return _populate_path(w, h, fill, border, stroke_width)
+    if t == '37':
+        return _distill_path(w, h, fill, border, stroke_width)
+    if t == '17':
+        return _parallelogram(w, h, fill, border, stroke_width)
+    if t == '43':
+        return _fact_octagon(w, h, fill, border, stroke_width)
+    if t == '26':
+        return _save_permanent_path(w, h, fill, border, stroke_width)
+    if t == '40':
+        return _var_hex(w, h, fill, border, stroke_width)
+    if t == '41':
+        return _var_hex(w, h, fill, border, stroke_width, tip_fill='#000000')
+    if t == '28':
+        return _rect_default(w, h, fill, border, stroke_width)
+    if t == '25':
+        return _rect_default(w, h, fill, border, stroke_width)
+    if t == '20':
+        return _rect_default(w, h, fill, border, stroke_width, rx=6)
+    return _rect_default(w, h, fill, border, stroke_width)
+
+
 class WorkflowVisualizer:
     def __init__(self, engine):
         self.engine = engine
@@ -29,23 +329,34 @@ class WorkflowVisualizer:
             tags.append({'label': '[Filter]', 'bg': '#4d3300', 'border': '#f1c232', 'text': '#ffffff'})
 
         subtitle = type_display_name(t_type)
+        t_type = str(t_type)
 
         width = 240
         wrap_limit = 28
         text_x_offset = 20
         
-        if t_type == '14': 
+        if t_type in ('14', '24'): 
             wrap_limit = 24
             text_x_offset = 15
+            extra_bottom = 20
         elif t_type == '22': 
             wrap_limit = 24
             text_x_offset = 15
-        elif t_type in ['1', '9', '13']: 
+            extra_bottom = 0
+        elif t_type in ('1', '9', '13'): 
             wrap_limit = 22
             text_x_offset = 35
+            extra_bottom = 0
         elif t_type == '29': 
             wrap_limit = 26
             text_x_offset = 20
+            extra_bottom = 0
+        elif t_type in ('38', '30', '33', '40', '41', '17', '36', '37'):
+            wrap_limit = 22
+            text_x_offset = 28
+            extra_bottom = 0
+        else:
+            extra_bottom = 0
 
         wrapped_name = textwrap.wrap(t_name, width=wrap_limit)
         
@@ -55,10 +366,9 @@ class WorkflowVisualizer:
         subtitle_y = name_start_y + (len(wrapped_name) * line_height) + 6
         
         pill_area_h = 35 if tags else 15
-        total_h = subtitle_y + pill_area_h
+        total_h = subtitle_y + pill_area_h + extra_bottom
 
-        if t_type == '14': total_h += 20 
-
+        # --- fills / fonts ---
         bg_color = '#ffffff'
         border_color = '#7f8c8d'
         font_color = '#111111'
@@ -66,46 +376,42 @@ class WorkflowVisualizer:
         header_font_color = '#222222'
         header_label_color = '#555555'
         line_color = '#7f8c8d'
-        
-        if t_type in ['1', 'Trigger', 'Start']:
-            bg_color = '#00b050' 
-            border_color = '#007a37'
-        elif t_type in ['9', '13']:
-            bg_color = '#ff0000' 
-            border_color = '#b30000'
-        elif t_type == '28':
-            bg_color = '#ffcccc' 
-            border_color = '#ff6666'
+
+        if t_type in _FILL:
+            bg_color = _FILL[t_type]
+            border_color = _stroke_for(bg_color)
+            if t_type in _DARK_FILLS:
+                font_color = subtitle_color = header_font_color = '#f5f5f5'
+                header_label_color = '#e0e0e0'
+                line_color = '#cccccc'
+        elif t_type in ('1', 'Trigger', 'Start'):
+            bg_color, border_color = '#00b050', '#007a37'
+        elif t_type == '9':
+            bg_color, border_color = '#ff0000', '#b30000'
+            font_color = subtitle_color = header_font_color = '#f5f5f5'
+            header_label_color = '#ffe0e0'
+        elif t_type == '13':
+            bg_color, border_color = '#ff0000', '#b30000'
+            font_color = subtitle_color = header_font_color = '#f5f5f5'
+            header_label_color = '#ffe0e0'
         elif t_type == '29':
-            bg_color = '#bbf3ff' 
-            border_color = '#33ccff'
+            bg_color, border_color = '#bbf3ff', '#33ccff'
         elif t_type == '22':
-            bg_color = '#ccffcc' 
-            border_color = '#66cc66'
-        elif t_type == '23':
-            bg_color = '#e6ccff' 
-            border_color = '#b366ff'
+            bg_color, border_color = '#ccffcc', '#66cc66'
         elif t_type == '14':
-            bg_color = '#00b0f0' 
-            border_color = '#007ab3'
-        elif t_type in ['20', '24']:          # Loop / Iter (cycle constructs)
-            bg_color = '#ffe0b3'
-            border_color = '#e69500'
-        elif t_type in ['19', '21']:          # Continue / Break (loop control)
-            bg_color = '#f2f2f2'
-            border_color = '#999999'
-        elif t_type == '38':                  # Call Workflow (sub-routine)
-            bg_color = '#fff2b3'
-            border_color = '#d4b106'
-        elif t_type in ['40', '41']:          # Variable Definition / Assignment
-            bg_color = '#d0f0ee'
-            border_color = '#2aa198'
-        elif t_type == '31':                  # Trigger Action (state transition)
-            bg_color = '#ffd6e7'
-            border_color = '#eb2f96'
-        elif t_type in ['26', '30', '32', '33']:  # Record persistence / linkage
-            bg_color = '#fde3cf'
-            border_color = '#d46b08'
+            bg_color, border_color = _SWITCH_BLUE, '#007ab3'
+        elif t_type == '19':
+            bg_color, border_color = '#f2f2f2', '#999999'
+        elif t_type == '10':
+            bg_color, border_color = '#eceff4', '#5c6b7a'
+        elif t_type == '31':
+            bg_color, border_color = '#ffd6e7', '#eb2f96'
+        elif t_type == '27':
+            bg_color, border_color = '#c4a574', '#8b6914'
+            font_color = '#1a1208'
+            subtitle_color = '#3d2e14'
+            header_font_color = '#2a1f0e'
+            header_label_color = '#5c4a2a'
 
         stroke_width = 2
         if is_live:
@@ -115,26 +421,7 @@ class WorkflowVisualizer:
             border_color = '#e67e22'
             stroke_width = 3
 
-        svg_shape = ""
-        mid = total_h / 2
-        w = width - 2
-        h = total_h - 2
-        
-        if t_type in ['1', 'Trigger', 'Start', '9', '13']:
-            svg_shape = f'<ellipse cx="{width/2}" cy="{mid}" rx="{width/2 - 2}" ry="{mid - 2}" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
-        elif t_type == '14':
-            svg_shape = f'<polygon points="2,2 {w},2 {w},{h-20} {w/2},{h} 2,{h-20}" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
-        elif t_type == '22':
-            svg_shape = f'<polygon points="2,2 {w-15},2 {w},{mid} {w-15},{h} 2,{h}" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
-        elif t_type == '29':
-            svg_shape = f'<rect x="2" y="2" width="{width-4}" height="{total_h-4}" rx="20" ry="20" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
-        elif t_type == '23':
-            r = 14
-            y1 = total_h * 0.35
-            y2 = total_h * 0.65
-            svg_shape = f'<path d="M 2 2 L {w} 2 L {w} {y1-r} A {r} {r} 0 0 0 {w} {y1+r} L {w} {y2-r} A {r} {r} 0 0 0 {w} {y2+r} L {w} {h} L 2 {h} L 2 {y2+r} A {r} {r} 0 0 0 2 {y2-r} L 2 {y1+r} A {r} {r} 0 0 0 2 {y1-r} Z" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
-        else:
-            svg_shape = f'<rect x="2" y="2" width="{width-4}" height="{total_h-4}" rx="4" fill="{bg_color}" stroke="{border_color}" stroke-width="{stroke_width}"/>'
+        svg_shape = _build_shape_markup(t_type, width, total_h, bg_color, border_color, stroke_width)
 
         svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{total_h}">
             {svg_shape}
