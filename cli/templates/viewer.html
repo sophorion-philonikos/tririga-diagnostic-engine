@@ -28,6 +28,31 @@
         
         .node { cursor: pointer; }
         .node rect, .node circle, .node ellipse, .node polygon { fill: transparent !important; stroke: none !important; }
+
+        .cluster { cursor: pointer; }
+        .cluster > rect {
+            fill: #E3F2FD;
+            stroke: #00b0f0;
+            stroke-width: 2px;
+        }
+        .cluster.cluster-loop > rect {
+            fill: #E8F5E9;
+            stroke: #5b7cfa;
+        }
+        .cluster .protractor-cap { fill: none; stroke: #00b0f0; stroke-width: 2.5px; pointer-events: none; }
+        .cluster.cluster-loop .protractor-cap { stroke: #5b7cfa; }
+        .cluster.search-hit > rect {
+            stroke: #00e6c3 !important;
+            stroke-width: 3px;
+            filter: drop-shadow(0 0 6px rgba(0, 230, 195, 0.7));
+        }
+        .cluster.sim-dim { opacity: 0.12; }
+        .cluster.sim-active > rect { stroke: #c341ff; stroke-width: 3px; }
+        .cluster.sim-failed > rect { stroke: #cc0000; stroke-width: 3px; }
+        .cluster.sim-altered > rect { stroke: #ff9500; stroke-width: 3px; }
+        .cluster.sim-broken > rect { stroke: #ff2d2d; stroke-width: 3px; }
+        .edgePath.loop-back path { stroke-dasharray: 6 4; }
+        .viz-error { color: #ffb3b3; font-family: Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
         
         .edgePath path { fill: none; }
         .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
@@ -158,7 +183,14 @@
         .s-fork { background: #eceff4; border-radius: 2px; height: 8px; margin-top: 4px; margin-bottom: 4px; }
         .s-temp { background: #86A690; border-radius: 2px; }
         .s-create { background: #c4a574; border-radius: 2px; border: 1px solid #8b6914; }
-        .s-iter { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+        .s-iter {
+            background: #E3F2FD; border: 2px solid #00b0f0;
+            border-radius: 10px 10px 2px 2px; height: 14px;
+        }
+        .s-loop-cluster {
+            background: #E8F5E9; border: 2px solid #5b7cfa;
+            border-radius: 10px 10px 2px 2px; height: 14px;
+        }
         .s-del-ref { background: #BAE7BA; clip-path: polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%); }
         .s-call-wf { background: #87A690; clip-path: polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%, 12% 50%); }
         .s-add-child { background: #CC9CFD; clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%); }
@@ -200,7 +232,8 @@
             <div class="legend-item"><div class="shape-icon s-fork"></div> Fork / Join</div>
             <div class="legend-item"><div class="shape-icon s-temp"></div> Get Temp Record</div>
             <div class="legend-item"><div class="shape-icon s-create"></div> Create Record</div>
-            <div class="legend-item"><div class="shape-icon s-iter"></div> Iter / Loop</div>
+            <div class="legend-item"><div class="shape-icon s-iter"></div> Iter (container)</div>
+            <div class="legend-item"><div class="shape-icon s-loop-cluster"></div> Loop (container)</div>
             <div class="legend-item"><div class="shape-icon s-del-ref"></div> Delete Reference</div>
             <div class="legend-item"><div class="shape-icon s-call-wf"></div> Call Workflow</div>
             <div class="legend-item"><div class="shape-icon s-add-child"></div> Add Child</div>
@@ -242,39 +275,126 @@
 
         var startNodeId = null;
 
-        var g = new dagreD3.graphlib.Graph().setGraph({
+        function escapeHtml(s) {
+            return String(s == null ? "" : s)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function clusterHeaderHtml(n) {
+            var isIter = String(n.type) === "24";
+            var chip = isIter ? "#00b0f0" : "#5b7cfa";
+            var kind = isIter ? "Iter" : "Loop";
+            var cue = n.exitCue
+                ? '<div style="font-size:10px;color:#555;margin-top:2px;">' + escapeHtml(n.exitCue) + '</div>'
+                : '';
+            return (
+                '<div onclick="window.handleNodeClick(\'' + n.id + '\')" ' +
+                'style="pointer-events:all;cursor:pointer;padding:4px 10px;min-width:140px;">' +
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + chip +
+                ';margin-right:6px;vertical-align:middle;"></span>' +
+                '<strong style="vertical-align:middle;">' + escapeHtml(n.name) + '</strong>' +
+                '<span style="color:#666;font-size:11px;margin-left:6px;vertical-align:middle;">' + kind + '</span>' +
+                cue + '</div>'
+            );
+        }
+
+        function decorateClusterCaps(root) {
+            root.selectAll("g.cluster").each(function(d) {
+                var sel = d3.select(this);
+                sel.selectAll(".protractor-cap").remove();
+                var rect = sel.select("rect");
+                if (rect.empty()) return;
+                var w = parseFloat(rect.attr("width")) || 0;
+                var h = parseFloat(rect.attr("height")) || 0;
+                if (w < 8 || h < 8) return;
+                var rx = parseFloat(rect.attr("x")) || 0;
+                var ry = parseFloat(rect.attr("y")) || 0;
+                var cap = Math.min(28, w * 0.12, h * 0.18);
+                var meta = nodesData.find(function(n) { return String(n.id) === String(d); });
+                var isLoop = meta && String(meta.type) === "20";
+                sel.classed("cluster-iter", !isLoop).classed("cluster-loop", !!isLoop);
+
+                var topPath = "M " + rx + " " + (ry + 2) +
+                    " A " + (w / 2) + " " + cap + " 0 0 1 " + (rx + w) + " " + (ry + 2);
+                sel.insert("path", ":first-child")
+                    .attr("class", "protractor-cap")
+                    .attr("d", topPath);
+
+                var botPath = "M " + rx + " " + (ry + h - 2) +
+                    " A " + (w / 2) + " " + cap + " 0 0 0 " + (rx + w) + " " + (ry + h - 2);
+                sel.append("path")
+                    .attr("class", "protractor-cap")
+                    .attr("d", botPath);
+            });
+        }
+
+        function showRenderFailure(err) {
+            var msg = "Visualization failed to generate.\n" +
+                "Reason: " + (err && err.message ? err.message : String(err)) + "\n" +
+                "Location: cli/templates/viewer.html (dagreD3.render / compound cluster layout)";
+            var panel = document.getElementById("payloadData");
+            if (panel) panel.innerHTML = "<div class='viz-error'>" + escapeHtml(msg) + "</div>";
+        }
+
+        var g = new dagreD3.graphlib.Graph({ compound: true }).setGraph({
             rankdir: 'TB',
-            nodesep: 80,   
-            edgesep: 30,
-            ranksep: 80   
+            nodesep: 90,
+            edgesep: 35,
+            ranksep: 90,
+            marginx: 20,
+            marginy: 20
         });
 
         nodesData.forEach(function(n) {
             if (n.isStart && !startNodeId) startNodeId = n.id;
             window.payloads[n.id] = n.customPayload;
-            
-            g.setNode(n.id, {
-                labelType: "html",
-                // NATIVE ONCLICK: Bypasses D3 entirely. Pointer-events:all forces the div to catch the mouse.
-                label: "<div onclick=\"window.handleNodeClick('" + n.id + "')\" style='width:" + n.width + "px; height:" + n.height + "px; pointer-events: all; cursor: pointer;'><img src='" + n.image + "' style='width:100%; height:100%; display:block; pointer-events: none;'/></div>",
-                padding: 0,
-                width: n.width,
-                height: n.height
-            });
+
+            if (n.isCluster) {
+                var isIter = String(n.type) === "24";
+                g.setNode(n.id, {
+                    labelType: "html",
+                    label: clusterHeaderHtml(n),
+                    clusterLabelPos: "top",
+                    style: isIter
+                        ? "fill: #E3F2FD; stroke: #00b0f0; stroke-width: 2px"
+                        : "fill: #E8F5E9; stroke: #5b7cfa; stroke-width: 2px",
+                    rx: 6,
+                    ry: 6,
+                    padding: 20
+                });
+            } else {
+                g.setNode(n.id, {
+                    labelType: "html",
+                    label: "<div onclick=\"window.handleNodeClick('" + n.id + "')\" style='width:" + n.width + "px; height:" + n.height + "px; pointer-events: all; cursor: pointer;'><img src='" + n.image + "' style='width:100%; height:100%; display:block; pointer-events: none;'/></div>",
+                    padding: 0,
+                    width: n.width,
+                    height: n.height
+                });
+            }
+        });
+
+        nodesData.forEach(function(n) {
+            if (n.parent && g.hasNode(n.parent) && g.hasNode(n.id) && n.parent !== n.id) {
+                g.setParent(n.id, n.parent);
+            }
         });
 
         edgesData.forEach(function(e) {
             var weight = (e.label === "TRUE" || e.label === "") ? 100 : 1;
-            
+            var isBack = e.constraint === false || e.kind === "loop-back";
+            var style = "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;";
+            if (isBack) style += " stroke-dasharray: 6 4;";
+
             g.setEdge(e.from, e.to, {
                 label: e.label || "",
-                style: "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;",
-                // Directed arrowhead so execution direction is unambiguous regardless of how
-                // Dagre lays out ports (including reversed back-edges on cyclic workflows).
+                style: style,
                 arrowhead: "vee",
                 arrowheadStyle: "fill: " + e.color + "; stroke: " + e.color + ";",
                 weight: weight,
-                curve: d3.curveStepBefore 
+                curve: d3.curveStepBefore,
+                constraint: e.constraint !== false,
+                minlen: 1
             });
         });
 
@@ -286,8 +406,29 @@
         });
         svg.call(zoom);
 
-        var render = new dagreD3.render();
-        render(inner, g);
+        var renderOk = false;
+        try {
+            var render = new dagreD3.render();
+            render(inner, g);
+            decorateClusterCaps(inner);
+            renderOk = true;
+        } catch (err) {
+            showRenderFailure(err);
+        }
+        document.getElementById('svg-canvas').style.opacity = 1;
+
+        var backEdgeKeys = {};
+        edgesData.forEach(function(e) {
+            if (e.constraint === false || e.kind === "loop-back") {
+                backEdgeKeys[String(e.from) + "->" + String(e.to)] = true;
+            }
+        });
+        if (renderOk) {
+            inner.selectAll("g.edgePath")
+                .classed("loop-back", function(d) {
+                    return !!backEdgeKeys[String(d.v) + "->" + String(d.w)];
+                });
+        }
 
         if (!startNodeId && nodesData.length > 0) startNodeId = nodesData[0].id;
         
@@ -298,9 +439,9 @@
         var tx = canvasWidth / 2;
         var ty = 60;
 
-        if (startNodeId) {
+        if (startNodeId && renderOk) {
             var startNode = g.node(startNodeId);
-            if (startNode) {
+            if (startNode && startNode.x != null && !isNaN(startNode.x)) {
                 tx = (canvasWidth / 2) - (startNode.x * initialScale);
                 ty = 60 - (startNode.y * initialScale) + ((startNode.height * initialScale) / 2);
             }
@@ -365,8 +506,12 @@
             });
         }
 
+        function graphNodes() {
+            return inner.selectAll("g.node, g.cluster");
+        }
+
         function clearSearchHit() {
-            inner.selectAll("g.node").classed("search-hit", false);
+            graphNodes().classed("search-hit", false);
             searchMatches = [];
             searchIndex = -1;
             var status = document.getElementById('searchStatus');
@@ -376,7 +521,7 @@
         function focusNode(id) {
             var nid = String(id);
             var n = g.node(nid);
-            if (!n) return;
+            if (!n || n.x == null || isNaN(n.x)) return;
             var cw = container.clientWidth || 1;
             var ch = container.clientHeight || 1;
             var current = d3.zoomTransform(svg.node());
@@ -386,7 +531,7 @@
             var nx = (cw / 2) - (n.x * scale);
             var ny = (ch / 2) - (n.y * scale);
             applyZoomTransform(d3.zoomIdentity.translate(nx, ny).scale(scale));
-            inner.selectAll("g.node").classed("search-hit", function(d) {
+            graphNodes().classed("search-hit", function(d) {
                 return String(d) === nid;
             });
             if (window.handleNodeClick) window.handleNodeClick(nid);
@@ -407,7 +552,7 @@
             var q = input ? input.value : "";
             var matches = findMatches(q);
             if (!matches.length) {
-                inner.selectAll("g.node").classed("search-hit", false);
+                graphNodes().classed("search-hit", false);
                 searchMatches = [];
                 searchIndex = -1;
                 updateSearchStatus();
@@ -469,7 +614,7 @@
             }));
 
             // Precedence per node: failed (deep red) > altered (orange) > broken (red) > active (purple) > dim.
-            inner.selectAll("g.node")
+            graphNodes()
                 .classed("sim-failed", function(d) { return failedSet.has(String(d)); })
                 .classed("sim-altered", function(d) {
                     var id = String(d);
@@ -513,7 +658,7 @@
         };
 
         window.clearSimulation = function() {
-            inner.selectAll("g.node")
+            graphNodes()
                 .classed("sim-active", false).classed("sim-dim", false)
                 .classed("sim-altered", false).classed("sim-broken", false).classed("sim-failed", false);
             inner.selectAll("g.edgePath")

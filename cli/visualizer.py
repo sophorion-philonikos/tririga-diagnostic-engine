@@ -572,6 +572,38 @@ class WorkflowVisualizer:
         dagre_nodes = []
         dagre_edges = []
 
+        parents, container_ids, members_by_container = graph_utils.compute_container_parents(
+            graph, branch_map_fn=self.engine.get_branch_map,
+        )
+        container_successors = {
+            cid: {str(s) for s in graph.successors(cid)}
+            for cid in container_ids if graph.has_node(cid)
+        }
+
+        visible_child_counts = {}
+        for child, parent in parents.items():
+            if not graph.has_node(child):
+                continue
+            if graph_utils.is_invisible(graph.nodes[child]) and graph.out_degree(child) > 0:
+                continue
+            visible_child_counts[parent] = visible_child_counts.get(parent, 0) + 1
+
+        # Containers with ≥1 visible child get a synthetic cluster wrapper. The
+        # real task id remains a leaf (edges may touch it). Dagre forbids edges
+        # on compound parents — that caused the blank-canvas rank crash.
+        wrapping = {
+            cid for cid in container_ids
+            if visible_child_counts.get(cid, 0) >= 1
+        }
+
+        def viz_parent(nid):
+            p = parents.get(nid)
+            if not p:
+                return None
+            if p in wrapping:
+                return graph_utils.cluster_wrapper_id(p)
+            return p
+
         in_degrees = dict(graph.in_degree())
         start_nodes = [n for n, d in in_degrees.items() if d == 0]
 
@@ -587,27 +619,81 @@ class WorkflowVisualizer:
             is_live = str(node_id) in live_trace_ids
             is_critical = str(node_id) in critical_path_nodes
             is_start = node_id in start_nodes
-
-            svg_data_uri, node_width, node_height = self._build_svg_node(t_name, t_type, t_bo, data, is_live, is_critical)
+            nid = str(node_id)
             insight = self._build_task_insight(node_id, data, t_type, t_name, t_bo)
 
-            dagre_nodes.append({
-                'id': str(node_id),
+            if nid in wrapping:
+                condition = data.get('Condition', '')
+                if isinstance(condition, list):
+                    condition = condition[0] if condition else ''
+                condition = str(condition or '').strip()
+                trgt = data.get('TRGTTaskId', data.get('trgtTaskId', ''))
+                if isinstance(trgt, list):
+                    trgt = trgt[0] if trgt else ''
+                exit_cue = condition
+                if not exit_cue and str(trgt) not in ('', '-1', 'None'):
+                    exit_cue = f"TRGT={trgt}"
+
+                cluster_id = graph_utils.cluster_wrapper_id(nid)
+                cluster_rec = {
+                    'id': cluster_id,
+                    'name': str(t_name),
+                    'type': str(t_type),
+                    'isCluster': True,
+                    'taskId': nid,
+                    'isStart': False,
+                    'exitCue': exit_cue,
+                    'customPayload': insight.render_html(),
+                }
+                outer = viz_parent(nid)
+                if outer:
+                    cluster_rec['parent'] = outer
+                dagre_nodes.append(cluster_rec)
+
+                svg_data_uri, node_width, node_height = self._build_svg_node(
+                    t_name, t_type, t_bo, data, is_live, is_critical,
+                )
+                leaf_rec = {
+                    'id': nid,
+                    'name': str(t_name),
+                    'type': str(t_type),
+                    'image': svg_data_uri,
+                    'width': node_width,
+                    'height': node_height,
+                    'isStart': is_start,
+                    'isCluster': False,
+                    'parent': cluster_id,
+                    'customPayload': insight.render_html(),
+                }
+                dagre_nodes.append(leaf_rec)
+                continue
+
+            svg_data_uri, node_width, node_height = self._build_svg_node(
+                t_name, t_type, t_bo, data, is_live, is_critical,
+            )
+            node_rec = {
+                'id': nid,
                 'name': str(t_name),
                 'type': str(t_type),
                 'image': svg_data_uri,
                 'width': node_width,
                 'height': node_height,
                 'isStart': is_start,
-                'customPayload': insight.render_html()
-            })
+                'isCluster': False,
+                'customPayload': insight.render_html(),
+            }
+            parent = viz_parent(nid)
+            if parent:
+                node_rec['parent'] = parent
+            dagre_nodes.append(node_rec)
 
         def get_visible_targets(start_id, visited=None):
             return graph_utils.visible_successors(graph, start_id, visited)
 
+        visible_ids = {n['id'] for n in dagre_nodes}
         edge_tracker = set()
         for node_id in graph.nodes():
-            if str(node_id) not in [n['id'] for n in dagre_nodes]: continue
+            if str(node_id) not in visible_ids: continue
 
             targets = get_visible_targets(node_id)
             source_data = graph.nodes[node_id]
@@ -649,14 +735,22 @@ class WorkflowVisualizer:
                         e_color = '#e67e22'
                         e_width = 3
 
-                    local_edges.append({
+                    is_back = graph_utils.is_loop_back_edge(
+                        node_id, t, parents, container_ids, members_by_container,
+                        container_successors=container_successors,
+                    )
+                    edge_rec = {
                         'from': str(node_id),
                         'to': str(t),
                         'label': label,
                         'color': e_color,
                         'width': e_width,
                         'live': bool(is_edge_live),
-                    })
+                        'constraint': not is_back,
+                    }
+                    if is_back:
+                        edge_rec['kind'] = 'loop-back'
+                    local_edges.append(edge_rec)
 
             # Declare each switch's edges in a CONSISTENT order (FALSE/default first, then
             # TRUE, then unlabeled). Edge declaration order is a supported Dagre input that

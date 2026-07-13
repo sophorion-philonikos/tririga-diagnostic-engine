@@ -64,9 +64,27 @@ _EMPTY_LABEL_NAMES = {
     '13': 'Stop',
     '14': 'Switch',
     '19': 'Continue',
+    '20': 'Loop',
     '21': 'Break',
     '24': 'Iter',
 }
+
+CONTAINER_TYPES = frozenset({'20', '24'})
+CLUSTER_ID_PREFIX = 'c_'
+
+
+def cluster_wrapper_id(container_id):
+    """Synthetic Dagre cluster id — must not be used as an edge endpoint.
+
+    Dagre throws ``Cannot set properties of undefined (setting 'rank')`` when an
+    edge touches a compound parent. Real Iter/Loop task ids stay leaf nodes;
+    this wrapper is the setParent target only.
+    """
+    return f'{CLUSTER_ID_PREFIX}{container_id}'
+
+
+def is_cluster_wrapper_id(node_id):
+    return str(node_id).startswith(CLUSTER_ID_PREFIX)
 
 
 def default_task_name(t_type, node_id):
@@ -75,3 +93,123 @@ def default_task_name(t_type, node_id):
     if code in _EMPTY_LABEL_NAMES:
         return _EMPTY_LABEL_NAMES[code]
     return f"Unnamed Component ({node_id})"
+
+
+def _nx_has_path(graph, source, target):
+    import networkx as nx
+    return nx.has_path(graph, source, target)
+
+
+def _cycle_members(graph, container_id):
+    """Nodes that participate in a directed cycle with container_id (incl. invisible).
+
+    BFS outward from the container; keep n iff n can reach the container again.
+    TargetAssociation EXIT ids are NOT excluded — cycling tasks (e.g. Retrieve
+    330919) nest inside even when labeled EXIT for edge text.
+    """
+    container_id = str(container_id)
+    if not graph.has_node(container_id):
+        return set()
+
+    reachable = set()
+    stack = [str(s) for s in graph.successors(container_id)]
+    seen = set(stack)
+    while stack:
+        cur = stack.pop()
+        if cur == container_id:
+            continue
+        reachable.add(cur)
+        for succ in graph.successors(cur):
+            s = str(succ)
+            if s == container_id or s in seen:
+                continue
+            seen.add(s)
+            stack.append(s)
+
+    members = set()
+    for n in reachable:
+        try:
+            if _nx_has_path(graph, n, container_id):
+                members.add(n)
+        except Exception:
+            continue
+    return members
+
+
+def iter_body_members(graph, iter_id):
+    """Cycle-based body of an Iter (24). Type 11 junctions may appear for walking."""
+    return _cycle_members(graph, iter_id)
+
+
+def loop_body_members(graph, loop_id):
+    """Cycle-based body of a Loop (20). Break escapes (no return) are excluded."""
+    return _cycle_members(graph, loop_id)
+
+
+def compute_container_parents(graph, branch_map_fn=None):
+    """Map visible child id -> nearest enclosing Iter/Loop container id.
+
+    Returns (parents, container_ids, members_by_container).
+    Invisible junctions are walked for membership but omitted from parents.
+    branch_map_fn is accepted for API compatibility; nesting ignores TA labels.
+    """
+    del branch_map_fn  # nesting is cycle-based, not TargetAssociation-based
+    container_ids = set()
+    members_by_container = {}
+
+    for node_id, data in graph.nodes(data=True):
+        nid = str(node_id)
+        t = get_type_str(data)
+        if t not in CONTAINER_TYPES:
+            continue
+        container_ids.add(nid)
+        members_by_container[nid] = (
+            iter_body_members(graph, nid) if t == '24' else loop_body_members(graph, nid)
+        )
+
+    claims = {}
+    for cid, members in members_by_container.items():
+        for mid in members:
+            claims.setdefault(str(mid), set()).add(cid)
+
+    def _is_viz_child(child):
+        if not graph.has_node(child):
+            return False
+        if is_invisible(graph.nodes[child]) and child not in container_ids:
+            return False
+        return True
+
+    def _nearest(child, candidates):
+        inner = [
+            c for c in candidates
+            if any(c in members_by_container.get(o, ()) for o in candidates if o != c)
+        ]
+        pool = inner if inner else list(candidates)
+        return min(pool, key=lambda c: len(members_by_container.get(c, ())))
+
+    parents = {}
+    for child, candidates in claims.items():
+        if not _is_viz_child(child):
+            continue
+        parent = _nearest(child, candidates)
+        if parent != child:
+            parents[child] = parent
+
+    return parents, container_ids, members_by_container
+
+
+def is_loop_back_edge(src, dst, parents, container_ids, members_by_container,
+                      container_successors=None):
+    """True when edge src→dst returns into a container (DAG layout exception)."""
+    src, dst = str(src), str(dst)
+    if dst not in container_ids:
+        return False
+    if src == dst:
+        return True
+    if src in members_by_container.get(dst, ()):
+        return True
+    if parents.get(src) == dst:
+        return True
+    if container_successors and src in container_successors.get(dst, ()):
+        return True
+    return False

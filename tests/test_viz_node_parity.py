@@ -87,11 +87,21 @@ class TestVarietyNodeParity(unittest.TestCase):
                 graph = eng.graphs[wf]
                 expected = set(_expected_visible_ids(graph))
                 html = WorkflowVisualizer(eng).build_html(wf)
-                actual = {n['id'] for n in _nodes_data(html)}
+                nodes = _nodes_data(html)
+                # Synthetic c_* cluster wrappers are extras for Dagre compound parents.
+                actual = {
+                    n['id'] for n in nodes
+                    if not n.get('isCluster') and not graph_utils.is_cluster_wrapper_id(n['id'])
+                }
+                extras = {n['id'] for n in nodes} - expected
                 self.assertEqual(
                     actual, expected,
                     f'missing={sorted(expected - actual)[:10]} '
                     f'extra={sorted(actual - expected)[:10]}')
+                for eid in extras:
+                    self.assertTrue(
+                        graph_utils.is_cluster_wrapper_id(eid),
+                        f'unexpected non-cluster extra id {eid}')
 
     def test_junctions_still_hidden(self):
         files = sorted(glob.glob(os.path.join(VARIETY_DIR, '*.xml')))
