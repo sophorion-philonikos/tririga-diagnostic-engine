@@ -5,6 +5,8 @@ import webbrowser
 import networkx as nx
 import textwrap
 import urllib.parse
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as xml_escape
 from cli.formatters import wrap_ascii
 from cli.models import TaskInsight, MechanicSection
 from cli.knowledge import type_display_name
@@ -33,6 +35,11 @@ _FILL = {
     '41': '#9093B8',   # Variable Assignment
 }
 _DARK_FILLS = {'23', '26', '37'}
+
+
+def _svg_text(value):
+    """Escape user/task strings embedded as SVG text nodes."""
+    return xml_escape(str(value), {'"': '&quot;', "'": '&apos;'})
 
 
 def _stroke_for(fill, darken=0.35):
@@ -328,8 +335,9 @@ class WorkflowVisualizer:
         if payload_data.get('LFldName', []) or payload_data.get('PField', []) or payload_data.get('Expression', []): 
             tags.append({'label': '[Filter]', 'bg': '#4d3300', 'border': '#f1c232', 'text': '#ffffff'})
 
-        subtitle = type_display_name(t_type)
+        subtitle = _svg_text(type_display_name(t_type))
         t_type = str(t_type)
+        safe_bo = _svg_text(t_bo)
 
         width = 240
         wrap_limit = 28
@@ -358,7 +366,7 @@ class WorkflowVisualizer:
         else:
             extra_bottom = 0
 
-        wrapped_name = textwrap.wrap(t_name, width=wrap_limit)
+        wrapped_name = [_svg_text(line) for line in textwrap.wrap(t_name, width=wrap_limit)]
         
         header_h = 28
         line_height = 16
@@ -425,7 +433,7 @@ class WorkflowVisualizer:
 
         svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{total_h}">
             {svg_shape}
-            <text x="{text_x_offset}" y="20" font-family="Segoe UI, Tahoma, sans-serif" font-size="11" font-weight="bold" fill="{header_label_color}">Context: <tspan fill="{header_font_color}">{t_bo}</tspan></text>
+            <text x="{text_x_offset}" y="20" font-family="Segoe UI, Tahoma, sans-serif" font-size="11" font-weight="bold" fill="{header_label_color}">Context: <tspan fill="{header_font_color}">{safe_bo}</tspan></text>
             <line x1="{text_x_offset}" y1="{header_h}" x2="{width - 30}" y2="{header_h}" stroke="{line_color}" stroke-width="1" opacity="0.4"/>
         """
 
@@ -443,7 +451,7 @@ class WorkflowVisualizer:
                 text_w = len(tag['label']) * 6
                 rect_w = text_w + 10
                 svg += f'<rect x="{pill_x}" y="{pill_y}" width="{rect_w}" height="16" rx="3" fill="{tag["bg"]}" stroke="{tag["border"]}" stroke-width="1"/>'
-                svg += f'<text x="{pill_x + 5}" y="{pill_y + 11}" font-family="Consolas, monospace" font-size="9" font-weight="bold" fill="{tag["text"]}">{tag["label"]}</text>'
+                svg += f'<text x="{pill_x + 5}" y="{pill_y + 11}" font-family="Consolas, monospace" font-size="9" font-weight="bold" fill="{tag["text"]}">{_svg_text(tag["label"])}</text>'
                 pill_x += rect_w + 5
 
         svg += "</svg>"
