@@ -143,7 +143,24 @@ def process_visualization_request(uploads):
 
     live_trace_ids = [step['id'] for step in target_trace]
     visualizer = WorkflowVisualizer(engine)
-    map_html = visualizer.build_html(target_wf, live_trace_ids=live_trace_ids)
+    map_html = None
+    viz_render_errors = []
+    try:
+        map_html = visualizer.build_html(target_wf, live_trace_ids=live_trace_ids)
+    except Exception as exc:
+        import traceback
+        reasons = [f"{type(exc).__name__}: {exc}"]
+        for line in reversed(traceback.format_exc().splitlines()):
+            if 'File "' in line and ('cli/' in line or 'core/' in line or 'web/' in line):
+                reasons.append(line.strip())
+                break
+        viz_render_errors = reasons
+        map_html = (
+            "<!DOCTYPE html><html><body style='font-family:Segoe UI,sans-serif;"
+            "background:#2b2b2b;color:#ffb3b3;padding:24px;'>"
+            "<h2>Visualization failed to render</h2>"
+            f"<pre>{chr(10).join(reasons)}</pre></body></html>"
+        )
 
     global _session
     with _session_lock:
@@ -166,6 +183,7 @@ def process_visualization_request(uploads):
         'trace_summary': trace_summary,
         'note': note,
         'map_html': map_html,
+        'viz_render_errors': viz_render_errors,
     }
 
 

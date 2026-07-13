@@ -636,6 +636,12 @@
     viewerReady = false;
     pendingMapMessage = null;
     showNote(payload.note);
+    if (payload.viz_render_errors && payload.viz_render_errors.length) {
+      showNote(
+        (payload.note ? payload.note + "\n\n" : "") +
+        "Visualization failed to render due to: " + payload.viz_render_errors.join("; ")
+      );
+    }
     showSimOutcome("");  // a fresh map invalidates any previous simulation overlay
     result.classList.add("visible");
     result.scrollIntoView({ behavior: "smooth", block: "start" });
