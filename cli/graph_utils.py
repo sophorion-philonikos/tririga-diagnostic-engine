@@ -198,6 +198,36 @@ def compute_container_parents(graph, branch_map_fn=None):
     return parents, container_ids, members_by_container
 
 
+def format_context_display(bo, node_data, graph):
+    """Diagnostic Context line: ``triApproval (INNVarApproval)`` when uniquely sourced.
+
+    Uses the consumer's primary ``FromTask`` (TaskRef UseType=1). When there is
+    not exactly one resolvable named source task, returns the BO alone.
+    """
+    bo_raw = bo
+    if isinstance(bo_raw, list):
+        bo_raw = bo_raw[0] if bo_raw else ''
+    bo_str = str(bo_raw or '').strip() or 'Context BO'
+
+    from_tasks = node_data.get('FromTask', [])
+    if isinstance(from_tasks, str):
+        from_tasks = [from_tasks]
+    from_tasks = [str(t).strip() for t in from_tasks if str(t).strip() not in ('', '-1')]
+
+    if len(from_tasks) != 1:
+        return bo_str
+
+    src_id = from_tasks[0]
+    if src_id == '0' or graph is None or not graph.has_node(src_id):
+        return bo_str
+
+    src_name = str(graph.nodes[src_id].get('name', '')).strip()
+    if not src_name or src_name.lower().startswith('unnamed component'):
+        return bo_str
+
+    return f'{bo_str} ({src_name})'
+
+
 def is_loop_back_edge(src, dst, parents, container_ids, members_by_container,
                       container_successors=None):
     """True when edge src→dst returns into a container (DAG layout exception)."""

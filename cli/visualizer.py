@@ -459,14 +459,15 @@ class WorkflowVisualizer:
         encoded_svg = "data:image/svg+xml;base64," + base64.b64encode(svg.encode('utf-8')).decode('utf-8')
         return encoded_svg, width, total_h
 
-    def _build_task_insight(self, node_id, node_data, t_type, t_name, t_bo):
+    def _build_task_insight(self, node_id, node_data, t_type, t_name, t_bo, graph=None):
         """Assemble a renderer-neutral TaskInsight for the diagnostics side panel."""
         sections = self._build_mechanic_sections(node_data, t_type)
+        context_display = graph_utils.format_context_display(t_bo, node_data, graph)
         return TaskInsight(
             task_id=str(node_id),
             name=t_name,
             type_code=str(t_type),
-            bo=str(t_bo),
+            bo=context_display,
             mechanics=sections,
         )
 
@@ -620,7 +621,7 @@ class WorkflowVisualizer:
             is_critical = str(node_id) in critical_path_nodes
             is_start = node_id in start_nodes
             nid = str(node_id)
-            insight = self._build_task_insight(node_id, data, t_type, t_name, t_bo)
+            insight = self._build_task_insight(node_id, data, t_type, t_name, t_bo, graph)
 
             if nid in wrapping:
                 condition = data.get('Condition', '')
