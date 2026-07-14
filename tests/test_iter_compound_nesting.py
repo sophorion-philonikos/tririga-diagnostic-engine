@@ -103,6 +103,10 @@ class TestBaselineIterCycleNesting(unittest.TestCase):
         self.assertIn('compound: true', self.html)
         self.assertIn('setParent', self.html)
         self.assertIn('decorateClusterCaps', self.html)
+        # Modest denser packing so more tasks fit on screen.
+        self.assertIn('nodesep: 55', self.html)
+        self.assertIn('ranksep: 55', self.html)
+        self.assertIn('edgesep: 25', self.html)
 
 
 @unittest.skipUnless(os.path.isfile(RENT), 'Rent sample missing')
