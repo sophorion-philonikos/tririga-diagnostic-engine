@@ -25,6 +25,8 @@
         h3 { color: #ffffff; margin-bottom: 5px; }
         hr { border-color: #555; }
         .hint { color: #888; font-style: italic; margin-top: 20px; }
+        .source-link { color: #4da6ff; text-decoration: underline; cursor: pointer; }
+        .source-link:hover { color: #00c3a5; }
         
         .node { cursor: pointer; }
         .node rect, .node circle, .node ellipse, .node polygon { fill: transparent !important; stroke: none !important; }
@@ -536,6 +538,7 @@
             });
             if (window.handleNodeClick) window.handleNodeClick(nid);
         }
+        window.focusNode = focusNode;
 
         function updateSearchStatus() {
             var status = document.getElementById('searchStatus');

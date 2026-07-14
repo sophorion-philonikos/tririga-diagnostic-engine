@@ -42,6 +42,8 @@ class TaskInsight:
     payload_blocks: List[PayloadBlock] = field(default_factory=list)
     routes: List[str] = field(default_factory=list)
     flags: List[str] = field(default_factory=list)
+    sourced_from_id: str = ''
+    sourced_from_label: str = ''
 
     def display_subtitle(self):
         return self.subtitle or type_display_name(self.type_code)
@@ -59,6 +61,8 @@ class TaskInsight:
 
     def render_cli(self):
         out = [f"Deep Logic Analysis: '{self.name}' (ID: {self.task_id}, Type {self.type_code}, BO: {self.bo})"]
+        if self.sourced_from_id and self.sourced_from_label:
+            out.append(f"  Sourced From: {self.sourced_from_label}")
         for sec in self.mechanics:
             out.append(f"  [{sec.heading}]:")
             for bullet in sec.bullets:
@@ -87,8 +91,17 @@ class TaskInsight:
             f"<h3>Task: {esc(self.name)}</h3>",
             f"<b>Type:</b> {esc(self.type_code)} ({esc(self.display_subtitle())})<br/>",
             f"<b>ID:</b> {esc(self.task_id)}<br/>",
-            f"<b>Context:</b> {esc(self.bo)}<hr/>",
+            f"<b>Context:</b> {esc(self.bo)}<br/>",
         ]
+        if self.sourced_from_id and self.sourced_from_label:
+            sid = esc(self.sourced_from_id)
+            parts.append(
+                f"<b>Sourced From:</b> "
+                f"<a href=\"#\" class=\"source-link\" "
+                f"onclick=\"window.focusNode('{sid}'); return false;\">"
+                f"{esc(self.sourced_from_label)}</a><br/>"
+            )
+        parts.append("<hr/>")
 
         body = []
         for sec in self.mechanics:

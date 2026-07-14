@@ -228,6 +228,58 @@ def format_context_display(bo, node_data, graph):
     return f'{bo_str} ({src_name})'
 
 
+def resolve_modify_source(node_data, graph):
+    """Resolve Modify (type 28) mapping source from FilterTask (UseType=2).
+
+    Returns ``(src_id, label)`` like ``('334773', 'Retrieve ... (Location)')``,
+    or ``None`` when the source is uncertain.
+    """
+    if graph is None:
+        return None
+
+    filter_tasks = node_data.get('FilterTask', [])
+    if isinstance(filter_tasks, str):
+        filter_tasks = [filter_tasks]
+    filter_tasks = [
+        str(t).strip() for t in filter_tasks
+        if str(t).strip() not in ('', '-1', '0')
+    ]
+    if len(filter_tasks) != 1:
+        return None
+
+    src_id = filter_tasks[0]
+    if not graph.has_node(src_id):
+        return None
+
+    src_name = str(graph.nodes[src_id].get('name', '')).strip()
+    if not src_name or src_name.lower().startswith('unnamed component'):
+        return None
+
+    src_bos = sorted({
+        str(r.get('SrcBo')).strip()
+        for r in (node_data.get('ObjMappingRecords') or [])
+        if r.get('SrcBo') and str(r.get('SrcBo')).strip()
+    })
+    bo = ''
+    if len(src_bos) == 1:
+        bo = src_bos[0]
+    else:
+        refs = [
+            r for r in (node_data.get('TaskRefRecords') or [])
+            if str(r.get('UseType')) == '2' and str(r.get('RefTaskId')) == src_id
+        ]
+        if refs:
+            bo = str(refs[0].get('RefObject') or refs[0].get('RefModule') or '').strip()
+        if not bo:
+            src_bo = graph.nodes[src_id].get('BO', graph.nodes[src_id].get('BoName', ''))
+            if isinstance(src_bo, list):
+                src_bo = src_bo[0] if src_bo else ''
+            bo = str(src_bo or '').strip()
+
+    label = f'{src_name} ({bo})' if bo else src_name
+    return src_id, label
+
+
 def is_loop_back_edge(src, dst, parents, container_ids, members_by_container,
                       container_successors=None):
     """True when edge src→dst returns into a container (DAG layout exception)."""

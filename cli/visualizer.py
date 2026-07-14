@@ -463,12 +463,20 @@ class WorkflowVisualizer:
         """Assemble a renderer-neutral TaskInsight for the diagnostics side panel."""
         sections = self._build_mechanic_sections(node_data, t_type)
         context_display = graph_utils.format_context_display(t_bo, node_data, graph)
+        sourced_from_id = ''
+        sourced_from_label = ''
+        if str(t_type) == '28' and graph is not None:
+            resolved = graph_utils.resolve_modify_source(node_data, graph)
+            if resolved:
+                sourced_from_id, sourced_from_label = resolved
         return TaskInsight(
             task_id=str(node_id),
             name=t_name,
             type_code=str(t_type),
             bo=context_display,
             mechanics=sections,
+            sourced_from_id=sourced_from_id,
+            sourced_from_label=sourced_from_label,
         )
 
     def _build_mechanic_sections(self, node_data, t_type):
