@@ -777,6 +777,23 @@ class WorkflowVisualizer:
                              else (1 if x['label'] in ('TRUE', 'LOOP BODY') else 2))
             dagre_edges.extend(local_edges)
 
+        wrapping_containers = {
+            cid for cid in wrapping
+            if graph.has_node(cid) and self._get_type_str(graph.nodes[cid]) in ('20', '24')
+        }
+        # Also restyle non-wrapping Iters that still emit EXIT/LOOP BODY.
+        for cid in container_ids:
+            if graph.has_node(cid) and self._get_type_str(graph.nodes[cid]) == '24':
+                wrapping_containers.add(cid)
+        container_types = {
+            cid: self._get_type_str(graph.nodes[cid])
+            for cid in wrapping_containers if graph.has_node(cid)
+        }
+        dagre_edges = graph_utils.restyle_container_branch_edges(
+            dagre_edges, parents, wrapping_containers, members_by_container,
+            container_types=container_types,
+        )
+
         template_path = os.path.join(os.path.dirname(__file__), 'templates', 'viewer.html')
         try:
             with open(template_path, 'r', encoding='utf-8') as f:

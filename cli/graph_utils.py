@@ -228,6 +228,88 @@ def format_context_display(bo, node_data, graph):
     return f'{bo_str} ({src_name})'
 
 
+def restyle_container_branch_edges(edges, parents, wrapping_containers,
+                                   members_by_container, container_types=None):
+    """Hide Iter internal EXIT/LOOP BODY; tag outside continuations for perimeter routing.
+
+    - Iter (24) EXIT/LOOP BODY into body → ``iter-branch-hidden``
+    - Iter (24) EXIT/LOOP BODY to outside → ``container-continue`` (unlabeled)
+    - Loop (20) body-member → outside escapes → rehost onto Loop leaf as
+      ``container-continue``
+
+    ``container_types`` maps container id → type string ('20' / '24').
+    """
+    wrapping_containers = set(wrapping_containers or ())
+    parents = parents or {}
+    members_by_container = members_by_container or {}
+    container_types = container_types or {}
+
+    def _inside(nid, container_id):
+        nid = str(nid)
+        if nid == container_id:
+            return True
+        if parents.get(nid) == container_id:
+            return True
+        if nid in members_by_container.get(container_id, ()):
+            return True
+        return False
+
+    out = []
+    seen = set()
+    for edge in edges:
+        e = dict(edge)
+        src = str(e.get('from', ''))
+        dst = str(e.get('to', ''))
+        label = e.get('label', '')
+
+        if e.get('kind') == 'loop-back' or e.get('constraint') is False:
+            key = (src, dst, label, e.get('kind'))
+            if key not in seen:
+                seen.add(key)
+                out.append(e)
+            continue
+
+        # Iter branch restyle
+        if (
+            src in wrapping_containers
+            and container_types.get(src) == '24'
+            and label in ('EXIT', 'LOOP BODY')
+        ):
+            if _inside(dst, src):
+                e['kind'] = 'iter-branch-hidden'
+            else:
+                e['kind'] = 'container-continue'
+                e['label'] = ''
+                e['exitContainer'] = src
+
+        # Loop body escape → continue from Loop leaf
+        elif (
+            parents.get(src) in wrapping_containers
+            and container_types.get(parents.get(src)) == '20'
+            and not _inside(dst, parents.get(src))
+        ):
+            loop_id = parents.get(src)
+            e['from'] = loop_id
+            e['kind'] = 'container-continue'
+            e['label'] = ''
+            e['exitContainer'] = loop_id
+
+        key = (str(e['from']), str(e['to']), e.get('label', ''), e.get('kind'))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
+
+
+# Back-compat alias used by older tests/call sites.
+def restyle_iter_branch_edges(edges, parents, wrapping_iters, members_by_container):
+    types = {cid: '24' for cid in (wrapping_iters or ())}
+    return restyle_container_branch_edges(
+        edges, parents, wrapping_iters, members_by_container, container_types=types,
+    )
+
+
 def resolve_modify_source(node_data, graph):
     """Resolve Modify (type 28) mapping source from FilterTask (UseType=2).
 

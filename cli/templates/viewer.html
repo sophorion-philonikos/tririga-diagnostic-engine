@@ -331,6 +331,105 @@
             });
         }
 
+        function hideIterBranchEdges(root) {
+            // EXIT / LOOP BODY into the Iter body stay for layout but must not paint.
+            root.selectAll("g.edgePath").each(function(d) {
+                var meta = edgesData.find(function(e) {
+                    return String(e.from) === String(d.v) && String(e.to) === String(d.w);
+                });
+                if (meta && meta.kind === "iter-branch-hidden") {
+                    d3.select(this).style("opacity", 0).style("pointer-events", "none")
+                        .classed("iter-branch-hidden", true);
+                }
+            });
+            root.selectAll("g.edgeLabel").each(function(d) {
+                var meta = edgesData.find(function(e) {
+                    return String(e.from) === String(d.v) && String(e.to) === String(d.w);
+                });
+                if (meta && (meta.kind === "iter-branch-hidden"
+                        || meta.kind === "iter-continue"
+                        || meta.kind === "container-continue")) {
+                    if (meta.kind === "iter-branch-hidden" || !meta.label) {
+                        d3.select(this).style("opacity", 0).style("pointer-events", "none");
+                    }
+                }
+            });
+        }
+
+        function nodeBox(g, id) {
+            var n = g.node(id);
+            if (!n) return null;
+            var w = n.width || 0, h = n.height || 0;
+            return {
+                x: n.x, y: n.y, w: w, h: h,
+                left: n.x - w / 2, right: n.x + w / 2,
+                top: n.y - h / 2, bottom: n.y + h / 2
+            };
+        }
+
+        function skirtPath(leaf, cluster, target, pad) {
+            // Orthogonal leaf → perimeter → outside → target; never through cluster interior.
+            pad = pad == null ? 14 : pad;
+            var cl = cluster.left - pad, cr = cluster.right + pad;
+            var cb = cluster.bottom + pad;
+            var preferLeft = target.x < cluster.x;
+            var xOut = preferLeft ? cl : cr;
+            var sx = preferLeft ? leaf.left : leaf.right;
+            var sy = leaf.y;
+            var tx = target.x;
+            var ty = target.top;
+            var pts = [[sx, sy], [xOut, sy]];
+            if (ty > cb) {
+                pts.push([xOut, cb]);
+                pts.push([tx, cb]);
+                pts.push([tx, ty]);
+            } else {
+                pts.push([xOut, ty]);
+                pts.push([tx, ty]);
+            }
+            var d = "M " + pts[0][0] + " " + pts[0][1];
+            for (var i = 1; i < pts.length; i++) {
+                d += " L " + pts[i][0] + " " + pts[i][1];
+            }
+            return { d: d, points: pts };
+        }
+
+        function routeContainerContinueEdges(root, g) {
+            root.selectAll("g.edgePath").each(function(d) {
+                var meta = edgesData.find(function(e) {
+                    return String(e.from) === String(d.v) && String(e.to) === String(d.w);
+                });
+                if (!meta) return;
+                var kind = meta.kind || "";
+                if (kind !== "container-continue" && kind !== "iter-continue") return;
+
+                var leafId = String(meta.exitContainer || d.v);
+                var clusterId = "c_" + leafId;
+                if (!g.hasNode(clusterId)) {
+                    var p = g.parent(leafId);
+                    if (p) clusterId = String(p);
+                }
+                if (!g.hasNode(clusterId) || !g.hasNode(d.v) || !g.hasNode(d.w)) return;
+
+                var leaf = nodeBox(g, d.v);
+                var cluster = nodeBox(g, clusterId);
+                var target = nodeBox(g, d.w);
+                if (!leaf || !cluster || !target) return;
+
+                var routed = skirtPath(leaf, cluster, target, 14);
+                var sel = d3.select(this);
+                var pathEl = sel.select("path.path");
+                if (pathEl.empty()) pathEl = sel.select("path");
+                pathEl.attr("d", routed.d);
+                var pts = routed.points;
+                var eg = g.edge(d.v, d.w);
+                if (eg) {
+                    eg.points = pts.map(function(p) { return { x: p[0], y: p[1] }; });
+                }
+                sel.classed("container-continue", true);
+            });
+        }
+
         function showRenderFailure(err) {
             var msg = "Visualization failed to generate.\n" +
                 "Reason: " + (err && err.message ? err.message : String(err)) + "\n" +
@@ -385,18 +484,24 @@
         edgesData.forEach(function(e) {
             var weight = (e.label === "TRUE" || e.label === "") ? 100 : 1;
             var isBack = e.constraint === false || e.kind === "loop-back";
-            var style = "stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;";
+            var isHiddenBranch = e.kind === "iter-branch-hidden";
+            var style = isHiddenBranch
+                ? "stroke: none; stroke-width: 0; fill: none; opacity: 0;"
+                : ("stroke: " + e.color + "; stroke-width: " + e.width + "px; fill: none;");
             if (isBack) style += " stroke-dasharray: 6 4;";
 
             g.setEdge(e.from, e.to, {
-                label: e.label || "",
+                label: isHiddenBranch ? "" : (e.label || ""),
                 style: style,
-                arrowhead: "vee",
-                arrowheadStyle: "fill: " + e.color + "; stroke: " + e.color + ";",
+                arrowhead: isHiddenBranch ? "undirected" : "vee",
+                arrowheadStyle: isHiddenBranch
+                    ? "fill: none; stroke: none; opacity: 0;"
+                    : ("fill: " + e.color + "; stroke: " + e.color + ";"),
                 weight: weight,
                 curve: d3.curveStepBefore,
                 constraint: e.constraint !== false,
-                minlen: 1
+                minlen: 1,
+                kind: e.kind || ""
             });
         });
 
@@ -413,6 +518,8 @@
             var render = new dagreD3.render();
             render(inner, g);
             decorateClusterCaps(inner);
+            hideIterBranchEdges(inner);
+            routeContainerContinueEdges(inner, g);
             renderOk = true;
         } catch (err) {
             showRenderFailure(err);
