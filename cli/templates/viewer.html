@@ -358,7 +358,7 @@
 
         function nodeBox(g, id) {
             var n = g.node(id);
-            if (!n) return null;
+            if (!n || n.x == null) return null;
             var w = n.width || 0, h = n.height || 0;
             return {
                 x: n.x, y: n.y, w: w, h: h,
@@ -367,13 +367,58 @@
             };
         }
 
+        function clusterBox(root, g, clusterId) {
+            // Compound parents often lack width/height on g.node(); use the rendered rect.
+            var el = null;
+            root.selectAll("g.cluster").each(function(d) {
+                if (String(d) === String(clusterId)) el = this;
+            });
+            if (el) {
+                var rect = d3.select(el).select("rect");
+                if (!rect.empty()) {
+                    var bb = el.getBBox();
+                    var transform = el.getAttribute("transform") || "";
+                    var m = /translate\(\s*([-\d.]+)[,\s]+([-\d.]+)\s*\)/.exec(transform);
+                    var tx = m ? parseFloat(m[1]) : 0;
+                    var ty = m ? parseFloat(m[2]) : 0;
+                    var left = tx + bb.x, top = ty + bb.y;
+                    var w = bb.width, h = bb.height;
+                    return {
+                        x: left + w / 2, y: top + h / 2, w: w, h: h,
+                        left: left, right: left + w, top: top, bottom: top + h
+                    };
+                }
+            }
+            // Fallback: union of direct children boxes.
+            var kids = (g.children && g.children(clusterId)) || [];
+            var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            var any = false;
+            kids.forEach(function(cid) {
+                var b = nodeBox(g, cid);
+                if (!b || !b.w) return;
+                any = true;
+                minX = Math.min(minX, b.left);
+                maxX = Math.max(maxX, b.right);
+                minY = Math.min(minY, b.top);
+                maxY = Math.max(maxY, b.bottom);
+            });
+            if (!any) return nodeBox(g, clusterId);
+            return {
+                x: (minX + maxX) / 2, y: (minY + maxY) / 2,
+                w: maxX - minX, h: maxY - minY,
+                left: minX, right: maxX, top: minY, bottom: maxY
+            };
+        }
+
         function skirtPath(leaf, cluster, target, pad) {
-            // Orthogonal leaf → perimeter → outside → target; never through cluster interior.
-            pad = pad == null ? 14 : pad;
+            // Orthogonal: leaf side nearest target → cluster perimeter → outside → target.
+            // Never exit the leaf bottom; never re-enter the cluster bbox.
+            pad = pad == null ? 30 : pad;
+            var preferLeft = target.x < leaf.x;
             var cl = cluster.left - pad, cr = cluster.right + pad;
             var cb = cluster.bottom + pad;
-            var preferLeft = target.x < cluster.x;
-            var xOut = preferLeft ? cl : cr;
+            // Perimeter must be strictly outside the leaf on the chosen side.
+            var xOut = preferLeft ? Math.min(cl, leaf.left - pad) : Math.max(cr, leaf.right + pad);
             var sx = preferLeft ? leaf.left : leaf.right;
             var sy = leaf.y;
             var tx = target.x;
@@ -409,14 +454,14 @@
                     var p = g.parent(leafId);
                     if (p) clusterId = String(p);
                 }
-                if (!g.hasNode(clusterId) || !g.hasNode(d.v) || !g.hasNode(d.w)) return;
+                if (!g.hasNode(d.v) || !g.hasNode(d.w)) return;
 
                 var leaf = nodeBox(g, d.v);
-                var cluster = nodeBox(g, clusterId);
+                var cluster = clusterBox(root, g, clusterId);
                 var target = nodeBox(g, d.w);
                 if (!leaf || !cluster || !target) return;
 
-                var routed = skirtPath(leaf, cluster, target, 14);
+                var routed = skirtPath(leaf, cluster, target, 30);
                 var sel = d3.select(this);
                 var pathEl = sel.select("path.path");
                 if (pathEl.empty()) pathEl = sel.select("path");

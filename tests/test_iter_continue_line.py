@@ -112,6 +112,12 @@ class TestIter334008ContinueLine(unittest.TestCase):
         self.assertIn('routeContainerContinueEdges', self.html)
         self.assertIn('iter-branch-hidden', self.html)
         self.assertIn('container-continue', self.html)
+        # Leaf-relative side exit + DOM cluster bbox (dagre parents lack width/height).
+        self.assertIn('target.x < leaf.x', self.html)
+        self.assertIn('function clusterBox', self.html)
+        self.assertIn('skirtPath(leaf, cluster, target, 30)', self.html)
+        self.assertRegex(self.html, r'pad\s*=\s*pad\s*==\s*null\s*\?\s*30\s*:')
+        self.assertIn('Math.min(cl, leaf.left - pad)', self.html)
 
 
 if __name__ == '__main__':
