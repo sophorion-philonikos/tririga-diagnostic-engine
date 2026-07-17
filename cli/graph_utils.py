@@ -56,6 +56,30 @@ def resolve_to_visible(graph, node_id):
     return sorted(str(t) for t in visible_successors(graph, str(node_id)))
 
 
+def branch_label_for_visible(graph, branch_map, visible_succ, default='FALSE'):
+    """Label a visible successor of a Switch/Iter using TargetAssociation branch_map.
+
+    Exact raw-id matches win. Otherwise only **invisible** raw targets may claim
+    a downstream visible node (skip junctions). Resolving through a *visible*
+    raw target to a later merge point causes dual-TRUE diamonds and is forbidden.
+    """
+    if not branch_map:
+        return default
+    visible_succ = str(visible_succ)
+    for raw_target, verdict in branch_map.items():
+        if visible_succ == str(raw_target):
+            return verdict
+    for raw_target, verdict in branch_map.items():
+        raw = str(raw_target)
+        if not graph.has_node(raw):
+            continue
+        if not is_invisible(graph.nodes[raw]):
+            continue
+        if visible_succ in {str(x) for x in visible_successors(graph, raw)}:
+            return verdict
+    return default
+
+
 # Short display names used when TaskLabel is empty in the XML export.
 _EMPTY_LABEL_NAMES = {
     '1': 'Start',
@@ -185,7 +209,14 @@ def compute_container_parents(graph, branch_map_fn=None):
             if any(c in members_by_container.get(o, ()) for o in candidates if o != c)
         ]
         pool = inner if inner else list(candidates)
-        return min(pool, key=lambda c: len(members_by_container.get(c, ())))
+
+        def _near_key(c):
+            # Smaller member set = nearer. Tie: Iter (24) inside Loop (20), then id.
+            t = get_type_str(graph.nodes[c]) if graph.has_node(c) else ''
+            type_rank = 0 if t == '24' else (1 if t == '20' else 2)
+            return (len(members_by_container.get(c, ())), type_rank, str(c))
+
+        return min(pool, key=_near_key)
 
     parents = {}
     for child, candidates in claims.items():
@@ -195,7 +226,69 @@ def compute_container_parents(graph, branch_map_fn=None):
         if parent != child:
             parents[child] = parent
 
+    _break_container_parent_cycles(parents, container_ids, members_by_container, graph)
     return parents, container_ids, members_by_container
+
+
+def _break_container_parent_cycles(parents, container_ids, members_by_container, graph):
+    """Ensure container→container parent links form a DAG (dagre forbids cycles).
+
+    Mutual Iter/Loop cycle membership often yields A⊂B and B⊂A. Prefer Loop (20)
+    as outer over Iter (24); same type → larger member set is outer.
+    """
+    def _container_parent(cid):
+        p = parents.get(cid)
+        return p if p in container_ids else None
+
+    def _find_cycle():
+        for start in sorted(container_ids, key=str):
+            seen = []
+            cur = start
+            while cur and cur in container_ids:
+                if cur in seen:
+                    return seen[seen.index(cur):] + [cur]
+                seen.append(cur)
+                cur = _container_parent(cur)
+        return None
+
+    def _prefer_outer(a, b):
+        ta = get_type_str(graph.nodes[a]) if graph.has_node(a) else ''
+        tb = get_type_str(graph.nodes[b]) if graph.has_node(b) else ''
+        if ta == '20' and tb == '24':
+            return a
+        if tb == '20' and ta == '24':
+            return b
+        la = len(members_by_container.get(a, ()))
+        lb = len(members_by_container.get(b, ()))
+        if la != lb:
+            return a if la > lb else b
+        return a if str(a) < str(b) else b
+
+    # Guard against pathological graphs.
+    for _ in range(max(8, len(container_ids) + 2)):
+        cycle = _find_cycle()
+        if not cycle or len(cycle) < 2:
+            return
+        # cycle like [A, B, A] → edges A→B, B→A; drop the worse outer→inner link.
+        nodes = cycle[:-1]
+        if len(nodes) == 2:
+            a, b = nodes[0], nodes[1]
+            outer = _prefer_outer(a, b)
+            inner = b if outer == a else a
+            parents[inner] = outer
+            if parents.get(outer) == inner:
+                del parents[outer]
+        else:
+            # Longer cycle: remove one edge into the cycle (deterministic: last→first).
+            edge_child = nodes[-1]
+            if parents.get(edge_child) == nodes[0]:
+                del parents[edge_child]
+            else:
+                for i in range(len(nodes)):
+                    c, nxt = nodes[i], nodes[(i + 1) % len(nodes)]
+                    if parents.get(c) == nxt:
+                        del parents[c]
+                        break
 
 
 def format_context_display(bo, node_data, graph):

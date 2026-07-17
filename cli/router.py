@@ -649,19 +649,12 @@ class TririgaNLPRouter:
         """Return the branch label for a visible successor of a branching task
         (Switch Type 14 -> TRUE/FALSE, Iter Type 24 -> LOOP BODY/EXIT).
 
-        Uses the TargetAssociation-derived branch map keyed by raw target ids, then
-        resolves it forward through any invisible junctions to the concrete visible
-        successor actually rendered on that branch.
+        Uses TargetAssociation branch map; resolves through invisible junctions
+        only (see graph_utils.branch_label_for_visible).
         """
-        if not branch_map:
-            return default
-        for raw_target, verdict in branch_map.items():
-            if str(visible_succ) == str(raw_target):
-                return verdict
-            if graph.has_node(str(raw_target)):
-                if str(visible_succ) in [str(x) for x in self._resolve_visible_successors(graph, str(raw_target), succ_cache)]:
-                    return verdict
-        return default
+        return graph_utils.branch_label_for_visible(
+            graph, branch_map, visible_succ, default=default,
+        )
 
     def _translate_task_to_action(self, node_id, data):
         t_type = self._get_type_str(data)

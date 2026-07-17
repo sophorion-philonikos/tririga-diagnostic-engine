@@ -36,6 +36,13 @@ def _edges(html):
     return data
 
 
+def _nodes(html):
+    marker = 'var nodesData = '
+    idx = html.find(marker)
+    data, _ = json.JSONDecoder().raw_decode(html[idx + len(marker):])
+    return data
+
+
 class TestRestyleContainerBranchEdges(unittest.TestCase):
     def test_iter_inside_exit_hidden_outside_continue(self):
         edges = [
@@ -118,6 +125,27 @@ class TestIter334008ContinueLine(unittest.TestCase):
         self.assertIn('skirtPath(leaf, cluster, target, 30)', self.html)
         self.assertRegex(self.html, r'pad\s*=\s*pad\s*==\s*null\s*\?\s*30\s*:')
         self.assertIn('Math.min(cl, leaf.left - pad)', self.html)
+
+    def test_multi_loop_backs_merged_visually(self):
+        backs = [
+            e for e in self.edges
+            if e.get('kind') == 'loop-back' and e['to'] == ITER
+        ]
+        self.assertGreaterEqual(len(backs), 2, backs)
+        self.assertIn('mergeLoopBackEdges', self.html)
+        self.assertIn('loop-back-merged', self.html)
+        # Merged trunk clamped inside cluster border.
+        self.assertIn('cluster.right - pad', self.html)
+        for n in _nodes(self.html):
+            self.assertFalse(str(n['id']).startswith('lb_'), n)
+
+    def test_iter_terminal_switch_fork_balanced(self):
+        # Switch 334034 → FALSE 334037 / TRUE 334022 (both loop back).
+        self.assertIn('balanceIterSwitchForks', self.html)
+        nodes = {n['id']: n for n in _nodes(self.html)}
+        self.assertEqual(nodes['334037'].get('parent'), nodes['334034'].get('parent'))
+        self.assertEqual(nodes['334022'].get('parent'), nodes['334034'].get('parent'))
+        self.assertTrue(str(nodes['334034'].get('parent', '')).startswith('c_'))
 
 
 if __name__ == '__main__':

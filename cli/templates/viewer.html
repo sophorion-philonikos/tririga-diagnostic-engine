@@ -55,6 +55,14 @@
         .cluster.sim-broken > rect { stroke: #ff2d2d; stroke-width: 3px; }
         .edgePath.loop-back path { stroke-dasharray: 6 4; }
         .viz-error { color: #ffb3b3; font-family: Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+        #viz-error-banner {
+            display: none; position: absolute; left: 16px; right: 16px; top: 16px; z-index: 40;
+            background: rgba(40, 12, 12, 0.94); border: 1px solid #cc4444; border-radius: 6px;
+            padding: 14px 16px; color: #ffb3b3; font-family: Consolas, monospace; font-size: 12px;
+            line-height: 1.5; white-space: pre-wrap; max-height: 45%; overflow: auto;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+        }
+        #viz-error-banner.visible { display: block; }
         
         .edgePath path { fill: none; }
         .edgeLabel rect { fill: #ffffff; stroke: #ccc; stroke-width: 1; rx: 3; ry: 3; }
@@ -207,6 +215,7 @@
 <body>
     <div id="canvas-container">
         <svg id="svg-canvas"><g/></svg>
+        <div id="viz-error-banner" role="alert" aria-live="assertive"></div>
         <div class="zoom-toolbar" id="zoomToolbar">
             <button type="button" class="wide" id="zoomFit" title="Fit to view">Fit</button>
             <button type="button" class="wide" id="zoomReset" title="Reset view">Reset</button>
@@ -475,13 +484,230 @@
             });
         }
 
-        function showRenderFailure(err) {
-            var msg = "Visualization failed to generate.\n" +
-                "Reason: " + (err && err.message ? err.message : String(err)) + "\n" +
-                "Location: cli/templates/viewer.html (dagreD3.render / compound cluster layout)";
+        function setNodeX(root, g, id, newX) {
+            var n = g.node(id);
+            if (!n || n.x == null) return;
+            n.x = newX;
+            root.selectAll("g.node").each(function(d) {
+                if (String(d) !== String(id)) return;
+                d3.select(this).attr("transform", "translate(" + n.x + "," + n.y + ")");
+            });
+        }
+
+        function applyEdgePoints(root, g, v, w, pts) {
+            var d = "M " + pts[0][0] + " " + pts[0][1];
+            for (var i = 1; i < pts.length; i++) {
+                d += " L " + pts[i][0] + " " + pts[i][1];
+            }
+            root.selectAll("g.edgePath").each(function(ed) {
+                if (String(ed.v) !== String(v) || String(ed.w) !== String(w)) return;
+                var sel = d3.select(this);
+                var pathEl = sel.select("path.path");
+                if (pathEl.empty()) pathEl = sel.select("path");
+                pathEl.attr("d", d);
+                var eg = g.edge(ed.v, ed.w);
+                if (eg) {
+                    eg.points = pts.map(function(p) { return { x: p[0], y: p[1] }; });
+                }
+            });
+            var mid = pts[Math.floor(pts.length / 2)];
+            root.selectAll("g.edgeLabel").each(function(ed) {
+                if (String(ed.v) !== String(v) || String(ed.w) !== String(w)) return;
+                d3.select(this).attr("transform", "translate(" + mid[0] + "," + mid[1] + ")");
+            });
+        }
+
+        function balanceIterSwitchForks(root, g) {
+            // Terminal Switch forks inside Iter/Loop: center TRUE/FALSE kids under the Switch.
+            var byId = {};
+            nodesData.forEach(function(n) { byId[String(n.id)] = n; });
+
+            nodesData.forEach(function(swMeta) {
+                if (String(swMeta.type) !== "14") return;
+                var parent = swMeta.parent ? String(swMeta.parent) : "";
+                if (parent.indexOf("c_") !== 0) return;
+                var containerLeaf = parent.slice(2);
+                var swId = String(swMeta.id);
+
+                var falseTo = null, trueTo = null;
+                edgesData.forEach(function(e) {
+                    if (String(e.from) !== swId) return;
+                    if (e.label === "FALSE") falseTo = String(e.to);
+                    if (e.label === "TRUE") trueTo = String(e.to);
+                });
+                if (!falseTo || !trueTo) return;
+                var fMeta = byId[falseTo], tMeta = byId[trueTo];
+                if (!fMeta || !tMeta) return;
+                if (String(fMeta.parent) !== parent || String(tMeta.parent) !== parent) return;
+
+                function isTerminalForkTarget(nid) {
+                    var outs = edgesData.filter(function(e) { return String(e.from) === nid; });
+                    if (!outs.length) return true;
+                    return outs.every(function(e) {
+                        return e.kind === "loop-back" || e.constraint === false
+                            || String(e.to) === containerLeaf;
+                    });
+                }
+                if (!isTerminalForkTarget(falseTo) || !isTerminalForkTarget(trueTo)) return;
+
+                var sw = nodeBox(g, swId);
+                var fb = nodeBox(g, falseTo);
+                var tb = nodeBox(g, trueTo);
+                if (!sw || !fb || !tb) return;
+
+                var mid = (fb.x + tb.x) / 2;
+                var dx = sw.x - mid;
+                var cluster = clusterBox(root, g, parent);
+                if (cluster) {
+                    var pad = 8;
+                    var leftAfter = Math.min(fb.left, tb.left) + dx;
+                    var rightAfter = Math.max(fb.right, tb.right) + dx;
+                    if (leftAfter < cluster.left + pad) dx += (cluster.left + pad) - leftAfter;
+                    rightAfter = Math.max(fb.right, tb.right) + dx;
+                    if (rightAfter > cluster.right - pad) dx -= rightAfter - (cluster.right - pad);
+                }
+                if (Math.abs(dx) < 1) return;
+
+                setNodeX(root, g, falseTo, fb.x + dx);
+                setNodeX(root, g, trueTo, tb.x + dx);
+
+                [falseTo, trueTo].forEach(function(tid) {
+                    var child = nodeBox(g, tid);
+                    if (!child) return;
+                    var yMid = (sw.bottom + child.top) / 2;
+                    applyEdgePoints(root, g, swId, tid, [
+                        [sw.x, sw.bottom],
+                        [sw.x, yMid],
+                        [child.x, yMid],
+                        [child.x, child.top]
+                    ]);
+                });
+            });
+        }
+
+        function mergeLoopBackEdges(root, g) {
+            // Fan-in: multiple loop-backs to the same Iter/Loop share one right-side trunk.
+            var pad = 24;
+            var byTarget = {};
+            edgesData.forEach(function(e) {
+                if (!(e.kind === "loop-back" || e.constraint === false)) return;
+                var tid = String(e.to);
+                if (!byTarget[tid]) byTarget[tid] = [];
+                byTarget[tid].push(e);
+            });
+
+            Object.keys(byTarget).forEach(function(tid) {
+                var group = byTarget[tid];
+                if (group.length < 2) return;
+                if (!g.hasNode(tid)) return;
+
+                var target = nodeBox(g, tid);
+                if (!target) return;
+
+                var clusterId = "c_" + tid;
+                if (!g.hasNode(clusterId)) {
+                    var p = g.parent(tid);
+                    if (p) clusterId = String(p);
+                }
+                var cluster = g.hasNode(clusterId) ? clusterBox(root, g, clusterId) : null;
+
+                var contentRight = target.right;
+                var sources = [];
+                group.forEach(function(e) {
+                    var src = nodeBox(g, e.from);
+                    if (!src) return;
+                    sources.push({ edge: e, box: src });
+                    contentRight = Math.max(contentRight, src.right);
+                });
+                if (sources.length < 2) return;
+
+                // Trunk stays inside the cluster border (never leaks outside).
+                var trunkX = cluster
+                    ? Math.min(cluster.right - pad, Math.max(contentRight + 12, target.right + 12))
+                    : (contentRight + pad);
+                if (cluster && trunkX > cluster.right - pad) trunkX = cluster.right - pad;
+                var ty = target.y;
+                var tx = target.right;
+
+                sources.forEach(function(s) {
+                    var sx = s.box.right, sy = s.box.y;
+                    var pts = [
+                        [sx, sy],
+                        [trunkX, sy],
+                        [trunkX, ty],
+                        [tx, ty]
+                    ];
+                    applyEdgePoints(root, g, s.edge.from, tid, pts);
+                    root.selectAll("g.edgePath").each(function(ed) {
+                        if (String(ed.v) !== String(s.edge.from) || String(ed.w) !== tid) return;
+                        d3.select(this).classed("loop-back-merged", true);
+                    });
+                });
+            });
+        }
+
+        function formatVizFailure(err, location) {
+            var reason = err && err.message ? err.message : String(err);
+            var loc = location || "cli/templates/viewer.html (dagreD3.render / compound cluster layout)";
+            return "Visualization failed to generate.\n" +
+                "Reason: " + reason + "\n" +
+                "Location: " + loc + "\n" +
+                "What this means: the graph layout engine could not place tasks " +
+                "(often an illegal compound parent cycle, or a script/CDN load error). " +
+                "Fix the nesting/data and reload.";
+        }
+
+        function showRenderFailure(err, location) {
+            var msg = formatVizFailure(err, location);
             var panel = document.getElementById("payloadData");
             if (panel) panel.innerHTML = "<div class='viz-error'>" + escapeHtml(msg) + "</div>";
+            var banner = document.getElementById("viz-error-banner");
+            if (banner) {
+                banner.textContent = msg;
+                banner.classList.add("visible");
+            }
+            var canvas = document.getElementById("svg-canvas");
+            if (canvas) canvas.style.opacity = 1;
         }
+
+        function findParentCycle(nodes) {
+            var byId = {};
+            nodes.forEach(function(n) { byId[String(n.id)] = n; });
+            for (var i = 0; i < nodes.length; i++) {
+                var start = String(nodes[i].id);
+                var seen = [];
+                var cur = start;
+                while (cur && byId[cur]) {
+                    if (seen.indexOf(cur) >= 0) {
+                        return seen.slice(seen.indexOf(cur)).concat([cur]);
+                    }
+                    seen.push(cur);
+                    var p = byId[cur].parent;
+                    if (!p || p === cur) break;
+                    cur = String(p);
+                }
+            }
+            return null;
+        }
+
+        function assertAcyclicParents(nodes) {
+            var cycle = findParentCycle(nodes);
+            if (cycle) {
+                throw new Error(
+                    "Compound parent cycle detected (illegal for dagre clusters): " +
+                    cycle.join(" -> ") +
+                    ". Iter/Loop wrappers must form a tree, not a cycle."
+                );
+            }
+        }
+
+        window.onerror = function(message, source, lineno, colno, error) {
+            showRenderFailure(error || message, source ? (source + ":" + lineno) : "window.onerror");
+            return false;
+        };
+        window.onunhandledrejection = function(ev) {
+            showRenderFailure(ev.reason || "Unhandled promise rejection", "unhandledrejection");
+        };
 
         var g = new dagreD3.graphlib.Graph({ compound: true }).setGraph({
             rankdir: 'TB',
@@ -560,11 +786,17 @@
 
         var renderOk = false;
         try {
+            if (typeof dagreD3 === "undefined" || typeof d3 === "undefined") {
+                throw new Error("Required script failed to load (d3 / dagre-d3 CDN). Check network.");
+            }
+            assertAcyclicParents(nodesData);
             var render = new dagreD3.render();
             render(inner, g);
             decorateClusterCaps(inner);
             hideIterBranchEdges(inner);
             routeContainerContinueEdges(inner, g);
+            balanceIterSwitchForks(inner, g);
+            mergeLoopBackEdges(inner, g);
             renderOk = true;
         } catch (err) {
             showRenderFailure(err);

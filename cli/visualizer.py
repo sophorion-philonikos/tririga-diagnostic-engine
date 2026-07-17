@@ -717,19 +717,14 @@ class WorkflowVisualizer:
                     label = ""
                     
                     if s_type in ('14', '24'):
-                        # Branch labels are read from the workflow's own EventName/
-                        # TargetAssociation declaration via the shared engine helper
-                        # (Switch -> TRUE/FALSE, Iter -> LOOP BODY/EXIT), then resolved
-                        # forward through invisible junctions to the visible successor.
+                        # Branch labels from EventName/TargetAssociation; resolve only
+                        # through invisible raw targets (never via a visible TRUE hop
+                        # into a FALSE merge point — that caused dual-TRUE labels).
                         truth_map = self.engine.get_branch_map(source_data)
-                        label = "FALSE" if s_type == '14' else "EXIT"
-                        for raw_target, verdict in truth_map.items():
-                            if str(t) == str(raw_target):
-                                label = verdict
-                                break
-                            if graph.has_node(str(raw_target)) and str(t) in [str(x) for x in get_visible_targets(str(raw_target))]:
-                                label = verdict
-                                break
+                        default = "FALSE" if s_type == '14' else "EXIT"
+                        label = graph_utils.branch_label_for_visible(
+                            graph, truth_map, t, default=default,
+                        )
 
                     is_edge_live = str(node_id) in live_trace_ids and str(t) in live_trace_ids
                     is_edge_critical = str(node_id) in critical_path_nodes and str(t) in critical_path_nodes
