@@ -115,6 +115,18 @@
     border-radius: 50%;
   }
   .chip button:hover { color: var(--danger); background: rgba(255, 107, 107, 0.12); }
+  /* What-If suggestion chips (buttons) — white label on dark panel */
+  #simChips button.chip {
+    color: #fff;
+    cursor: pointer;
+    padding: 3px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  #simChips button.chip:hover {
+    border-color: #9b7bff;
+    background: #2a2438;
+  }
 
   /* --- Actions --- */
   .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -294,7 +306,10 @@
     top: 1px;
   }
   #simOutcome .badge.altered { background: #ff9500; box-shadow: 0 0 6px rgba(255, 149, 0, 0.8); }
-  #simOutcome .badge.broken { background: #ff2d2d; box-shadow: 0 0 6px rgba(255, 45, 45, 0.8); }
+  #simOutcome .badge.broken {
+    background: radial-gradient(circle at center, #fff 38%, #9a9a9a 42%, #6e6e6e 100%);
+    box-shadow: 0 0 6px rgba(160, 160, 160, 0.95), 0 0 12px rgba(110, 110, 110, 0.65);
+  }
   #simOutcome .badge.failed { background: #cc0000; box-shadow: 0 0 8px rgba(204, 0, 0, 0.9); }
   #simOutcome .badge.info { background: #4da6ff; box-shadow: 0 0 6px rgba(77, 166, 255, 0.7); }
   #simOutcome .impact-tree { margin: 8px 0 0; }
@@ -339,6 +354,41 @@
   #simOutcome .impact-children { margin-left: 8px; }
   #simOutcome .impact-legend { color: var(--muted); font-size: 12px; margin-top: 8px; }
   #simOutcome .impact-legend .badge { display: inline-block; margin-right: 4px; }
+  #simOutcome .task-ref {
+    display: inline;
+    margin: 0;
+    padding: 0 3px;
+    border: none;
+    border-radius: 3px;
+    background: rgba(255, 149, 0, 0.28);
+    color: #ffe0b0;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  #simOutcome .task-ref:hover { background: rgba(255, 149, 0, 0.45); color: #fff; }
+  #simOutcome .task-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin: 0 2px 0 1px;
+    padding: 0;
+    vertical-align: -3px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a35;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+  }
+  #simOutcome .task-copy:hover { border-color: #9b7bff; color: #fff; background: #3a2a50; }
+  #simOutcome .task-copy.copied { border-color: #00c3a5; color: #00c3a5; }
+  #simOutcome summary .task-ref { font-weight: 600; color: var(--text); background: rgba(255, 149, 0, 0.18); }
   #traceList {
     margin: 10px 0 4px;
     padding: 0;
@@ -406,7 +456,7 @@
     <div class="sim-bar">
       <label for="simInput">What-If Simulation</label>
       <input type="text" id="simInput"
-             placeholder='Try: "What if the operational status is DISP?" or "Did Modify Records trigger?"'>
+             placeholder='Upload a workflow, then try a What-If (or click a suggestion chip)'>
       <button id="simRunBtn">Simulate</button>
       <button id="simClearBtn">Clear</button>
     </div>
@@ -653,6 +703,9 @@
       });
       chipsEl.appendChild(btn);
     });
+    if (payload.sim_placeholder) {
+      simInput.placeholder = payload.sim_placeholder;
+    }
 
     // Prefer map_url (avoids stuffing HTML into JSON); fall back to inline HTML.
     if (payload.map_url) {
@@ -707,6 +760,88 @@
     return div.innerHTML;
   }
 
+  function escapeAttr(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function taskRefHtml(id, name, labelEscaped) {
+    const idAttr = escapeAttr(id);
+    const nameAttr = escapeAttr(name || ("Task " + id));
+    return (
+      '<button type="button" class="task-ref" data-task-id="' + idAttr +
+      '" data-task-name="' + nameAttr + '" title="Focus this task on the map">' +
+      labelEscaped +
+      '</button><button type="button" class="task-copy" data-task-id="' + idAttr +
+      '" data-task-name="' + nameAttr +
+      '" title="Copy name and ID" aria-label="Copy task name and ID">⎘</button>'
+    );
+  }
+
+  /** Turn "Type N 'Name' (ID: id)" mentions into focus/copy controls. */
+  function linkifyTaskRefs(text) {
+    if (!text) return "";
+    // Optional leading article; Title-case type name; name in quotes; numeric id.
+    const labeled =
+      /(?:The\s+|A\s+|An\s+)?((?:[A-Z][A-Za-z0-9/+-]*)(?:\s+[A-Z][A-Za-z0-9/+-]*){0,6})\s*\(Type\s+(\d+)\)\s+'([^']+)'\s*\((?:ID:\s*)?(\d+)\)/g;
+    let out = "";
+    let last = 0;
+    let m;
+    while ((m = labeled.exec(text)) !== null) {
+      out += escapeHtml(text.slice(last, m.index));
+      const full = m[0];
+      const articleMatch = /^(The|A|An)\s+/i.exec(full);
+      if (articleMatch) out += escapeHtml(articleMatch[0]);
+      const label = articleMatch ? full.slice(articleMatch[0].length) : full;
+      out += taskRefHtml(m[4], m[3], escapeHtml(label));
+      last = m.index + m[0].length;
+    }
+    const rest = text.slice(last);
+    const bare = /\btask\s+(\d+)\b/gi;
+    let out2 = "";
+    let last2 = 0;
+    let m2;
+    while ((m2 = bare.exec(rest)) !== null) {
+      out2 += escapeHtml(rest.slice(last2, m2.index));
+      out2 += taskRefHtml(m2[1], "Task " + m2[1], escapeHtml(m2[0]));
+      last2 = m2.index + m2[0].length;
+    }
+    out2 += escapeHtml(rest.slice(last2));
+    return out + out2;
+  }
+
+  function copyTaskNameId(name, id, btn) {
+    const text = ((name || "").trim() + " " + String(id)).trim();
+    const done = () => {
+      if (!btn) return;
+      btn.classList.add("copied");
+      const prev = btn.textContent;
+      btn.textContent = "✓";
+      setTimeout(() => {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 900);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {
+        prompt("Copy task", text);
+      });
+    } else {
+      prompt("Copy task", text);
+      done();
+    }
+  }
+
+  function focusTaskOnMap(id) {
+    if (!id) return;
+    postToMap({ type: "tririga-focus-node", nodeId: String(id) });
+    const frame = document.getElementById("mapFrame");
+    if (frame) frame.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
   function showSimOutcome(html) {
     simOutcome.innerHTML = html;
     simOutcome.classList.toggle("visible", !!html);
@@ -740,10 +875,10 @@
     }
     let html = "<details class='impact-group depth-" + depth + "'" + openAttr + ">";
     html += "<summary><span class='badge " + badge + "'></span>";
-    html += "<span class='impact-summary-text'>" + escapeHtml(shortLabel) + "</span>";
+    html += taskRefHtml(node.task_id, node.task_name || ("Task " + node.task_id), escapeHtml(shortLabel));
     html += counts + "</summary>";
     if (node.sentence) {
-      html += "<div class='impact-body'>" + escapeHtml(node.sentence) + "</div>";
+      html += "<div class='impact-body'>" + linkifyTaskRefs(node.sentence) + "</div>";
     }
     if (children.length) {
       html += "<div class='impact-children'>";
@@ -769,7 +904,7 @@
         imp.ref_kind !== "field_reference";
       const badge = isStarved ? "broken" : "info";
       html += "<li><span class='badge " + badge + "'></span><span>" +
-        escapeHtml(imp.sentence) + "</span></li>";
+        linkifyTaskRefs(imp.sentence) + "</span></li>";
     }
     html += "</ul>";
     return html;
@@ -785,11 +920,11 @@
       html += "<hr>";
     } else if (impacts.length) {
       html += "<ul>";
-      for (const imp of impacts) html += "<li class='sim-impact'>" + escapeHtml(imp.sentence) + "</li>";
+      for (const imp of impacts) html += "<li class='sim-impact'>" + linkifyTaskRefs(imp.sentence) + "</li>";
       html += "</ul><hr>";
     }
     html += "<ul>";
-    for (const line of payload.summary) html += "<li>" + escapeHtml(line) + "</li>";
+    for (const line of payload.summary) html += "<li>" + linkifyTaskRefs(line) + "</li>";
     html += "</ul>";
     if (payload.decisions.length) {
       html += "<hr><ul>";
@@ -808,6 +943,22 @@
     }
     if (mapFrame.contentWindow) mapFrame.contentWindow.postMessage(message, "*");
   }
+
+  simOutcome.addEventListener("click", (ev) => {
+    const copyBtn = ev.target.closest(".task-copy");
+    if (copyBtn && simOutcome.contains(copyBtn)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      copyTaskNameId(copyBtn.getAttribute("data-task-name"), copyBtn.getAttribute("data-task-id"), copyBtn);
+      return;
+    }
+    const refBtn = ev.target.closest(".task-ref");
+    if (refBtn && simOutcome.contains(refBtn)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      focusTaskOnMap(refBtn.getAttribute("data-task-id"));
+    }
+  });
 
   window.addEventListener("message", (ev) => {
     const msg = ev.data || {};
@@ -881,11 +1032,11 @@
             line += " Fields not updated: " + ft.fields.join(", ");
             if (ft.bo) line += " on " + ft.bo;
           }
-          html += "<li><span class='badge failed'></span><span>" + escapeHtml(line) + "</span></li>";
+          html += "<li><span class='badge failed'></span><span>" + linkifyTaskRefs(line) + "</span></li>";
         }
         for (const a of altered) {
           html += "<li><span class='badge altered'></span><span>" +
-            escapeHtml(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
+            linkifyTaskRefs(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
                        "' (ID: " + a.node_id + ") simulated with zero records / null object token.") +
             "</span></li>";
         }

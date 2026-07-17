@@ -98,6 +98,22 @@ def _build_sim_chips(engine, wf_name, limit=12):
     return chips[:limit]
 
 
+def _build_sim_placeholder(chips, wf_name):
+    """Placeholder text tailored to the loaded workflow's suggested queries."""
+    def _short(q, n=72):
+        q = (q or "").strip()
+        return q if len(q) <= n else q[: n - 1] + "…"
+
+    if chips:
+        q1 = _short(chips[0].get('query', ''))
+        if len(chips) > 1:
+            q2 = _short(chips[1].get('query', ''), 56)
+            return f'Try: "{q1}" or "{q2}"'
+        return f'Try: "{q1}"'
+    short = (wf_name or "this workflow").split(" - ")[-1][:48]
+    return f'Try a What-If on {short} (e.g. force a Switch TRUE/FALSE, or zero records)'
+
+
 def _workflow_fingerprint(engine, wf_name):
     """Node id set for Diff mode across two loaded workflows."""
     if wf_name not in engine.graphs:
@@ -240,6 +256,7 @@ def process_visualization_request(uploads):
             'shared': sorted(a & b),
         }
 
+    sim_chips = _build_sim_chips(engine, target_wf)
     return {
         'session_id': session_id,
         'map_url': f'/api/map/{session_id}',
@@ -249,7 +266,8 @@ def process_visualization_request(uploads):
         'trace_summary': trace_summary,
         'note': note,
         'viz_render_errors': viz_render_errors,
-        'sim_chips': _build_sim_chips(engine, target_wf),
+        'sim_chips': sim_chips,
+        'sim_placeholder': _build_sim_placeholder(sim_chips, target_wf),
         'diff': diff,
         # Backward-compatible: omit huge body by default; clients should use map_url.
         'map_html': None,

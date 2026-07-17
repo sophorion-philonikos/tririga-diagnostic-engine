@@ -52,7 +52,7 @@
         .cluster.sim-active > rect { stroke: #c341ff; stroke-width: 3px; }
         .cluster.sim-failed > rect { stroke: #cc0000; stroke-width: 3px; }
         .cluster.sim-altered > rect { stroke: #ff9500; stroke-width: 3px; }
-        .cluster.sim-broken > rect { stroke: #ff2d2d; stroke-width: 3px; }
+        .cluster.sim-broken > rect { stroke: #8a8a8a; stroke-width: 3px; }
         .edgePath.loop-back path { stroke-dasharray: 6 4; }
         .node.diff-added { filter: drop-shadow(0 0 6px #2ecc71) drop-shadow(0 0 14px rgba(46, 204, 113, 0.75)); }
         .node.diff-removed { filter: drop-shadow(0 0 6px #e74c3c) drop-shadow(0 0 14px rgba(231, 76, 60, 0.75)); }
@@ -149,18 +149,18 @@
         .node.sim-active { filter: drop-shadow(0 0 5px #c341ff) drop-shadow(0 0 14px rgba(195, 65, 255, 0.65)); }
         /* Dual-state dataflow highlighting: the FAILED task glows deep red;
            the ALTERED source task (simulated zero-record state) glows orange;
-           its BROKEN/starved dependents glow red.
+           its BROKEN/starved dependents glow grey with a white core (distinct from failed).
            Precedence (failed > altered > broken > active) is enforced by the data join. */
         .node.sim-failed { filter: drop-shadow(0 0 8px #cc0000) drop-shadow(0 0 20px rgba(204, 0, 0, 0.9)); animation: sim-pulse 1.8s ease-in-out infinite; }
         @keyframes sim-pulse { 0%, 100% { filter: drop-shadow(0 0 6px #cc0000) drop-shadow(0 0 16px rgba(204, 0, 0, 0.75)); } 50% { filter: drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 24px rgba(255, 0, 0, 0.95)); } }
         .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); animation: sim-pulse-altered 1.8s ease-in-out infinite; }
         @keyframes sim-pulse-altered { 0%, 100% { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 14px rgba(255, 149, 0, 0.7)); } 50% { filter: drop-shadow(0 0 10px #ffb84d) drop-shadow(0 0 22px rgba(255, 149, 0, 0.95)); } }
-        .node.sim-broken { filter: drop-shadow(0 0 6px #ff2d2d) drop-shadow(0 0 16px rgba(255, 45, 45, 0.75)); }
+        .node.sim-broken { filter: drop-shadow(0 0 4px #ffffff) drop-shadow(0 0 12px rgba(140, 140, 140, 0.95)) drop-shadow(0 0 20px rgba(90, 90, 90, 0.75)); }
         .node.search-hit { filter: drop-shadow(0 0 8px #00e6c3) drop-shadow(0 0 18px rgba(0, 230, 195, 0.95)) !important; }
         .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
         .edgePath.sim-active marker path { fill: #c341ff !important; stroke: #c341ff !important; }
-        .edgePath.sim-broken path { stroke: #ff2d2d !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; filter: drop-shadow(0 0 4px rgba(255, 45, 45, 0.8)); }
-        .edgePath.sim-broken marker path { fill: #ff2d2d !important; stroke: #ff2d2d !important; }
+        .edgePath.sim-broken path { stroke: #8a8a8a !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; filter: drop-shadow(0 0 4px rgba(200, 200, 200, 0.85)); }
+        .edgePath.sim-broken marker path { fill: #8a8a8a !important; stroke: #8a8a8a !important; }
         .edgePath.live-trace path {
             stroke: #00e6c3 !important;
             stroke-width: 6.5px !important;
@@ -168,7 +168,7 @@
         }
         .edgePath.live-trace marker path { fill: #00e6c3 !important; stroke: #00e6c3 !important; }
         .edgeLabel.sim-active text { fill: #c341ff !important; }
-        .edgeLabel.sim-broken text { fill: #ff2d2d !important; }
+        .edgeLabel.sim-broken text { fill: #8a8a8a !important; }
         .sim-summary h3 { color: #c341ff; margin-top: 0; }
         .sim-summary ul { padding-left: 18px; margin: 8px 0; }
         .sim-summary li { margin-bottom: 6px; font-size: 13px; line-height: 1.45; }
@@ -192,13 +192,36 @@
             display: inline-block; position: relative; top: -1px;
         }
         .sim-summary .badge.altered { background: #ff9500; box-shadow: 0 0 5px rgba(255,149,0,0.8); }
-        .sim-summary .badge.broken { background: #ff2d2d; box-shadow: 0 0 5px rgba(255,45,45,0.8); }
+        .sim-summary .badge.broken {
+            background: radial-gradient(circle at center, #fff 38%, #9a9a9a 42%, #6e6e6e 100%);
+            box-shadow: 0 0 5px rgba(160,160,160,0.95), 0 0 10px rgba(110,110,110,0.65);
+        }
         .sim-summary .badge.failed { background: #cc0000; box-shadow: 0 0 5px rgba(204,0,0,0.9); }
         .sim-summary .badge.info { background: #4da6ff; box-shadow: 0 0 5px rgba(77,166,255,0.7); }
         .sim-summary .impact-summary-text { flex: 1; min-width: 0; font-size: 13px; }
         .sim-summary .impact-counts { flex: none; color: #888; font-size: 11px; white-space: nowrap; }
         .sim-summary .impact-body { margin: 2px 0 6px 20px; color: #ffb3b3; font-size: 12px; line-height: 1.45; }
         .sim-summary .impact-children { margin-left: 6px; }
+        .sim-summary .task-ref, #payloadData .task-ref {
+            display: inline; margin: 0; padding: 0 3px; border: none; border-radius: 3px;
+            background: rgba(255, 149, 0, 0.28); color: #ffe0b0; font: inherit; font-weight: 600;
+            cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+        }
+        .sim-summary .task-ref:hover, #payloadData .task-ref:hover {
+            background: rgba(255, 149, 0, 0.45); color: #fff;
+        }
+        .sim-summary .task-copy, #payloadData .task-copy {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 18px; height: 18px; margin: 0 2px 0 1px; padding: 0; vertical-align: -3px;
+            border: 1px solid #555; border-radius: 4px; background: #2a2a35; color: #ccc;
+            cursor: pointer; font-size: 11px; line-height: 1;
+        }
+        .sim-summary .task-copy:hover, #payloadData .task-copy:hover {
+            border-color: #9b7bff; color: #fff; background: #3a2a50;
+        }
+        .sim-summary .task-copy.copied, #payloadData .task-copy.copied {
+            border-color: #00c3a5; color: #00c3a5;
+        }
 
         .zoom-toolbar {
             position: absolute; top: 16px; left: 16px; z-index: 1001;
@@ -253,7 +276,10 @@
         .glow-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
         .glow-failed { background: #cc0000; box-shadow: 0 0 6px #cc0000; }
         .glow-altered { background: #ff9500; box-shadow: 0 0 6px #ff9500; }
-        .glow-broken { background: #ff2d2d; box-shadow: 0 0 6px #ff2d2d; }
+        .glow-broken {
+            background: radial-gradient(circle at center, #fff 38%, #9a9a9a 42%, #6e6e6e 100%);
+            box-shadow: 0 0 6px rgba(160, 160, 160, 0.95), 0 0 12px rgba(110, 110, 110, 0.65);
+        }
         .glow-path { background: #c341ff; box-shadow: 0 0 6px #c341ff; }
         .glow-dim { background: #999; opacity: 0.35; }
         
@@ -337,7 +363,7 @@
                     <li>Click <strong>Simulate</strong> — failed/altered/broken tasks glow; off-path tasks dim.</li>
                     <li>Click <strong>What-If</strong> on this strip anytime to re-show that overlay (after Clear, glow is gone until you Simulate again).</li>
                 </ol>
-                <div class="ex">Example: <em>“What if the operational status is DISP?”</em> → Simulate → purple path + red starved dependents.</div>
+                <div class="ex">Example: <em>“What if the operational status is DISP?”</em> → Simulate → purple path + grey starved dependents.</div>
 
                 <h4>4. Diff</h4>
                 <ol>
@@ -1425,7 +1451,7 @@
                 return String(p[0]) + "->" + String(p[1]);
             }));
 
-            // Precedence per node: failed (deep red) > altered (orange) > broken (red) > active (purple) > dim.
+            // Precedence per node: failed (deep red) > altered (orange) > broken (grey/white) > active (purple) > dim.
             graphNodes()
                 .classed("sim-failed", function(d) { return failedSet.has(String(d)); })
                 .classed("sim-altered", function(d) {
@@ -1501,6 +1527,45 @@
                 (msg.added || []).forEach(function(id) { window.diffOverlay.added[String(id)] = true; });
                 (msg.removed || []).forEach(function(id) { window.diffOverlay.removed[String(id)] = true; });
                 applyAnalysisMode("diff");
+            } else if (msg.type === "tririga-focus-node") {
+                var focusId = msg.nodeId || msg.node || msg.id;
+                if (focusId && typeof focusNode === "function") focusNode(focusId);
+            }
+        });
+
+        document.addEventListener("click", function(ev) {
+            var copyBtn = ev.target.closest && ev.target.closest(".task-copy");
+            if (copyBtn) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                var cName = copyBtn.getAttribute("data-task-name") || "";
+                var cId = copyBtn.getAttribute("data-task-id") || "";
+                var clip = (cName.trim() + " " + cId).trim();
+                var markCopied = function() {
+                    copyBtn.classList.add("copied");
+                    var prev = copyBtn.textContent;
+                    copyBtn.textContent = "✓";
+                    setTimeout(function() {
+                        copyBtn.textContent = prev;
+                        copyBtn.classList.remove("copied");
+                    }, 900);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(clip).then(markCopied).catch(function() {
+                        prompt("Copy task", clip);
+                    });
+                } else {
+                    prompt("Copy task", clip);
+                    markCopied();
+                }
+                return;
+            }
+            var refBtn = ev.target.closest && ev.target.closest(".task-ref");
+            if (refBtn) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                var rid = refBtn.getAttribute("data-task-id");
+                if (rid && typeof focusNode === "function") focusNode(rid);
             }
         });
 

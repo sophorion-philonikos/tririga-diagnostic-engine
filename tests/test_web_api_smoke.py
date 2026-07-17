@@ -38,6 +38,10 @@ class TestWebVisualizeSmoke(unittest.TestCase):
         self.assertIsNone(result.get('map_html'))
         self.assertIn('sim_chips', result)
         self.assertTrue(isinstance(result['sim_chips'], list))
+        self.assertIn('sim_placeholder', result)
+        self.assertTrue(result['sim_placeholder'])
+        if result['sim_chips']:
+            self.assertIn(result['sim_chips'][0]['query'][:20], result['sim_placeholder'])
         sid = result['session_id']
         with web_server._session_lock:
             sess = web_server._sessions.get(sid)
