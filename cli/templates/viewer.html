@@ -2,8 +2,8 @@
 <html>
 <head>
     <title>TRIRIGA Diagnostic Blueprint</title>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
-    <script src="https://dagrejs.github.io/project/dagre-d3/latest/dagre-d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@5.16.0/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
     <style type="text/css">
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background-color: #f4f6f9; }
         
@@ -54,7 +54,82 @@
         .cluster.sim-altered > rect { stroke: #ff9500; stroke-width: 3px; }
         .cluster.sim-broken > rect { stroke: #ff2d2d; stroke-width: 3px; }
         .edgePath.loop-back path { stroke-dasharray: 6 4; }
-        .viz-error { color: #ffb3b3; font-family: Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+        .node.diff-added { filter: drop-shadow(0 0 6px #2ecc71) drop-shadow(0 0 14px rgba(46, 204, 113, 0.75)); }
+        .node.diff-removed { filter: drop-shadow(0 0 6px #e74c3c) drop-shadow(0 0 14px rgba(231, 76, 60, 0.75)); }
+        .node.path-spotlight, .edgePath.path-spotlight path {
+            /* highlighted by sim-active reuse */
+        }
+        #modeStrip {
+            position: absolute; left: 16px; top: 58px; z-index: 1001;
+            display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+            background: rgba(255,255,255,0.96); border: 1px solid #ccc; border-radius: 8px;
+            padding: 6px 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+            max-width: calc(100% - 40px);
+        }
+        #modeStrip .mode-label {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+            text-transform: uppercase; color: #666; padding: 0 2px; white-space: nowrap;
+        }
+        #modeStrip button {
+            border: 1px solid #bbb; background: #fff; border-radius: 6px;
+            padding: 5px 10px; font-size: 11px; cursor: pointer; color: #333;
+        }
+        #modeStrip button.active { background: #17324d; color: #fff; border-color: #17324d; }
+        #modeStrip button:hover { border-color: #4da6ff; }
+        #modeStrip button.guide-btn {
+            background: #eef6fb; border-color: #7ab0d0; color: #1a4a66; font-weight: 600;
+        }
+        #modeStrip button.guide-btn:hover { background: #e0f0f8; border-color: #3a8ab0; }
+
+        #howtoGuide {
+            display: none; position: absolute; inset: 0; z-index: 2000;
+            background: rgba(10,12,20,0.5); align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        #howtoGuide.open { display: flex; }
+        #howtoGuide .guide-card {
+            width: min(560px, 100%); max-height: min(80vh, 720px); overflow-y: auto;
+            background: #1a1a24; color: #e8e8ef; border: 1px solid #4a4a60;
+            border-radius: 14px; padding: 20px 22px 18px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+            font-size: 13px; line-height: 1.5;
+        }
+        #howtoGuide .guide-card h3 { margin: 0 0 6px; font-size: 18px; color: #fff; font-weight: 700; }
+        #howtoGuide .guide-card .guide-sub { margin: 0 0 14px; color: #9aa; font-size: 12px; }
+        #howtoGuide .guide-card h4 {
+            margin: 14px 0 6px; font-size: 12px; text-transform: uppercase;
+            letter-spacing: 0.05em; color: #8ec8ff;
+        }
+        #howtoGuide .guide-card ol, #howtoGuide .guide-card ul { margin: 0 0 8px; padding-left: 18px; }
+        #howtoGuide .guide-card li { margin-bottom: 4px; }
+        #howtoGuide .guide-card code {
+            background: #2a2a3a; padding: 1px 5px; border-radius: 4px; font-size: 12px;
+        }
+        #howtoGuide .guide-card .ex {
+            background: #222230; border-left: 3px solid #00c3a5; padding: 8px 10px;
+            margin: 6px 0 10px; border-radius: 0 6px 6px 0; color: #c8d0d8; font-size: 12px;
+        }
+        #howtoGuide .guide-actions {
+            display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;
+        }
+        #howtoGuide .guide-actions button {
+            border: 1px solid #555; background: #2a2a3a; color: #eee;
+            border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 12px;
+        }
+        #howtoGuide .guide-actions button.primary {
+            background: #17324d; border-color: #4da6ff;
+        }
+        .panel-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+        .panel-tabs button {
+            background: #3a3a3a; color: #ccc; border: 1px solid #555; border-radius: 4px;
+            padding: 4px 8px; font-size: 11px; cursor: pointer;
+        }
+        .panel-tabs button.active { background: #4da6ff; color: #111; border-color: #4da6ff; }
+        .panel-actions { margin-top: 10px; }
+        .panel-actions button {
+            background: #3a3a3a; color: #ddd; border: 1px solid #555; border-radius: 4px;
+            padding: 5px 10px; font-size: 11px; cursor: pointer; margin-right: 6px; margin-top: 6px;
+        }
         #viz-error-banner {
             display: none; position: absolute; left: 16px; right: 16px; top: 16px; z-index: 40;
             background: rgba(40, 12, 12, 0.94); border: 1px solid #cc4444; border-radius: 6px;
@@ -227,6 +302,64 @@
                 <button type="button" id="searchClear" title="Clear search">×</button>
             </div>
         </div>
+        <div id="modeStrip" aria-label="Analysis modes">
+            <span class="mode-label">View</span>
+            <button type="button" data-mode="topology" class="active" title="Full workflow map with no analysis overlay">Topology</button>
+            <button type="button" data-mode="live" title="Highlight only the path taken in an uploaded live trace log">Live Trace</button>
+            <button type="button" data-mode="whatif" title="Show last What-If simulation result (run Simulate first)">What-If</button>
+            <button type="button" data-mode="diff" title="Compare this workflow to another uploaded map (added/removed tasks)">Diff</button>
+            <button type="button" class="guide-btn" id="btnHowto" title="How to use this viewer">Guide</button>
+        </div>
+        <div id="howtoGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" aria-hidden="true">
+            <div class="guide-card">
+                <h3 id="guideTitle">How to use this map</h3>
+                <p class="guide-sub">Four view modes change what the canvas emphasizes. Use them after you load a workflow (and optionally a log or What-If run).</p>
+
+                <h4>1. Topology (default)</h4>
+                <ol>
+                    <li>Open a workflow map — every task and edge is visible.</li>
+                    <li>Click any task → details appear in the Diagnostics Panel (Logic / lineage / trace / cluster).</li>
+                    <li>Use Fit / search to navigate large maps.</li>
+                </ol>
+                <div class="ex">Example: explore <code>Retrieve Approval Records</code> → check its query filters on the Logic tab.</div>
+
+                <h4>2. Live Trace</h4>
+                <ol>
+                    <li>Upload a workflow XML <em>and</em> a matching live execution <code>.log</code> (web UI), or generate a map with a log via CLI.</li>
+                    <li>Click <strong>Live Trace</strong> — teal edges/nodes show what actually ran; the rest dim.</li>
+                    <li>Click a live task → Trace evidence tab shows log lines for that step.</li>
+                </ol>
+                <div class="ex">Example: production failed mid-run → Live Trace shows which Switch branch was taken before it stopped.</div>
+
+                <h4>3. What-If</h4>
+                <ol>
+                    <li>In the web UI (above the map), type a scenario or click chips like <code>Force FALSE — Switch…</code>.</li>
+                    <li>Click <strong>Simulate</strong> — failed/altered/broken tasks glow; off-path tasks dim.</li>
+                    <li>Click <strong>What-If</strong> on this strip anytime to re-show that overlay (after Clear, glow is gone until you Simulate again).</li>
+                </ol>
+                <div class="ex">Example: <em>“What if the operational status is DISP?”</em> → Simulate → purple path + red starved dependents.</div>
+
+                <h4>4. Diff</h4>
+                <ol>
+                    <li>Upload <strong>two or more</strong> workflow XMLs in one session (web UI).</li>
+                    <li>Open map A, click <strong>Diff</strong> — green glow = tasks only in A; red = only in the other map.</li>
+                    <li>Use this to spot customization drift between baseline and custom WF versions.</li>
+                </ol>
+                <div class="ex">Example: baseline <code>PermanentSaveValidation</code> vs your customized copy → Diff highlights renamed/added tasks.</div>
+
+                <h4>Handy panel actions</h4>
+                <ul>
+                    <li><strong>Show path to here</strong> — spotlight Start → selected task.</li>
+                    <li><strong>Copy deep link</strong> — share a URL that re-opens this task (and mode) later.</li>
+                    <li><strong>Cluster</strong> tab — when you click an Iter/Loop container, lists nested tasks.</li>
+                </ul>
+
+                <div class="guide-actions">
+                    <button type="button" id="guideDismiss">Got it</button>
+                    <button type="button" class="primary" id="guideTryTopology">Start in Topology</button>
+                </div>
+            </div>
+        </div>
         <div class="legend">
             <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">Routing Tracks</div>
             <div class="legend-item"><div class="color-box" style="background: #e67e22;"></div> Critical Path</div>
@@ -267,22 +400,307 @@
     </div>
     <div id="sidepanel">
         <h2>Diagnostics Panel</h2>
+        <div class="panel-tabs" id="panelTabs">
+            <button type="button" data-tab="logic" class="active">Logic</button>
+            <button type="button" data-tab="lineage">Data lineage</button>
+            <button type="button" data-tab="trace">Trace evidence</button>
+            <button type="button" data-tab="cluster">Cluster</button>
+        </div>
         <div id="payloadData">
             <p class="hint">Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>
+        </div>
+        <div class="panel-actions" id="panelActions" hidden>
+            <button type="button" id="btnPathHere">Show path to here</button>
+            <button type="button" id="btnCopyLink">Copy deep link</button>
         </div>
     </div>
 
     <script type="text/javascript">
         var nodesData = GRAPH_NODES_DATA_PLACEHOLDER;
         var edgesData = GRAPH_EDGES_DATA_PLACEHOLDER;
+        var payloadsData = GRAPH_PAYLOADS_DATA_PLACEHOLDER;
         
         // PURE VANILLA CLICK DELEGATION
-        window.payloads = {};
-        window.handleNodeClick = function(id) {
-            if (window.payloads[id]) {
-                document.getElementById('payloadData').innerHTML = window.payloads[id];
+        window.payloads = payloadsData || {};
+        window.analysisMode = "topology";
+        window.selectedNodeId = null;
+        window.diffOverlay = { added: {}, removed: {} };
+        window.lastSimState = null;
+
+        function setPanelHtml(html) {
+            var panel = document.getElementById("payloadData");
+            if (panel) panel.innerHTML = html;
+        }
+
+        function extractSection(html, headingRe) {
+            if (!html) return "";
+            var m = html.match(headingRe);
+            return m ? m[0] : "";
+        }
+
+        function showPanelForNode(id, tab) {
+            window.selectedNodeId = String(id);
+            var actions = document.getElementById("panelActions");
+            if (actions) actions.hidden = false;
+            tab = tab || (document.querySelector("#panelTabs button.active") || {}).getAttribute("data-tab") || "logic";
+            var raw = window.payloads[id] || window.payloads[String(id)] || "";
+            var meta = nodesData.find(function(n) { return String(n.id) === String(id); });
+
+            if (tab === "cluster" || (meta && meta.isCluster)) {
+                var leafId = meta && meta.taskId ? String(meta.taskId) : String(id).replace(/^c_/, "");
+                var bodyCount = nodesData.filter(function(n) {
+                    return n.parent === ("c_" + leafId) || n.parent === String(id);
+                }).length;
+                var continues = edgesData.filter(function(e) {
+                    return e.kind === "container-continue" && String(e.exitContainer || e.from) === leafId;
+                });
+                var backs = edgesData.filter(function(e) {
+                    return (e.kind === "loop-back" || e.constraint === false) && String(e.to) === leafId;
+                });
+                setPanelHtml(
+                    "<h3>Cluster inspector</h3>" +
+                    "<b>Container:</b> " + escapeHtml((meta && meta.name) || leafId) + "<br/>" +
+                    "<b>Leaf id:</b> " + escapeHtml(leafId) + "<br/>" +
+                    "<b>Body nodes (approx):</b> " + bodyCount + "<br/>" +
+                    "<b>Continue outs:</b> " + (continues.map(function(e){return e.to;}).join(", ") || "—") + "<br/>" +
+                    "<b>Loop-back sources:</b> " + (backs.map(function(e){return e.from;}).join(", ") || "—") +
+                    (raw ? "<hr/>" + raw : "")
+                );
+                return;
             }
+
+            if (tab === "lineage") {
+                var lineage = raw;
+                // Prefer Sourced From / Context / Filter snippets when present.
+                var bits = [];
+                var ctx = raw.match(/<b>Context:<\/b>[^<]*(?:<[^>]+>[^<]*)*/i);
+                var src = raw.match(/Sourced From[\s\S]{0,400}/i);
+                if (ctx) bits.push(ctx[0]);
+                if (src) bits.push(src[0]);
+                setPanelHtml("<h3>Data lineage</h3>" + (bits.join("<hr/>") || lineage || "<p class='hint'>No lineage fields mapped.</p>"));
+                return;
+            }
+
+            if (tab === "trace") {
+                setPanelHtml(
+                    "<h3>Trace evidence</h3>" +
+                    "<p class='hint'>Live-trace highlighting uses uploaded server logs. " +
+                    "Task id <code>" + escapeHtml(String(id)) + "</code> — " +
+                    (meta && meta.image ? "see teal glow when this task is on the live path." : "open a map with a .log to correlate.") +
+                    "</p>" + (raw ? "<hr/>" + raw : "")
+                );
+                return;
+            }
+
+            setPanelHtml(raw || "<p class='hint'>No payload for this node.</p>");
+        }
+
+        window.handleNodeClick = function(id) {
+            showPanelForNode(id);
+            try {
+                var hash = "#node=" + encodeURIComponent(String(id)) + "&mode=" + encodeURIComponent(window.analysisMode || "topology");
+                if (history && history.replaceState) history.replaceState(null, "", hash);
+                else location.hash = hash;
+            } catch (e) { /* ignore */ }
         };
+
+        function clearPathSpotlight() {
+            if (typeof inner === "undefined" || !inner) return;
+            inner.selectAll(".node").classed("sim-active", false).classed("sim-dim", false);
+            inner.selectAll(".edgePath").classed("sim-active", false).classed("sim-dim", false);
+            inner.selectAll(".edgeLabel").classed("sim-dim", false);
+        }
+
+        function applyAnalysisMode(mode) {
+            window.analysisMode = mode;
+            document.querySelectorAll("#modeStrip button").forEach(function(b) {
+                b.classList.toggle("active", b.getAttribute("data-mode") === mode);
+            });
+            if (typeof inner === "undefined" || !inner) return;
+
+            // Reset mode-specific classes; keep last What-If if returning to whatif.
+            inner.selectAll(".node").classed("sim-dim", false).classed("diff-added", false).classed("diff-removed", false);
+            inner.selectAll(".edgePath").classed("sim-dim", false);
+            if (mode === "live") {
+                inner.selectAll(".node").classed("sim-dim", function(d) {
+                    var n = nodesData.find(function(x) { return String(x.id) === String(d); });
+                    // Dim nodes that were not live unless unknown.
+                    return !(n && n.image && false); // live is edge-class based
+                });
+                // Rely on existing .live-trace edge classes; dim non-live edges lightly.
+                inner.selectAll("g.edgePath").classed("sim-dim", function(d) {
+                    return !d3.select(this).classed("live-trace");
+                });
+            } else if (mode === "diff") {
+                var added = window.diffOverlay.added || {};
+                var removed = window.diffOverlay.removed || {};
+                inner.selectAll(".node").each(function(d) {
+                    var id = String(d);
+                    d3.select(this)
+                        .classed("diff-added", !!added[id])
+                        .classed("diff-removed", !!removed[id])
+                        .classed("sim-dim", !(added[id] || removed[id]));
+                });
+            } else if (mode === "whatif" && window.lastSimState) {
+                var s = window.lastSimState;
+                window.applySimulation(s.nodeIds, s.edgePairs, s.summaryHtml, s.alteredIds, s.impactedIds, s.failedIds);
+            } else {
+                clearPathSpotlight();
+            }
+        }
+
+        function ancestorsToStart(targetId) {
+            // BFS backward over edgesData to collect a spine (first path).
+            var preds = {};
+            edgesData.forEach(function(e) {
+                if (e.constraint === false || e.kind === "loop-back") return;
+                var t = String(e.to);
+                if (!preds[t]) preds[t] = [];
+                preds[t].push(String(e.from));
+            });
+            var start = startNodeId ? String(startNodeId) : null;
+            var queue = [String(targetId)];
+            var seen = {};
+            seen[String(targetId)] = true;
+            var parent = {};
+            while (queue.length) {
+                var cur = queue.shift();
+                if (start && cur === start) break;
+                var ps = preds[cur] || [];
+                for (var i = 0; i < ps.length; i++) {
+                    if (seen[ps[i]]) continue;
+                    seen[ps[i]] = true;
+                    parent[ps[i]] = cur;
+                    queue.push(ps[i]);
+                }
+            }
+            var pathNodes = [];
+            var pathEdges = {};
+            if (start && seen[start]) {
+                // reconstruct from start following child pointers incorrectly — rebuild forward from target back
+                var chain = [String(targetId)];
+                var guard = 0;
+                var cur2 = String(targetId);
+                // walk toward start via BFS parent map inverted: we stored parent[pred]=cur meaning edge pred->cur
+                // rebuild: from start follow until target using reverse of parent
+                var childOf = parent; // pred -> next toward target
+                // Actually parent[ps]=cur means we reached ps from cur going backward, so forward is ps -> cur
+                var forward = {};
+                Object.keys(parent).forEach(function(pred) { forward[pred] = parent[pred]; });
+                // Walk from any root that can reach target — prefer start
+                var walk = start;
+                chain = [walk];
+                while (forward[walk] && guard++ < 500) {
+                    var nxt = forward[walk];
+                    pathEdges[walk + "->" + nxt] = true;
+                    chain.push(nxt);
+                    walk = nxt;
+                    if (walk === String(targetId)) break;
+                }
+                pathNodes = chain;
+            } else {
+                pathNodes = Object.keys(seen);
+            }
+            return { nodes: pathNodes, edges: pathEdges };
+        }
+
+        function spotlightPathTo(targetId) {
+            var info = ancestorsToStart(targetId);
+            var nodeSet = {};
+            info.nodes.forEach(function(n) { nodeSet[n] = true; });
+            inner.selectAll(".node").classed("sim-active", function(d) {
+                return !!nodeSet[String(d)];
+            }).classed("sim-dim", function(d) {
+                return !nodeSet[String(d)];
+            });
+            inner.selectAll("g.edgePath").classed("sim-active", function(d) {
+                return !!info.edges[String(d.v) + "->" + String(d.w)];
+            }).classed("sim-dim", function(d) {
+                return !info.edges[String(d.v) + "->" + String(d.w)];
+            });
+            window.analysisMode = "topology";
+            document.querySelectorAll("#modeStrip button").forEach(function(b) {
+                b.classList.toggle("active", b.getAttribute("data-mode") === "topology");
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // Mode strip may exist before DOMContentLoaded if script is at end — bind now too.
+        });
+        (function bindUi() {
+            function openGuide() {
+                var el = document.getElementById("howtoGuide");
+                if (!el) return;
+                el.classList.add("open");
+                el.setAttribute("aria-hidden", "false");
+            }
+            function closeGuide() {
+                var el = document.getElementById("howtoGuide");
+                if (!el) return;
+                el.classList.remove("open");
+                el.setAttribute("aria-hidden", "true");
+                try { localStorage.setItem("tririga-viz-guide-seen", "1"); } catch (e) { /* ignore */ }
+            }
+            var strip = document.getElementById("modeStrip");
+            if (strip) {
+                strip.addEventListener("click", function(ev) {
+                    var btn = ev.target.closest("button[data-mode]");
+                    if (!btn) return;
+                    applyAnalysisMode(btn.getAttribute("data-mode"));
+                });
+            }
+            var howto = document.getElementById("btnHowto");
+            if (howto) howto.addEventListener("click", function(ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                openGuide();
+            });
+            var dismiss = document.getElementById("guideDismiss");
+            if (dismiss) dismiss.addEventListener("click", closeGuide);
+            var tryTopo = document.getElementById("guideTryTopology");
+            if (tryTopo) tryTopo.addEventListener("click", function() {
+                closeGuide();
+                applyAnalysisMode("topology");
+            });
+            var guideEl = document.getElementById("howtoGuide");
+            if (guideEl) {
+                guideEl.addEventListener("click", function(ev) {
+                    if (ev.target === guideEl) closeGuide();
+                });
+                document.addEventListener("keydown", function(ev) {
+                    if (ev.key === "Escape" && guideEl.classList.contains("open")) closeGuide();
+                });
+                try {
+                    if (!localStorage.getItem("tririga-viz-guide-seen")) openGuide();
+                } catch (e) { /* ignore */ }
+            }
+            var tabs = document.getElementById("panelTabs");
+            if (tabs) {
+                tabs.addEventListener("click", function(ev) {
+                    var btn = ev.target.closest("button[data-tab]");
+                    if (!btn) return;
+                    tabs.querySelectorAll("button").forEach(function(b) { b.classList.remove("active"); });
+                    btn.classList.add("active");
+                    if (window.selectedNodeId) showPanelForNode(window.selectedNodeId, btn.getAttribute("data-tab"));
+                });
+            }
+            var pathBtn = document.getElementById("btnPathHere");
+            if (pathBtn) pathBtn.addEventListener("click", function() {
+                if (window.selectedNodeId) spotlightPathTo(window.selectedNodeId);
+            });
+            var linkBtn = document.getElementById("btnCopyLink");
+            if (linkBtn) linkBtn.addEventListener("click", function() {
+                var url = location.href.split("#")[0] + "#node=" + encodeURIComponent(window.selectedNodeId || "") +
+                    "&mode=" + encodeURIComponent(window.analysisMode || "topology");
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url);
+                    linkBtn.textContent = "Copied!";
+                    setTimeout(function() { linkBtn.textContent = "Copy deep link"; }, 1200);
+                } else {
+                    prompt("Copy deep link", url);
+                }
+            });
+        })();
 
         var startNodeId = null;
 
@@ -720,7 +1138,6 @@
 
         nodesData.forEach(function(n) {
             if (n.isStart && !startNodeId) startNodeId = n.id;
-            window.payloads[n.id] = n.customPayload;
 
             if (n.isCluster) {
                 var isIter = String(n.type) === "24";
@@ -992,6 +1409,14 @@
         }
 
         window.applySimulation = function(nodeIds, edgePairs, summaryHtml, alteredIds, impactedIds, failedIds) {
+            window.lastSimState = {
+                nodeIds: nodeIds || [], edgePairs: edgePairs || [], summaryHtml: summaryHtml || "",
+                alteredIds: alteredIds || [], impactedIds: impactedIds || [], failedIds: failedIds || []
+            };
+            window.analysisMode = "whatif";
+            document.querySelectorAll("#modeStrip button").forEach(function(b) {
+                b.classList.toggle("active", b.getAttribute("data-mode") === "whatif");
+            });
             var nodeSet = new Set((nodeIds || []).map(String));
             var alteredSet = new Set((alteredIds || []).map(String));
             var impactedSet = new Set((impactedIds || []).map(String));
@@ -1045,9 +1470,11 @@
         };
 
         window.clearSimulation = function() {
+            window.lastSimState = null;
             graphNodes()
                 .classed("sim-active", false).classed("sim-dim", false)
-                .classed("sim-altered", false).classed("sim-broken", false).classed("sim-failed", false);
+                .classed("sim-altered", false).classed("sim-broken", false).classed("sim-failed", false)
+                .classed("diff-added", false).classed("diff-removed", false);
             inner.selectAll("g.edgePath")
                 .classed("sim-active", false).classed("sim-dim", false)
                 .classed("sim-broken", false);
@@ -1069,8 +1496,30 @@
                                        msg.alteredIds || [], msg.impactedIds || [], msg.failedIds || []);
             } else if (msg.type === "tririga-simulation-clear") {
                 window.clearSimulation();
+            } else if (msg.type === "tririga-diff-overlay") {
+                window.diffOverlay = { added: {}, removed: {} };
+                (msg.added || []).forEach(function(id) { window.diffOverlay.added[String(id)] = true; });
+                (msg.removed || []).forEach(function(id) { window.diffOverlay.removed[String(id)] = true; });
+                applyAnalysisMode("diff");
             }
         });
+
+        // Restore deep link after layout.
+        if (renderOk) {
+            try {
+                var hash = (location.hash || "").replace(/^#/, "");
+                var params = {};
+                hash.split("&").forEach(function(part) {
+                    var kv = part.split("=");
+                    if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || "");
+                });
+                if (params.mode) applyAnalysisMode(params.mode);
+                if (params.node && g.hasNode(params.node)) {
+                    window.handleNodeClick(params.node);
+                    if (typeof focusNode === "function") focusNode(params.node);
+                }
+            } catch (e) { /* ignore */ }
+        }
 
         try {
             if (window.parent && window.parent !== window) {

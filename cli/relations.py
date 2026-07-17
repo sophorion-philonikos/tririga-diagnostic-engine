@@ -17,7 +17,7 @@ from cli import graph_utils
 # simple path is exponential in the worst case, so we sample a bounded set and
 # always report the true route count separately.
 MAX_ROUTES_TO_SHOW = 5
-MAX_ROUTES_TO_COUNT = 200
+MAX_ROUTES_TO_COUNT = 100
 
 
 def _is_invisible(data, get_type_str=None):

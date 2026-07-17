@@ -322,9 +322,7 @@ class WorkflowVisualizer:
         self.engine = engine
 
     def _get_type_str(self, data):
-        t = data.get('type', data.get('Type', 'Generic'))
-        if isinstance(t, list): return str(t[0])
-        return str(t).strip()
+        return graph_utils.get_type_str(data)
 
     def _build_svg_node(self, t_name, t_type, t_bo, payload_data, is_live, is_critical):
         tags = []
@@ -580,6 +578,7 @@ class WorkflowVisualizer:
 
         dagre_nodes = []
         dagre_edges = []
+        payloads_by_id = {}
 
         parents, container_ids, members_by_container = graph_utils.compute_container_parents(
             graph, branch_map_fn=self.engine.get_branch_map,
@@ -652,8 +651,9 @@ class WorkflowVisualizer:
                     'taskId': nid,
                     'isStart': False,
                     'exitCue': exit_cue,
-                    'customPayload': insight.render_html(),
                 }
+                payloads_by_id[cluster_id] = insight.render_html()
+                payloads_by_id[nid] = insight.render_html()
                 outer = viz_parent(nid)
                 if outer:
                     cluster_rec['parent'] = outer
@@ -672,7 +672,6 @@ class WorkflowVisualizer:
                     'isStart': is_start,
                     'isCluster': False,
                     'parent': cluster_id,
-                    'customPayload': insight.render_html(),
                 }
                 dagre_nodes.append(leaf_rec)
                 continue
@@ -689,8 +688,8 @@ class WorkflowVisualizer:
                 'height': node_height,
                 'isStart': is_start,
                 'isCluster': False,
-                'customPayload': insight.render_html(),
             }
+            payloads_by_id[nid] = insight.render_html()
             parent = viz_parent(nid)
             if parent:
                 node_rec['parent'] = parent
@@ -798,6 +797,7 @@ class WorkflowVisualizer:
 
         html_content = html_content.replace('GRAPH_NODES_DATA_PLACEHOLDER', json.dumps(dagre_nodes))
         html_content = html_content.replace('GRAPH_EDGES_DATA_PLACEHOLDER', json.dumps(dagre_edges))
+        html_content = html_content.replace('GRAPH_PAYLOADS_DATA_PLACEHOLDER', json.dumps(payloads_by_id))
         return html_content
 
     def generate_html_map(self, wf_name, user_query, live_trace_ids=None):

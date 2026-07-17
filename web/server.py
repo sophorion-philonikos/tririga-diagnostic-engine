@@ -8,25 +8,31 @@ disk: they are streamed into the existing engine as in-memory objects.
 import io
 import json
 import os
+import secrets
 import threading
 import webbrowser
 from email.parser import BytesParser
 from email.policy import default as default_email_policy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
 
 from core.engine import TririgaHybridEngine
 from cli.router import TririgaNLPRouter
 from cli.visualizer import WorkflowVisualizer
 from cli import simulation
+from cli import graph_utils
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 ALLOWED_EXTENSIONS = {'.zip', '.log', '.xml', '.txt'}
 
-# Last successful visualization, kept in memory so follow-up What-If queries
-# can run against the already-parsed graphs (single-user local tool).
+# Per-browser session store (token -> session dict). Multi-tab safe.
 _session_lock = threading.Lock()
-_session = None  # dict(engine, router, workflow, trace_ids)
+_sessions = {}
+
+
+def _new_session_id():
+    return secrets.token_urlsafe(18)
 
 
 def _classify_upload(filename):
@@ -42,11 +48,7 @@ def _classify_upload(filename):
 
 
 def _parse_multipart(content_type, body):
-    """Parse a multipart/form-data body into [(filename, bytes)] using stdlib email.
-
-    The deprecated ``cgi`` module is intentionally avoided so this runs on
-    Python 3.13+ unchanged.
-    """
+    """Parse a multipart/form-data body into [(filename, bytes)] using stdlib email."""
     header = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode('utf-8')
     message = BytesParser(policy=default_email_policy).parsebytes(header + body)
     if not message.is_multipart():
@@ -62,6 +64,49 @@ def _parse_multipart(content_type, body):
             continue
         uploads.append((os.path.basename(filename), payload))
     return uploads
+
+
+def _build_sim_chips(engine, wf_name, limit=12):
+    """One-click What-If prompts derived from Switch/Query/Retrieve structure."""
+    if wf_name not in engine.graphs:
+        return []
+    graph = engine.graphs[wf_name]
+    chips = []
+    for nid, data in graph.nodes(data=True):
+        if len(chips) >= limit:
+            break
+        if graph_utils.is_invisible(data):
+            continue
+        t = graph_utils.get_type_str(data)
+        name = str(data.get('name', f'Task {nid}'))
+        if t == '14':
+            chips.append({
+                'label': f"Force FALSE · {name[:40]}",
+                'query': f"what if switch {nid} is FALSE",
+            })
+            if len(chips) >= limit:
+                break
+            chips.append({
+                'label': f"Force TRUE · {name[:40]}",
+                'query': f"what if switch {nid} is TRUE",
+            })
+        elif t in ('22', '29'):
+            chips.append({
+                'label': f"Zero records · {name[:40]}",
+                'query': f"what if {name} returns zero records",
+            })
+    return chips[:limit]
+
+
+def _workflow_fingerprint(engine, wf_name):
+    """Node id set for Diff mode across two loaded workflows."""
+    if wf_name not in engine.graphs:
+        return []
+    g = engine.graphs[wf_name]
+    return sorted(
+        str(n) for n, d in g.nodes(data=True)
+        if not (graph_utils.is_invisible(d) and g.out_degree(n) > 0)
+    )
 
 
 def process_visualization_request(uploads):
@@ -109,11 +154,10 @@ def process_visualization_request(uploads):
 
     router = TririgaNLPRouter(engine, offline_mode=True)
 
-    # Live-trace correlation: match each loaded <Header><Name> against the log and
-    # keep the workflow whose execution instance (WFIID) is the most recent.
     detected = []
     target_wf, target_trace, target_wfiid = None, [], None
     note = None
+    log_text = None
 
     if server_logs:
         log_text = server_logs[0][1].decode('utf-8', errors='ignore')
@@ -162,13 +206,20 @@ def process_visualization_request(uploads):
             f"<pre>{chr(10).join(reasons)}</pre></body></html>"
         )
 
-    global _session
+    session_id = _new_session_id()
+    fingerprints = {
+        name: _workflow_fingerprint(engine, name)
+        for name in engine.loaded_workflow_names
+    }
     with _session_lock:
-        _session = {
+        _sessions[session_id] = {
             'engine': engine,
             'router': router,
             'workflow': target_wf,
             'trace_ids': live_trace_ids,
+            'map_html': map_html,
+            'log_text': log_text,
+            'fingerprints': fingerprints,
         }
 
     trace_summary = [
@@ -176,14 +227,32 @@ def process_visualization_request(uploads):
         for step in target_trace
     ]
 
+    # Diff vs second loaded workflow (if any): ids only for overlay.
+    diff = None
+    others = [n for n in engine.loaded_workflow_names if n != target_wf]
+    if others:
+        a = set(fingerprints.get(target_wf, []))
+        b = set(fingerprints.get(others[0], []))
+        diff = {
+            'other_workflow': others[0],
+            'added': sorted(a - b),
+            'removed': sorted(b - a),
+            'shared': sorted(a & b),
+        }
+
     return {
+        'session_id': session_id,
+        'map_url': f'/api/map/{session_id}',
         'workflow': target_wf,
         'wfiid': target_wfiid,
         'detected_workflows': detected,
         'trace_summary': trace_summary,
         'note': note,
-        'map_html': map_html,
         'viz_render_errors': viz_render_errors,
+        'sim_chips': _build_sim_chips(engine, target_wf),
+        'diff': diff,
+        # Backward-compatible: omit huge body by default; clients should use map_url.
+        'map_html': None,
     }
 
 
@@ -198,8 +267,18 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, status, html):
+        body = html.encode('utf-8') if isinstance(html, str) else html
+        self.send_response(status)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
-        if self.path in ('/', '/index.html'):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path in ('/', '/index.html'):
             index_path = os.path.join(STATIC_DIR, 'index.html')
             try:
                 with open(index_path, 'rb') as f:
@@ -213,6 +292,17 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+
+        if path.startswith('/api/map/'):
+            sid = path[len('/api/map/'):].strip('/')
+            with _session_lock:
+                sess = _sessions.get(sid)
+            if not sess or not sess.get('map_html'):
+                self._send_html(404, '<html><body>Map session not found.</body></html>')
+                return
+            self._send_html(200, sess['map_html'])
+            return
+
         self._send_json(404, {'error': 'Not found'})
 
     def do_POST(self):
@@ -272,8 +362,12 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             self._send_json(400, {'error': 'Provide a simulation question, e.g. "What if the approval is denied?".'})
             return
 
+        session_id = str(payload.get('session_id', '')).strip()
         with _session_lock:
-            session = _session
+            session = _sessions.get(session_id) if session_id else None
+            # Fallback: most recent session (single-tab convenience).
+            if session is None and _sessions:
+                session = _sessions[list(_sessions.keys())[-1]]
 
         if session is None:
             self._send_json(400, {'error': 'No workflow is loaded yet. Upload files and click Visualize first.'})

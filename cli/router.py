@@ -437,9 +437,7 @@ class TririgaNLPRouter:
         return self.engine.graphs
 
     def _get_type_str(self, data):
-        t = data.get('type', data.get('Type', 'Generic'))
-        if isinstance(t, list): return str(t[0])
-        return str(t).strip()
+        return graph_utils.get_type_str(data)
 
     def _explain_purpose_with_paths(self, user_query):
         wf_name, _graph, err = self._get_context_graph(user_query)
