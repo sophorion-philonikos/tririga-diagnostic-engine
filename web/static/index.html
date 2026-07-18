@@ -328,6 +328,7 @@
     line-height: 1.45;
     padding: 3px 0;
     user-select: none;
+    font-size: 12px;
   }
   #simOutcome details.impact-group > summary::-webkit-details-marker { display: none; }
   #simOutcome details.impact-group > summary::before {
@@ -357,38 +358,48 @@
   #simOutcome .task-ref {
     display: inline;
     margin: 0;
-    padding: 0 3px;
+    padding: 0;
     border: none;
-    border-radius: 3px;
-    background: rgba(255, 149, 0, 0.28);
-    color: #ffe0b0;
+    border-radius: 0;
+    background: none;
     font: inherit;
-    font-weight: 600;
+    font-size: 12px;
+    line-height: 1.45;
+    font-family: inherit;
+    font-weight: 700;
     cursor: pointer;
+    text-decoration: none;
+    color: #4da6ff;
+    vertical-align: baseline;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  #simOutcome .task-ref--altered { color: #ff9500; }
+  #simOutcome .task-ref--broken { color: #c8c8c8; }
+  #simOutcome .task-ref--failed { color: #ff6b6b; }
+  #simOutcome .task-ref--info { color: #4da6ff; }
+  #simOutcome .task-ref:hover {
     text-decoration: underline;
     text-underline-offset: 2px;
+    filter: brightness(1.15);
   }
-  #simOutcome .task-ref:hover { background: rgba(255, 149, 0, 0.45); color: #fff; }
   #simOutcome .task-copy {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    margin: 0 2px 0 1px;
+    display: inline;
+    margin: 0 0 0 3px;
     padding: 0;
-    vertical-align: -3px;
-    border: 1px solid #555;
-    border-radius: 4px;
-    background: #2a2a35;
-    color: #ccc;
+    border: none;
+    background: none;
+    color: #888;
     cursor: pointer;
-    font-size: 11px;
-    line-height: 1;
+    font: inherit;
+    font-size: 0.85em;
+    line-height: inherit;
+    vertical-align: baseline;
+    appearance: none;
+    -webkit-appearance: none;
   }
-  #simOutcome .task-copy:hover { border-color: #9b7bff; color: #fff; background: #3a2a50; }
-  #simOutcome .task-copy.copied { border-color: #00c3a5; color: #00c3a5; }
-  #simOutcome summary .task-ref { font-weight: 600; color: var(--text); background: rgba(255, 149, 0, 0.18); }
+  #simOutcome .task-copy:hover { color: #cbb8ff; }
+  #simOutcome .task-copy.copied { color: #00c3a5; }
   #traceList {
     margin: 10px 0 4px;
     padding: 0;
@@ -768,23 +779,49 @@
       .replace(/>/g, "&gt;");
   }
 
-  function taskRefHtml(id, name, labelEscaped) {
+  function normalizeBadge(badge) {
+    const b = String(badge || "info").toLowerCase();
+    if (b === "altered" || b === "broken" || b === "failed" || b === "info") return b;
+    return "info";
+  }
+
+  function taskRefHtml(id, name, labelEscaped, badge) {
     const idAttr = escapeAttr(id);
     const nameAttr = escapeAttr(name || ("Task " + id));
+    const role = normalizeBadge(badge);
+    // Use <span> (not <button>) so refs stay true inline text in panels.
     return (
-      '<button type="button" class="task-ref" data-task-id="' + idAttr +
-      '" data-task-name="' + nameAttr + '" title="Focus this task on the map">' +
-      labelEscaped +
-      '</button><button type="button" class="task-copy" data-task-id="' + idAttr +
+      '<span class="task-ref task-ref--' + role +
+      '" role="button" tabindex="0" data-task-id="' + idAttr +
       '" data-task-name="' + nameAttr +
-      '" title="Copy name and ID" aria-label="Copy task name and ID">⎘</button>'
+      '" data-badge="' + role +
+      '" title="Focus this task on the map">' +
+      labelEscaped +
+      '</span><span class="task-copy" role="button" tabindex="0" data-task-id="' + idAttr +
+      '" data-task-name="' + nameAttr +
+      '" title="Copy name and ID" aria-label="Copy task name and ID">⎘</span>'
     );
   }
 
+  function collectBadgeById(nodes, out) {
+    const map = out || {};
+    for (const node of nodes || []) {
+      if (node && node.task_id != null) {
+        map[String(node.task_id)] = normalizeBadge(
+          node.badge || (node.informational ? "info" : "broken")
+        );
+      }
+      if (node && node.children && node.children.length) {
+        collectBadgeById(node.children, map);
+      }
+    }
+    return map;
+  }
+
   /** Turn "Type N 'Name' (ID: id)" mentions into focus/copy controls. */
-  function linkifyTaskRefs(text) {
+  function linkifyTaskRefs(text, badgeById) {
     if (!text) return "";
-    // Optional leading article; Title-case type name; name in quotes; numeric id.
+    const roles = badgeById || {};
     const labeled =
       /(?:The\s+|A\s+|An\s+)?((?:[A-Z][A-Za-z0-9/+-]*)(?:\s+[A-Z][A-Za-z0-9/+-]*){0,6})\s*\(Type\s+(\d+)\)\s+'([^']+)'\s*\((?:ID:\s*)?(\d+)\)/g;
     let out = "";
@@ -796,7 +833,8 @@
       const articleMatch = /^(The|A|An)\s+/i.exec(full);
       if (articleMatch) out += escapeHtml(articleMatch[0]);
       const label = articleMatch ? full.slice(articleMatch[0].length) : full;
-      out += taskRefHtml(m[4], m[3], escapeHtml(label));
+      const tid = m[4];
+      out += taskRefHtml(tid, m[3], escapeHtml(label), roles[String(tid)] || "info");
       last = m.index + m[0].length;
     }
     const rest = text.slice(last);
@@ -806,7 +844,8 @@
     let m2;
     while ((m2 = bare.exec(rest)) !== null) {
       out2 += escapeHtml(rest.slice(last2, m2.index));
-      out2 += taskRefHtml(m2[1], "Task " + m2[1], escapeHtml(m2[0]));
+      const tid = m2[1];
+      out2 += taskRefHtml(tid, "Task " + tid, escapeHtml(m2[0]), roles[String(tid)] || "info");
       last2 = m2.index + m2[0].length;
     }
     out2 += escapeHtml(rest.slice(last2));
@@ -859,11 +898,11 @@
     return { direct, nested };
   }
 
-  function renderImpactTreeNode(node, depth) {
+  function renderImpactTreeNode(node, depth, badgeById) {
     const children = node.children || [];
     const { direct, nested } = impactNodeCounts(node);
     const openAttr = depth < 2 ? " open" : "";
-    const badge = node.badge || (depth === 0 ? "altered" : "broken");
+    const badge = normalizeBadge(node.badge || (depth === 0 ? "altered" : "broken"));
     const shortLabel = (node.task_type_name || "Task") +
       (node.task_type ? " (Type " + node.task_type + ")" : "") +
       " '" + (node.task_name || node.task_id) + "' (" + node.task_id + ")";
@@ -875,14 +914,19 @@
     }
     let html = "<details class='impact-group depth-" + depth + "'" + openAttr + ">";
     html += "<summary><span class='badge " + badge + "'></span>";
-    html += taskRefHtml(node.task_id, node.task_name || ("Task " + node.task_id), escapeHtml(shortLabel));
+    html += taskRefHtml(
+      node.task_id,
+      node.task_name || ("Task " + node.task_id),
+      escapeHtml(shortLabel),
+      badge
+    );
     html += counts + "</summary>";
     if (node.sentence) {
-      html += "<div class='impact-body'>" + linkifyTaskRefs(node.sentence) + "</div>";
+      html += "<div class='impact-body'>" + linkifyTaskRefs(node.sentence, badgeById) + "</div>";
     }
     if (children.length) {
       html += "<div class='impact-children'>";
-      for (const child of children) html += renderImpactTreeNode(child, depth + 1);
+      for (const child of children) html += renderImpactTreeNode(child, depth + 1, badgeById);
       html += "</div>";
     }
     html += "</details>";
@@ -891,20 +935,38 @@
 
   function renderImpactTree(tree) {
     if (!tree || !tree.length) return "";
+    const badgeById = collectBadgeById(tree);
     let html = "<div class='impact-tree'>";
-    for (const root of tree) html += renderImpactTreeNode(root, 0);
+    for (const root of tree) html += renderImpactTreeNode(root, 0, badgeById);
     html += "</div>";
     return html;
   }
 
+  function badgeMapFromFlatImpacts(impacts) {
+    const map = {};
+    for (const imp of impacts || []) {
+      if (imp.producer_id != null) {
+        const pid = String(imp.producer_id);
+        if (!map[pid]) map[pid] = "altered";
+      }
+      if (imp.consumer_id != null) {
+        const cid = String(imp.consumer_id);
+        const isStarved = imp.informational !== true && imp.ref_kind !== "field_reference";
+        map[cid] = isStarved ? "broken" : "info";
+      }
+    }
+    return map;
+  }
+
   function renderFlatImpacts(impacts) {
+    const badgeById = badgeMapFromFlatImpacts(impacts);
     let html = "<ul class='impact-list'>";
     for (const imp of impacts) {
       const isStarved = !!imp.consumer_id && imp.informational !== true &&
         imp.ref_kind !== "field_reference";
       const badge = isStarved ? "broken" : "info";
       html += "<li><span class='badge " + badge + "'></span><span>" +
-        linkifyTaskRefs(imp.sentence) + "</span></li>";
+        linkifyTaskRefs(imp.sentence, badgeById) + "</span></li>";
     }
     html += "</ul>";
     return html;
@@ -919,12 +981,18 @@
       html += renderImpactTree(tree);
       html += "<hr>";
     } else if (impacts.length) {
+      const badgeById = badgeMapFromFlatImpacts(impacts);
       html += "<ul>";
-      for (const imp of impacts) html += "<li class='sim-impact'>" + linkifyTaskRefs(imp.sentence) + "</li>";
+      for (const imp of impacts) {
+        html += "<li class='sim-impact'>" + linkifyTaskRefs(imp.sentence, badgeById) + "</li>";
+      }
       html += "</ul><hr>";
     }
+    const summaryBadges = tree.length
+      ? collectBadgeById(tree)
+      : badgeMapFromFlatImpacts(impacts);
     html += "<ul>";
-    for (const line of payload.summary) html += "<li>" + linkifyTaskRefs(line) + "</li>";
+    for (const line of payload.summary) html += "<li>" + linkifyTaskRefs(line, summaryBadges) + "</li>";
     html += "</ul>";
     if (payload.decisions.length) {
       html += "<hr><ul>";
@@ -956,6 +1024,20 @@
     if (refBtn && simOutcome.contains(refBtn)) {
       ev.preventDefault();
       ev.stopPropagation();
+      focusTaskOnMap(refBtn.getAttribute("data-task-id"));
+    }
+  });
+  simOutcome.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    const copyBtn = ev.target.closest(".task-copy");
+    if (copyBtn && simOutcome.contains(copyBtn)) {
+      ev.preventDefault();
+      copyTaskNameId(copyBtn.getAttribute("data-task-name"), copyBtn.getAttribute("data-task-id"), copyBtn);
+      return;
+    }
+    const refBtn = ev.target.closest(".task-ref");
+    if (refBtn && simOutcome.contains(refBtn)) {
+      ev.preventDefault();
       focusTaskOnMap(refBtn.getAttribute("data-task-id"));
     }
   });
@@ -1032,12 +1114,18 @@
             line += " Fields not updated: " + ft.fields.join(", ");
             if (ft.bo) line += " on " + ft.bo;
           }
-          html += "<li><span class='badge failed'></span><span>" + linkifyTaskRefs(line) + "</span></li>";
+          const failMap = {};
+          failMap[String(ft.node_id)] = "failed";
+          html += "<li><span class='badge failed'></span><span>" +
+            linkifyTaskRefs(line, failMap) + "</span></li>";
         }
         for (const a of altered) {
+          const altMap = {};
+          altMap[String(a.node_id)] = "altered";
           html += "<li><span class='badge altered'></span><span>" +
             linkifyTaskRefs(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
-                       "' (ID: " + a.node_id + ") simulated with zero records / null object token.") +
+                       "' (ID: " + a.node_id + ") simulated with zero records / null object token.",
+                       altMap) +
             "</span></li>";
         }
         html += "</ul>";

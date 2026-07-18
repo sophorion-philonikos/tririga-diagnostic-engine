@@ -180,7 +180,8 @@
         }
         .sim-summary details.impact-group > summary {
             cursor: pointer; list-style: none; display: flex; gap: 8px;
-            align-items: baseline; line-height: 1.4; padding: 2px 0; color: #eee;
+            align-items: baseline; line-height: 1.45; padding: 2px 0; color: #eee;
+            font-size: 12px;
         }
         .sim-summary details.impact-group > summary::-webkit-details-marker { display: none; }
         .sim-summary details.impact-group > summary::before {
@@ -198,29 +199,67 @@
         }
         .sim-summary .badge.failed { background: #cc0000; box-shadow: 0 0 5px rgba(204,0,0,0.9); }
         .sim-summary .badge.info { background: #4da6ff; box-shadow: 0 0 5px rgba(77,166,255,0.7); }
-        .sim-summary .impact-summary-text { flex: 1; min-width: 0; font-size: 13px; }
+        .sim-summary .impact-summary-text { flex: 1; min-width: 0; font-size: 12px; }
         .sim-summary .impact-counts { flex: none; color: #888; font-size: 11px; white-space: nowrap; }
         .sim-summary .impact-body { margin: 2px 0 6px 20px; color: #ffb3b3; font-size: 12px; line-height: 1.45; }
         .sim-summary .impact-children { margin-left: 6px; }
-        .sim-summary .task-ref, #payloadData .task-ref {
-            display: inline; margin: 0; padding: 0 3px; border: none; border-radius: 3px;
-            background: rgba(255, 149, 0, 0.28); color: #ffe0b0; font: inherit; font-weight: 600;
-            cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+        /* Inline text refs (spans) — never button chrome in Diagnostics Panel */
+        .sim-summary .task-ref, #payloadData .task-ref, #sidepanel .task-ref {
+            display: inline !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: none !important;
+            box-shadow: none !important;
+            font: inherit !important;
+            font-size: 12px !important;
+            line-height: 1.45 !important;
+            font-family: inherit !important;
+            font-weight: 700 !important;
+            cursor: pointer;
+            text-decoration: none !important;
+            color: #4da6ff;
+            vertical-align: baseline;
+            appearance: none;
+            -webkit-appearance: none;
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
         }
-        .sim-summary .task-ref:hover, #payloadData .task-ref:hover {
-            background: rgba(255, 149, 0, 0.45); color: #fff;
+        .sim-summary .task-ref--altered, #payloadData .task-ref--altered, #sidepanel .task-ref--altered { color: #ff9500 !important; }
+        .sim-summary .task-ref--broken, #payloadData .task-ref--broken, #sidepanel .task-ref--broken { color: #c8c8c8 !important; }
+        .sim-summary .task-ref--failed, #payloadData .task-ref--failed, #sidepanel .task-ref--failed { color: #ff6b6b !important; }
+        .sim-summary .task-ref--info, #payloadData .task-ref--info, #sidepanel .task-ref--info { color: #4da6ff !important; }
+        .sim-summary .task-ref:hover, #payloadData .task-ref:hover, #sidepanel .task-ref:hover {
+            text-decoration: underline !important;
+            text-underline-offset: 2px;
+            filter: brightness(1.15);
+            background: none !important;
         }
-        .sim-summary .task-copy, #payloadData .task-copy {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 18px; height: 18px; margin: 0 2px 0 1px; padding: 0; vertical-align: -3px;
-            border: 1px solid #555; border-radius: 4px; background: #2a2a35; color: #ccc;
-            cursor: pointer; font-size: 11px; line-height: 1;
+        .sim-summary .task-copy, #payloadData .task-copy, #sidepanel .task-copy {
+            display: inline !important;
+            margin: 0 0 0 3px !important;
+            padding: 0 !important;
+            border: none !important;
+            background: none !important;
+            color: #888;
+            cursor: pointer;
+            font: inherit !important;
+            font-size: 0.85em !important;
+            line-height: inherit !important;
+            vertical-align: baseline;
+            width: auto !important;
+            height: auto !important;
+            appearance: none;
+            -webkit-appearance: none;
         }
-        .sim-summary .task-copy:hover, #payloadData .task-copy:hover {
-            border-color: #9b7bff; color: #fff; background: #3a2a50;
+        .sim-summary .task-copy:hover, #payloadData .task-copy:hover, #sidepanel .task-copy:hover {
+            color: #cbb8ff; background: none !important; border: none !important;
         }
-        .sim-summary .task-copy.copied, #payloadData .task-copy.copied {
-            border-color: #00c3a5; color: #00c3a5;
+        .sim-summary .task-copy.copied, #payloadData .task-copy.copied, #sidepanel .task-copy.copied {
+            color: #00c3a5;
         }
 
         .zoom-toolbar {

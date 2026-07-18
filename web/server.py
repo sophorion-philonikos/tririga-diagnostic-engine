@@ -80,14 +80,15 @@ def _build_sim_chips(engine, wf_name, limit=12):
         t = graph_utils.get_type_str(data)
         name = str(data.get('name', f'Task {nid}'))
         if t == '14':
+            switch_label = f"{name[:32]} ({nid})"
             chips.append({
-                'label': f"Force FALSE · {name[:40]}",
+                'label': f"Force FALSE · {switch_label}",
                 'query': f"what if switch {nid} is FALSE",
             })
             if len(chips) >= limit:
                 break
             chips.append({
-                'label': f"Force TRUE · {name[:40]}",
+                'label': f"Force TRUE · {switch_label}",
                 'query': f"what if switch {nid} is TRUE",
             })
         elif t in ('22', '29'):
