@@ -56,6 +56,18 @@ def run_simulation(engine, wf_name, query_text, trace_ids=None):
     forced = {m['node_id']: m['verdict'] for m in matched}
     forced.update(failure_result['forced_overrides'])
 
+    # Matched gates must be reachable: default FALSE-spine often never visits a
+    # nested Switch. Force ancestor Switch/Iter verdicts along a path to each
+    # matched gate (same helper used for failed/altered targets). Never override
+    # an explicit user/failure force already in ``forced``.
+    for m in matched:
+        reach = path_to_task(graph, str(m['node_id']))
+        if not reach:
+            continue
+        for nid, verdict in force_verdicts_for_path(engine, wf_name, reach).items():
+            if nid not in forced:
+                forced[nid] = verdict
+
     # --- Dataflow token simulation for zero-record clauses ---
     # Type 29/22 task_failure already propagated inside analyze_task_failures;
     # only data_state clauses need a fresh propagate_null_token pass.

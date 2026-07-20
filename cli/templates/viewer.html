@@ -8,7 +8,7 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background-color: #f4f6f9; }
         
         #canvas-container { 
-            width: 75%; 
+            width: 82%; 
             height: 100%; 
             border-right: 2px solid #ccc; 
             background-color: #f8f9fa;
@@ -20,9 +20,36 @@
         
         #svg-canvas { width: 100%; height: 100%; outline: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
         
-        #sidepanel { width: 25%; height: 100%; padding: 20px; overflow-y: auto; background-color: #2b2b2b; color: #f1f1f1; box-sizing: border-box; }
-        h2 { color: #4da6ff; font-size: 1.2em; margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-        h3 { color: #ffffff; margin-bottom: 5px; }
+        #sidepanel {
+            width: 18%;
+            min-width: 200px;
+            height: 100%;
+            padding: 14px;
+            overflow-y: auto;
+            background-color: #2b2b2b;
+            color: #f1f1f1;
+            box-sizing: border-box;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        #sidepanel h2 {
+            color: #4da6ff;
+            font-size: 1.05em;
+            margin-top: 0;
+            border-bottom: 1px solid #555;
+            padding-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #sidepanel h3 { color: #ffffff; margin: 0 0 4px; font-size: 1.05em; }
+        #sidepanel hr { border-color: #555; }
+        #sidepanel .hint { color: #888; font-style: italic; margin-top: 14px; font-size: 11px; }
+        #sidepanel .source-link { color: #4da6ff; text-decoration: underline; cursor: pointer; }
+        #sidepanel .source-link:hover { color: #00c3a5; }
+        #sidepanel #payloadData { font-size: 12px; }
+        #sidepanel .sim-summary li { font-size: 11px; }
+        #sidepanel .sim-summary .sim-decision { font-size: 11px; }
+        #sidepanel .sim-summary .impact-summary-text { font-size: 11px; }
         hr { border-color: #555; }
         .hint { color: #888; font-style: italic; margin-top: 20px; }
         .source-link { color: #4da6ff; text-decoration: underline; cursor: pointer; }
@@ -45,8 +72,7 @@
         .cluster.cluster-loop .protractor-cap { stroke: #5b7cfa; }
         .cluster.search-hit > rect {
             stroke: #00e6c3 !important;
-            stroke-width: 3px;
-            filter: drop-shadow(0 0 6px rgba(0, 230, 195, 0.7));
+            stroke-width: 4px;
         }
         .cluster.sim-dim { opacity: 0.12; }
         .cluster.sim-active > rect { stroke: #c341ff; stroke-width: 3px; }
@@ -54,8 +80,15 @@
         .cluster.sim-altered > rect { stroke: #ff9500; stroke-width: 3px; }
         .cluster.sim-broken > rect { stroke: #8a8a8a; stroke-width: 3px; }
         .edgePath.loop-back path { stroke-dasharray: 6 4; }
-        .node.diff-added { filter: drop-shadow(0 0 6px #2ecc71) drop-shadow(0 0 14px rgba(46, 204, 113, 0.75)); }
-        .node.diff-removed { filter: drop-shadow(0 0 6px #e74c3c) drop-shadow(0 0 14px rgba(231, 76, 60, 0.75)); }
+        /* Diff / search / sim highlights: outline rings (no CSS filter:drop-shadow) */
+        .node.diff-added foreignObject > div {
+            outline: 3px solid #2ecc71;
+            outline-offset: 2px;
+        }
+        .node.diff-removed foreignObject > div {
+            outline: 3px solid #e74c3c;
+            outline-offset: 2px;
+        }
         .node.path-spotlight, .edgePath.path-spotlight path {
             /* highlighted by sim-active reuse */
         }
@@ -119,16 +152,16 @@
         #howtoGuide .guide-actions button.primary {
             background: #17324d; border-color: #4da6ff;
         }
-        .panel-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+        .panel-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
         .panel-tabs button {
             background: #3a3a3a; color: #ccc; border: 1px solid #555; border-radius: 4px;
-            padding: 4px 8px; font-size: 11px; cursor: pointer;
+            padding: 3px 7px; font-size: 10px; cursor: pointer;
         }
         .panel-tabs button.active { background: #4da6ff; color: #111; border-color: #4da6ff; }
-        .panel-actions { margin-top: 10px; }
+        .panel-actions { margin-top: 8px; }
         .panel-actions button {
             background: #3a3a3a; color: #ddd; border: 1px solid #555; border-radius: 4px;
-            padding: 5px 10px; font-size: 11px; cursor: pointer; margin-right: 6px; margin-top: 6px;
+            padding: 4px 8px; font-size: 10px; cursor: pointer; margin-right: 6px; margin-top: 6px;
         }
         #viz-error-banner {
             display: none; position: absolute; left: 16px; right: 16px; top: 16px; z-index: 40;
@@ -144,29 +177,80 @@
         .edgeLabel text { font-family: 'Segoe UI', sans-serif; font-size: 12px; font-weight: bold; fill: #d35400; }
 
         /* --- What-If simulation state (pure class toggles via D3 data joins; no re-render) --- */
-        .node, .edgePath, .edgeLabel { transition: opacity 0.35s ease, filter 0.35s ease; }
+        .node, .edgePath, .edgeLabel { transition: opacity 0.25s ease; }
+        /* Drop expensive paint while the canvas transform is changing */
+        #svg-canvas.is-zooming .node,
+        #svg-canvas.is-zooming .edgePath,
+        #svg-canvas.is-zooming .edgeLabel,
+        #svg-canvas.is-zooming .cluster,
+        #svg-canvas.is-zooming .edgePath path,
+        #svg-canvas.is-zooming .cluster > rect,
+        #svg-canvas.is-zooming .node foreignObject > div {
+            filter: none !important;
+            animation: none !important;
+            transition: none !important;
+            outline: none !important;
+        }
         .node.sim-dim, .edgePath.sim-dim, .edgeLabel.sim-dim { opacity: 0.12; }
-        .node.sim-active { filter: drop-shadow(0 0 5px #c341ff) drop-shadow(0 0 14px rgba(195, 65, 255, 0.65)); }
-        /* Dual-state dataflow highlighting: the FAILED task glows deep red;
-           the ALTERED source task (simulated zero-record state) glows orange;
-           its BROKEN/starved dependents glow grey with a white core (distinct from failed).
-           Precedence (failed > altered > broken > active) is enforced by the data join. */
-        .node.sim-failed { filter: drop-shadow(0 0 8px #cc0000) drop-shadow(0 0 20px rgba(204, 0, 0, 0.9)); animation: sim-pulse 1.8s ease-in-out infinite; }
-        @keyframes sim-pulse { 0%, 100% { filter: drop-shadow(0 0 6px #cc0000) drop-shadow(0 0 16px rgba(204, 0, 0, 0.75)); } 50% { filter: drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 24px rgba(255, 0, 0, 0.95)); } }
-        .node.sim-altered { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75)); animation: sim-pulse-altered 1.8s ease-in-out infinite; }
-        @keyframes sim-pulse-altered { 0%, 100% { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 14px rgba(255, 149, 0, 0.7)); } 50% { filter: drop-shadow(0 0 10px #ffb84d) drop-shadow(0 0 22px rgba(255, 149, 0, 0.95)); } }
-        .node.sim-broken { filter: drop-shadow(0 0 4px #ffffff) drop-shadow(0 0 12px rgba(140, 140, 140, 0.95)) drop-shadow(0 0 20px rgba(90, 90, 90, 0.75)); }
-        .node.search-hit { filter: drop-shadow(0 0 8px #00e6c3) drop-shadow(0 0 18px rgba(0, 230, 195, 0.95)) !important; }
-        .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; filter: drop-shadow(0 0 4px rgba(195, 65, 255, 0.8)); }
+        /* Dual-state glows on g.node (FO outlines clip and looked "missing").
+           is-zooming still strips filters during real pan/zoom for smoothness. */
+        .node.sim-active {
+            filter: drop-shadow(0 0 5px #c341ff) drop-shadow(0 0 14px rgba(195, 65, 255, 0.65));
+        }
+        .node.sim-failed {
+            filter: drop-shadow(0 0 8px #cc0000) drop-shadow(0 0 20px rgba(204, 0, 0, 0.9));
+            animation: sim-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes sim-pulse {
+            0%, 100% { filter: drop-shadow(0 0 6px #cc0000) drop-shadow(0 0 16px rgba(204, 0, 0, 0.75)); }
+            50% { filter: drop-shadow(0 0 10px #ff0000) drop-shadow(0 0 24px rgba(255, 0, 0, 0.95)); }
+        }
+        .node.sim-altered {
+            filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 16px rgba(255, 149, 0, 0.75));
+            animation: sim-pulse-altered 1.8s ease-in-out infinite;
+        }
+        @keyframes sim-pulse-altered {
+            0%, 100% { filter: drop-shadow(0 0 6px #ff9500) drop-shadow(0 0 14px rgba(255, 149, 0, 0.7)); }
+            50% { filter: drop-shadow(0 0 10px #ffb84d) drop-shadow(0 0 22px rgba(255, 149, 0, 0.95)); }
+        }
+        .node.sim-broken {
+            filter: drop-shadow(0 0 4px #ffffff) drop-shadow(0 0 12px rgba(140, 140, 140, 0.95)) drop-shadow(0 0 20px rgba(90, 90, 90, 0.75));
+        }
+        .node.search-hit {
+            filter: drop-shadow(0 0 8px #00e6c3) drop-shadow(0 0 18px rgba(0, 230, 195, 0.95)) !important;
+        }
+        .edgePath.sim-active path { stroke: #c341ff !important; stroke-width: 4.5px !important; }
         .edgePath.sim-active marker path { fill: #c341ff !important; stroke: #c341ff !important; }
-        .edgePath.sim-broken path { stroke: #8a8a8a !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; filter: drop-shadow(0 0 4px rgba(200, 200, 200, 0.85)); }
+        .edgePath.sim-broken path { stroke: #8a8a8a !important; stroke-width: 4.5px !important; stroke-dasharray: 8 4; }
         .edgePath.sim-broken marker path { fill: #8a8a8a !important; stroke: #8a8a8a !important; }
         .edgePath.live-trace path {
             stroke: #00e6c3 !important;
             stroke-width: 6.5px !important;
-            filter: drop-shadow(0 0 5px rgba(0, 230, 195, 0.85));
         }
         .edgePath.live-trace marker path { fill: #00e6c3 !important; stroke: #00e6c3 !important; }
+
+        /* Semantic zoom LOD (CSS only; no re-layout) */
+        #svg-canvas[data-lod="far"] .edgeLabel { opacity: 0.15; }
+        #svg-canvas[data-lod="far"] .legend { opacity: 0.55; }
+        #svg-canvas[data-lod="mid"] .edgeLabel { opacity: 0.55; }
+        #svg-canvas[data-lod="near"] .node.node-selected foreignObject > div {
+            outline: 4px solid #4da6ff;
+            outline-offset: 3px;
+        }
+
+        /* Neighborhood isolate (opacity only) */
+        .node.iso-dim, .edgePath.iso-dim, .edgeLabel.iso-dim, .cluster.iso-dim { opacity: 0.08; pointer-events: none; }
+        .node.iso-keep, .edgePath.iso-keep, .edgeLabel.iso-keep { opacity: 1; }
+
+        #lodCue {
+            position: absolute; right: 16px; bottom: 16px; z-index: 1001;
+            background: rgba(255,255,255,0.92); border: 1px solid #ccc; border-radius: 6px;
+            padding: 4px 10px; font-size: 11px; color: #555; pointer-events: none;
+        }
+        #isoStatus {
+            display: none; margin-top: 8px; font-size: 12px; color: #9ecbff;
+        }
+        #isoStatus.visible { display: block; }
         .edgeLabel.sim-active text { fill: #c341ff !important; }
         .edgeLabel.sim-broken text { fill: #8a8a8a !important; }
         .sim-summary h3 { color: #c341ff; margin-top: 0; }
@@ -373,8 +457,10 @@
             <button type="button" data-mode="live" title="Highlight only the path taken in an uploaded live trace log">Live Trace</button>
             <button type="button" data-mode="whatif" title="Show last What-If simulation result (run Simulate first)">What-If</button>
             <button type="button" data-mode="diff" title="Compare this workflow to another uploaded map (added/removed tasks)">Diff</button>
+            <button type="button" id="btnIsolate" title="Dim everything outside the selected task's neighborhood (depth 2)">Isolate</button>
             <button type="button" class="guide-btn" id="btnHowto" title="How to use this viewer">Guide</button>
         </div>
+        <div id="lodCue" aria-live="polite">Detail: Mid</div>
         <div id="howtoGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" aria-hidden="true">
             <div class="guide-card">
                 <h3 id="guideTitle">How to use this map</h3>
@@ -476,8 +562,11 @@
         </div>
         <div class="panel-actions" id="panelActions" hidden>
             <button type="button" id="btnPathHere">Show path to here</button>
+            <button type="button" id="btnIsolateHere">Isolate neighborhood</button>
+            <button type="button" id="btnClearIsolate">Clear isolate</button>
             <button type="button" id="btnCopyLink">Copy deep link</button>
         </div>
+        <div id="isoStatus" aria-live="polite"></div>
     </div>
 
     <script type="text/javascript">
@@ -491,6 +580,9 @@
         window.selectedNodeId = null;
         window.diffOverlay = { added: {}, removed: {} };
         window.lastSimState = null;
+        window.isolateActive = false;
+        window.isolateKeepIds = null;
+        window.currentLod = "mid";
 
         function setPanelHtml(html) {
             var panel = document.getElementById("payloadData");
@@ -560,8 +652,124 @@
             setPanelHtml(raw || "<p class='hint'>No payload for this node.</p>");
         }
 
+        function postSelectionToParent(id) {
+            var meta = nodesData.find(function(n) { return String(n.id) === String(id); });
+            var neighborCount = 0;
+            if (window.isolateKeepIds) neighborCount = window.isolateKeepIds.size;
+            else {
+                var nb = neighborhoodIds(String(id), 2);
+                neighborCount = nb.size;
+            }
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: "tririga-selection",
+                        nodeId: String(id),
+                        name: (meta && meta.name) || String(id),
+                        mode: window.analysisMode || "topology",
+                        lod: window.currentLod || "mid",
+                        neighborCount: neighborCount,
+                        isolateActive: !!window.isolateActive
+                    }, "*");
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function neighborhoodIds(rootId, depth) {
+            depth = depth == null ? 2 : depth;
+            var adj = {};
+            edgesData.forEach(function(e) {
+                if (e.kind === "iter-branch-hidden") return;
+                var a = String(e.from), b = String(e.to);
+                if (!adj[a]) adj[a] = [];
+                if (!adj[b]) adj[b] = [];
+                adj[a].push(b);
+                adj[b].push(a);
+            });
+            var keep = new Set();
+            var q = [{ id: String(rootId), d: 0 }];
+            keep.add(String(rootId));
+            while (q.length) {
+                var cur = q.shift();
+                if (cur.d >= depth) continue;
+                var nbrs = adj[cur.id] || [];
+                for (var i = 0; i < nbrs.length; i++) {
+                    if (keep.has(nbrs[i])) continue;
+                    keep.add(nbrs[i]);
+                    q.push({ id: nbrs[i], d: cur.d + 1 });
+                }
+            }
+            // Keep cluster parents of kept leaves so Iterator chrome stays readable.
+            nodesData.forEach(function(n) {
+                if (n.parent && keep.has(String(n.id))) keep.add(String(n.parent));
+                if (n.isCluster && keep.has(String(n.taskId || "").replace(/^c_/, ""))) {
+                    keep.add(String(n.id));
+                }
+            });
+            return keep;
+        }
+
+        function applyNeighborhoodIsolate(rootId, depth) {
+            if (!rootId || typeof inner === "undefined" || !inner) return;
+            var keep = neighborhoodIds(rootId, depth == null ? 2 : depth);
+            window.isolateActive = true;
+            window.isolateKeepIds = keep;
+            var total = nodesData.filter(function(n) { return !n.isCluster; }).length;
+            graphNodes()
+                .classed("iso-keep", function(d) { return keep.has(String(d)); })
+                .classed("iso-dim", function(d) { return !keep.has(String(d)); });
+            inner.selectAll("g.edgePath")
+                .classed("iso-keep", function(d) {
+                    return keep.has(String(d.v)) && keep.has(String(d.w));
+                })
+                .classed("iso-dim", function(d) {
+                    return !(keep.has(String(d.v)) && keep.has(String(d.w)));
+                });
+            inner.selectAll("g.edgeLabel")
+                .classed("iso-keep", function(d) {
+                    return keep.has(String(d.v)) && keep.has(String(d.w));
+                })
+                .classed("iso-dim", function(d) {
+                    return !(keep.has(String(d.v)) && keep.has(String(d.w)));
+                });
+            inner.selectAll("g.cluster")
+                .classed("iso-keep", function(d) { return keep.has(String(d)); })
+                .classed("iso-dim", function(d) { return !keep.has(String(d)); });
+            var isoBtn = document.getElementById("btnIsolate");
+            if (isoBtn) isoBtn.classList.add("active");
+            var st = document.getElementById("isoStatus");
+            if (st) {
+                st.classList.add("visible");
+                st.textContent = keep.size + " tasks in focus · " +
+                    Math.max(0, total - keep.size) + " dimmed (neighborhood depth 2)";
+            }
+            postSelectionToParent(rootId);
+        }
+
+        function clearNeighborhoodIsolate() {
+            window.isolateActive = false;
+            window.isolateKeepIds = null;
+            if (typeof inner !== "undefined" && inner) {
+                graphNodes().classed("iso-keep", false).classed("iso-dim", false);
+                inner.selectAll("g.edgePath").classed("iso-keep", false).classed("iso-dim", false);
+                inner.selectAll("g.edgeLabel").classed("iso-keep", false).classed("iso-dim", false);
+                inner.selectAll("g.cluster").classed("iso-keep", false).classed("iso-dim", false);
+            }
+            var isoBtn = document.getElementById("btnIsolate");
+            if (isoBtn) isoBtn.classList.remove("active");
+            var st = document.getElementById("isoStatus");
+            if (st) { st.classList.remove("visible"); st.textContent = ""; }
+            if (window.selectedNodeId) postSelectionToParent(window.selectedNodeId);
+        }
+
         window.handleNodeClick = function(id) {
             showPanelForNode(id);
+            if (typeof graphNodes === "function") {
+                graphNodes().classed("node-selected", function(d) {
+                    return String(d) === String(id);
+                });
+            }
+            postSelectionToParent(id);
             try {
                 var hash = "#node=" + encodeURIComponent(String(id)) + "&mode=" + encodeURIComponent(window.analysisMode || "topology");
                 if (history && history.replaceState) history.replaceState(null, "", hash);
@@ -578,7 +786,7 @@
 
         function applyAnalysisMode(mode) {
             window.analysisMode = mode;
-            document.querySelectorAll("#modeStrip button").forEach(function(b) {
+            document.querySelectorAll("#modeStrip button[data-mode]").forEach(function(b) {
                 b.classList.toggle("active", b.getAttribute("data-mode") === mode);
             });
             if (typeof inner === "undefined" || !inner) return;
@@ -753,6 +961,33 @@
             if (pathBtn) pathBtn.addEventListener("click", function() {
                 if (window.selectedNodeId) spotlightPathTo(window.selectedNodeId);
             });
+            function toggleIsolateFromUi() {
+                if (window.isolateActive) {
+                    clearNeighborhoodIsolate();
+                    return;
+                }
+                if (!window.selectedNodeId) {
+                    var st = document.getElementById("isoStatus");
+                    if (st) {
+                        st.classList.add("visible");
+                        st.textContent = "Select a task first, then Isolate.";
+                    }
+                    return;
+                }
+                applyNeighborhoodIsolate(window.selectedNodeId, 2);
+            }
+            var isoStrip = document.getElementById("btnIsolate");
+            if (isoStrip) isoStrip.addEventListener("click", function(ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                toggleIsolateFromUi();
+            });
+            var isoHere = document.getElementById("btnIsolateHere");
+            if (isoHere) isoHere.addEventListener("click", function() {
+                if (window.selectedNodeId) applyNeighborhoodIsolate(window.selectedNodeId, 2);
+            });
+            var isoClear = document.getElementById("btnClearIsolate");
+            if (isoClear) isoClear.addEventListener("click", clearNeighborhoodIsolate);
             var linkBtn = document.getElementById("btnCopyLink");
             if (linkBtn) linkBtn.addEventListener("click", function() {
                 var url = location.href.split("#")[0] + "#node=" + encodeURIComponent(window.selectedNodeId || "") +
@@ -1261,10 +1496,44 @@
         var svg = d3.select("#svg-canvas"),
             inner = svg.select("g");
 
-        var zoom = d3.zoom().on("zoom", function() {
-            inner.attr("transform", d3.event.transform);
-        });
+        var svgCanvasEl = document.getElementById('svg-canvas');
+        var lodRaf = null;
+        function updateLodFromTransform(transform) {
+            var k = transform && transform.k != null ? transform.k : 1;
+            var lod = k < 0.55 ? "far" : (k > 1.15 ? "near" : "mid");
+            if (lod === window.currentLod) return;
+            window.currentLod = lod;
+            svgCanvasEl.setAttribute("data-lod", lod);
+            var cue = document.getElementById("lodCue");
+            if (cue) {
+                cue.textContent = "Detail: " + (lod === "far" ? "Far" : (lod === "near" ? "Near" : "Mid"));
+            }
+        }
+        function scheduleLodUpdate(transform) {
+            if (lodRaf) return;
+            lodRaf = requestAnimationFrame(function() {
+                lodRaf = null;
+                updateLodFromTransform(transform);
+            });
+        }
+        var zoom = d3.zoom()
+            .on("start", function() {
+                // Only for real pointer/wheel gestures. Programmatic focus pans
+                // (task-ref clicks) must not leave is-zooming stuck — that killed glows.
+                if (d3.event && d3.event.sourceEvent) {
+                    svgCanvasEl.classList.add('is-zooming');
+                }
+            })
+            .on("zoom", function() {
+                inner.attr("transform", d3.event.transform);
+                scheduleLodUpdate(d3.event.transform);
+            })
+            .on("end", function() {
+                svgCanvasEl.classList.remove('is-zooming');
+                updateLodFromTransform(d3.event.transform);
+            });
         svg.call(zoom);
+        svgCanvasEl.setAttribute("data-lod", "mid");
 
         var renderOk = false;
         try {
@@ -1527,11 +1796,7 @@
                 .classed("sim-dim", function(d) { return !edgeSet.has(edgeKey(d)) && !edgeBroken(d); });
 
             setSimLegendVisible(true);
-
-            if (summaryHtml) {
-                document.getElementById('payloadData').innerHTML =
-                    "<div class='sim-summary'>" + summaryHtml + "</div>";
-            }
+            // Outcome text lives in the parent Analysis Dock only — do not overwrite Diagnostics Panel.
         };
 
         window.clearSimulation = function() {
@@ -1546,8 +1811,13 @@
             inner.selectAll("g.edgeLabel")
                 .classed("sim-active", false).classed("sim-dim", false).classed("sim-broken", false);
             setSimLegendVisible(false);
-            document.getElementById('payloadData').innerHTML =
-                "<p class='hint'>Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>";
+            // Restore task inspector if a node was selected; otherwise default hint.
+            if (window.selectedNodeId && typeof showPanelForNode === "function") {
+                showPanelForNode(window.selectedNodeId);
+            } else {
+                document.getElementById('payloadData').innerHTML =
+                    "<p class='hint'>Click on any Task to inspect its internal logic, database modifiers, and GUI mappings.</p>";
+            }
         };
 
         window.addEventListener("message", function(ev) {
@@ -1569,6 +1839,13 @@
             } else if (msg.type === "tririga-focus-node") {
                 var focusId = msg.nodeId || msg.node || msg.id;
                 if (focusId && typeof focusNode === "function") focusNode(focusId);
+            } else if (msg.type === "tririga-isolate") {
+                if (msg.clear) {
+                    clearNeighborhoodIsolate();
+                } else {
+                    var isoRoot = msg.nodeId || msg.node || window.selectedNodeId;
+                    if (isoRoot) applyNeighborhoodIsolate(isoRoot, msg.depth == null ? 2 : msg.depth);
+                }
             }
         });
 

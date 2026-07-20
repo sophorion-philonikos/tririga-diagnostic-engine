@@ -1,0 +1,94 @@
+# TRIRIGA Diagnostic Engine — Runbook
+
+Central command reference for setup, CLI, web UI, and tests.
+
+## Environment setup
+
+```bash
+cd /path/to/tririga-diagnostic-engine
+pip install -r requirements.txt
+```
+
+Python **3.9+** required. Credentials (live mode only) come from environment variables — see the table in [`README.md`](README.md). Nothing sensitive is stored in source.
+
+Optional offline defaults:
+
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| `TRIRIGA_OM_PACKAGE` | `Land_OnChange_RPIM_Status_Ind.zip` | OM Package for offline CLI |
+| `TRIRIGA_LOCAL_LOG` | `server (23).log` | Local server log for offline CLI |
+
+## Entry points
+
+### Live CLI (Oracle + SSH when configured)
+
+```bash
+python3 main.py
+```
+
+### Offline CLI (no DB/SSH)
+
+```bash
+python3 main.py --offline
+```
+
+Uses the bundled OM Package and local log (or paths from the env vars above).
+
+### Web UI
+
+```bash
+python3 main.py --web
+```
+
+Custom port:
+
+```bash
+python3 main.py --web --port 8000
+```
+
+Then open `http://127.0.0.1:<port>/` in a browser.
+
+#### Web flow
+
+1. Drag/drop or browse: `.zip` OM Package, `.log` server log (optional), `.xml` / `.txt` workflow export(s).
+2. Click **Visualize** — map loads in the workspace iframe; Analysis Dock opens on the right.
+3. Click tasks on the map → Focus Context updates (selection sync via `postMessage`).
+4. Run **What-If** from the dock (typed query or suggestion chips) → **Simulate**.
+5. Use viewer modes: Topology / Live Trace / What-If / Diff; **Isolate** dims outside a task neighborhood.
+6. **Open map in new tab** for a full-window viewer; **Hide dock** collapses the analysis column.
+
+## Interactive CLI commands (after prompt)
+
+Typical prompts once the engine is loaded:
+
+| Intent | Example |
+| ------ | ------- |
+| Build map | `visualize` |
+| Task deep-dive | `explain task 333449` |
+| Workflow summary | `what does this workflow do` |
+| Log correlation | `scan log` / `what just failed` |
+| Live instance | `trace live execution` |
+| What-If | natural-language scenarios naming switches/tasks/fields |
+
+Exact NLP routing lives in `cli/router.py` / `cli/commands/`.
+
+## Tests
+
+Run the full unit suite:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Targeted (examples):
+
+```bash
+python3 -m unittest tests.test_viz_shapes tests.test_viz_node_parity tests.test_viz_svg_escape -v
+python3 -m unittest tests.test_runbook -v
+```
+
+## Architecture notes (web map)
+
+- Layout is computed once by dagre-d3; pan/zoom only transforms the SVG inner `<g>`.
+- What-If / Live / Diff / Isolate apply **class toggles** on existing DOM nodes (no re-render).
+- Expensive CSS filters are avoided; glows use outline/stroke. During zoom, `#svg-canvas.is-zooming` disables outlines/animations.

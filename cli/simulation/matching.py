@@ -55,17 +55,37 @@ def _field_tokens(data):
     return _tokenize(' '.join(parts))
 
 
+_BRANCH_TYPES = ('14', '24')
+_TYPE_NOISE_TOKENS = frozenset({
+    'switch', 'switches', 'gate', 'gates', 'decision', 'iter', 'iterator',
+    'iteration', 'loop', 'task', 'tasks', 'true', 'false', 'forced', 'force',
+})
+_GENERIC_GATE_NAMES = frozenset({'switch', 'iter', 'iterator', 'loop', 'gate'})
+
+
 def _branching_nodes(graph):
     out = []
     for nid, data in graph.nodes(data=True):
-        if graph_utils.get_type_str(data) in ('14', '24'):
+        if graph_utils.get_type_str(data) in _BRANCH_TYPES:
             out.append((str(nid), data))
     return sorted(out, key=lambda x: x[0])
+
+
+def _branch_by_id(graph, nid):
+    """Return (nid, data) if nid is a Switch/Iter node, else (None, None)."""
+    nid = str(nid)
+    if not graph.has_node(nid):
+        return None, None
+    data = graph.nodes[nid]
+    if graph_utils.get_type_str(data) not in _BRANCH_TYPES:
+        return None, None
+    return nid, data
 
 
 def match_clauses(engine, wf_name, clauses):
     """Deterministically bind each clause to Switch/Iter nodes with a forced verdict.
 
+    Priority: explicit task id > constant/value assertions > semantic name/tokens.
     Returns (matched, unmatched): matched entries are dicts
     {node_id, node_name, verdict, clause, score, reason}.
     """
@@ -92,6 +112,19 @@ def match_clauses(engine, wf_name, clauses):
         if clause.value:
             c_tokens.add(clause.value.lower())
         c_field_tokens = _tokenize(clause.field_hint) if clause.field_hint else set()
+
+        # --- Explicit task id (same contract as match_task) ---
+        id_match = re.search(r'\b(\d{5,})\b', clause.text)
+        if id_match:
+            nid, data = _branch_by_id(graph, id_match.group(1))
+            if nid is None:
+                unmatched.append(clause.text)
+                continue
+            if clause.type_hint and graph_utils.get_type_str(data) != clause.type_hint:
+                unmatched.append(clause.text)
+                continue
+            add_match(nid, data, clause.verdict, clause, 10.0, 'explicit task id')
+            continue
 
         # --- Value assertions: force EVERY switch comparing that constant ---
         if clause.value:
@@ -120,20 +153,67 @@ def match_clauses(engine, wf_name, clauses):
             if hit_any:
                 continue
 
-        # --- Semantic scoring against each branching node ---
-        best = None
-        for nid, data in branch_nodes:
-            bag = _node_token_bag(data)
-            overlap = len(c_tokens & bag)
-            name_ratio = difflib.SequenceMatcher(
-                None, clause.text.lower(), str(data.get('name', '')).lower()).ratio()
-            score = overlap + 2.0 * name_ratio
-            if best is None or score > best[0]:
-                best = (score, nid, data)
+        # --- Semantic scoring (optional type_hint filter) ---
+        candidates = branch_nodes
+        if clause.type_hint:
+            typed = [(nid, d) for nid, d in branch_nodes
+                     if graph_utils.get_type_str(d) == clause.type_hint]
+            if typed:
+                candidates = typed
 
-        if best and best[0] >= _MATCH_THRESHOLD:
-            score, nid, data = best
-            add_match(nid, data, clause.verdict, clause, score,
+        content_tokens = c_tokens - _TYPE_NOISE_TOKENS
+        name_hint = (clause.target_hint or '').strip().lower()
+        scored = []
+        for nid, data in candidates:
+            name = str(data.get('name', ''))
+            name_low = name.lower().strip()
+            bag = _node_token_bag(data)
+            overlap = len(content_tokens & bag)
+            # Prefer label similarity to the gate name, not the whole clause
+            # (avoids "switch … is true" ≈ TaskLabel "Switch").
+            label_src = name_hint or ' '.join(sorted(content_tokens)) or clause.text.lower()
+            name_ratio = difflib.SequenceMatcher(None, label_src, name_low).ratio()
+            clause_ratio = difflib.SequenceMatcher(
+                None, clause.text.lower(), name_low).ratio()
+            score = overlap + 2.0 * max(name_ratio, clause_ratio * 0.5)
+            if name_hint:
+                if name_hint == name_low:
+                    score += 4.0
+                else:
+                    score += 3.0 * difflib.SequenceMatcher(None, name_hint, name_low).ratio()
+            elif name_low and name_low in clause.text.lower():
+                score += 3.5  # bare label mention, e.g. "ACT? is true"
+            scored.append((score, nid, data, name_low))
+
+        if not scored:
+            unmatched.append(clause.text)
+            continue
+
+        scored.sort(key=lambda t: t[0], reverse=True)
+        best_score, best_nid, best_data, best_name = scored[0]
+
+        # Ambiguous generic "Switch"/"Iter" labels with no real name/content hint:
+        # refuse to guess (caller can supply an id).
+        near = [t for t in scored if abs(t[0] - best_score) < 0.35 and t[0] >= _MATCH_THRESHOLD]
+        generic_cluster = (
+            len(near) > 1
+            and all(t[3] in _GENERIC_GATE_NAMES for t in near)
+            and not name_hint
+            and not (content_tokens - _GENERIC_GATE_NAMES)
+        )
+        # Also: sole winner is generic label but query only had type noise + verdict.
+        bare_type_guess = (
+            best_name in _GENERIC_GATE_NAMES
+            and not name_hint
+            and not content_tokens
+            and best_score < 4.0
+        )
+        if generic_cluster or bare_type_guess:
+            unmatched.append(clause.text)
+            continue
+
+        if best_score >= _MATCH_THRESHOLD:
+            add_match(best_nid, best_data, clause.verdict, clause, best_score,
                       'semantic token/name match')
         else:
             unmatched.append(clause.text)

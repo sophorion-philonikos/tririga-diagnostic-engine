@@ -55,6 +55,8 @@ export TRIRIGA_SSH_USER=your_ssh_user
 
 ## Usage
 
+For the full command list (web, offline, ports, tests), see [`RUNBOOK.md`](RUNBOOK.md).
+
 Live mode (Oracle + SSH active):
 
 ```bash
@@ -65,6 +67,12 @@ Offline mode (uses the bundled OM Package and a local log file, no DB/SSH):
 
 ```bash
 python3 main.py --offline
+```
+
+Web UI:
+
+```bash
+python3 main.py --web
 ```
 
 Once the chat prompt appears, try:

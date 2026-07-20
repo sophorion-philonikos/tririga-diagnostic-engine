@@ -45,7 +45,7 @@
     flex-direction: column;
     padding: 22px 28px;
     gap: 18px;
-    max-width: 1500px;
+    max-width: 1800px;
     width: 100%;
     margin: 0 auto;
   }
@@ -177,7 +177,7 @@
   #errorBanner { background: rgba(255, 107, 107, 0.12); border: 1px solid var(--danger); color: #ffc2c2; }
   #noteBanner { background: rgba(241, 194, 50, 0.1); border: 1px solid rgba(241, 194, 50, 0.55); color: #f5dc8e; }
 
-  /* --- Result --- */
+  /* --- Result / Analysis Dock workspace --- */
   #result { display: none; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
   #result.visible { display: flex; }
   .result-head {
@@ -193,7 +193,7 @@
   .result-head .wf-name { font-weight: 700; font-size: 15px; color: var(--accent); }
   .result-head .meta { color: var(--muted); font-size: 13px; }
   .result-head .spacer { flex: 1; }
-  #openTabBtn {
+  #openTabBtn, #dockToggleBtn {
     background: none;
     border: 1px solid var(--accent-dim);
     color: var(--accent);
@@ -202,7 +202,28 @@
     font-size: 13px;
     cursor: pointer;
   }
-  #openTabBtn:hover { background: rgba(0, 195, 165, 0.1); }
+  #openTabBtn:hover, #dockToggleBtn:hover { background: rgba(0, 195, 165, 0.1); }
+  #dockToggleBtn { border-color: #7a6bb8; color: #cbb8ff; }
+  #dockToggleBtn:hover { background: rgba(195, 65, 255, 0.12); }
+
+  #workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+    gap: 12px;
+    flex: 1;
+    min-height: 640px;
+    align-items: stretch;
+  }
+  #result.dock-collapsed #workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #result.dock-collapsed #analysisDock { display: none; }
+  #mapPane {
+    min-width: 0;
+    min-height: 640px;
+    display: flex;
+    flex-direction: column;
+  }
   #mapFrame {
     flex: 1;
     min-height: 640px;
@@ -210,6 +231,60 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     background: #ffffff;
+  }
+  #analysisDock {
+    min-width: 0;
+    min-height: 640px;
+    max-height: calc(100vh - 120px);
+    overflow: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #analysisDock .dock-section {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  #analysisDock .dock-section h3 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    position: sticky;
+    top: 0;
+    background: var(--panel-2);
+    z-index: 1;
+    padding-bottom: 4px;
+  }
+  #analysisDock .dock-section h3.sim-heading { color: var(--sim, #c341ff); }
+  #focusContext {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text);
+  }
+  #focusContext .fc-muted { color: var(--muted); font-size: 12px; }
+  #focusContext .fc-name { color: var(--accent); font-weight: 700; }
+  #focusContext .fc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  #focusContext .fc-actions button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #focusContext .fc-actions button:hover { border-color: #9b7bff; color: #cbb8ff; }
+  @media (max-width: 960px) {
+    #workspace { grid-template-columns: 1fr; }
+    #analysisDock { max-height: none; min-height: 0; }
   }
   details#traceDetails {
     background: var(--panel);
@@ -231,6 +306,12 @@
     padding: 12px 16px;
     flex-wrap: wrap;
   }
+  #analysisDock .sim-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #analysisDock #simInput { min-width: 0; width: 100%; }
+  #analysisDock .sim-bar > button { width: 100%; }
   .sim-bar label {
     font-size: 11px;
     text-transform: uppercase;
@@ -458,22 +539,41 @@
       <span class="wf-name" id="resultWf"></span>
       <span class="meta" id="resultMeta"></span>
       <span class="spacer"></span>
-      <button id="openTabBtn">Open map in new tab</button>
+      <button type="button" id="dockToggleBtn" title="Show or hide the Analysis Dock">Hide dock</button>
+      <button type="button" id="openTabBtn">Open map in new tab</button>
     </div>
     <details id="traceDetails" hidden>
       <summary>Chronological live execution trace</summary>
       <ul id="traceList"></ul>
     </details>
-    <div class="sim-bar">
-      <label for="simInput">What-If Simulation</label>
-      <input type="text" id="simInput"
-             placeholder='Upload a workflow, then try a What-If (or click a suggestion chip)'>
-      <button id="simRunBtn">Simulate</button>
-      <button id="simClearBtn">Clear</button>
+    <div id="workspace">
+      <div id="mapPane">
+        <iframe id="mapFrame" title="Workflow blueprint map"></iframe>
+      </div>
+      <aside id="analysisDock" aria-label="Analysis dock">
+        <div class="dock-section" id="focusSection">
+          <h3>Focus Context</h3>
+          <div id="focusContext">
+            <div class="fc-muted">Click a task on the map to inspect context here.</div>
+          </div>
+        </div>
+        <div class="dock-section" id="simSection">
+          <h3>What-If Simulation</h3>
+          <div class="sim-bar" style="padding:0;border:none;background:transparent;">
+            <label for="simInput" class="visually-hidden" style="position:absolute;left:-9999px;">What-If Simulation</label>
+            <input type="text" id="simInput"
+                   placeholder='Try a What-If (or click a suggestion chip)'>
+            <button type="button" id="simRunBtn">Simulate</button>
+            <button type="button" id="simClearBtn">Clear</button>
+          </div>
+          <div id="simChips" class="chips" style="margin:10px 0 0;"></div>
+        </div>
+        <div class="dock-section" id="simResultsSection">
+          <h3 class="sim-heading">Simulation Results</h3>
+          <div id="simOutcome"></div>
+        </div>
+      </aside>
     </div>
-    <div id="simChips" class="chips" style="margin:0 0 10px;"></div>
-    <div id="simOutcome"></div>
-    <iframe id="mapFrame" title="Workflow blueprint map"></iframe>
   </section>
 </main>
 
@@ -764,11 +864,66 @@
   const simRunBtn = document.getElementById("simRunBtn");
   const simClearBtn = document.getElementById("simClearBtn");
   const simOutcome = document.getElementById("simOutcome");
+  const dockToggleBtn = document.getElementById("dockToggleBtn");
+  const focusContext = document.getElementById("focusContext");
+  let lastSelection = null;
 
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function setDockCollapsed(collapsed) {
+    result.classList.toggle("dock-collapsed", !!collapsed);
+    if (dockToggleBtn) {
+      dockToggleBtn.textContent = collapsed ? "Show dock" : "Hide dock";
+    }
+  }
+  if (dockToggleBtn) {
+    dockToggleBtn.addEventListener("click", () => {
+      setDockCollapsed(!result.classList.contains("dock-collapsed"));
+    });
+  }
+
+  function renderFocusContext(sel) {
+    if (!focusContext) return;
+    if (!sel || !sel.nodeId) {
+      focusContext.innerHTML =
+        '<div class="fc-muted">Click a task on the map to inspect context here.</div>';
+      return;
+    }
+    const lod = sel.lod === "far" ? "Far" : (sel.lod === "near" ? "Near" : "Mid");
+    const iso = sel.isolateActive
+      ? "Isolate on · " + (sel.neighborCount || 0) + " in focus"
+      : (sel.neighborCount || 0) + " neighbors within depth 2";
+    focusContext.innerHTML =
+      '<div class="fc-name">' + escapeHtml(sel.name || sel.nodeId) + "</div>" +
+      '<div class="fc-muted">ID ' + escapeHtml(String(sel.nodeId)) +
+      " · mode " + escapeHtml(sel.mode || "topology") +
+      " · detail " + lod + "</div>" +
+      '<div class="fc-muted">' + escapeHtml(iso) + "</div>" +
+      '<div class="fc-actions">' +
+      '<button type="button" id="fcFocusBtn">Focus on map</button>' +
+      '<button type="button" id="fcIsolateBtn">' +
+      (sel.isolateActive ? "Clear isolate" : "Isolate neighborhood") +
+      "</button></div>";
+    const fcFocus = document.getElementById("fcFocusBtn");
+    const fcIso = document.getElementById("fcIsolateBtn");
+    if (fcFocus) {
+      fcFocus.addEventListener("click", () => {
+        postToMap({ type: "tririga-focus-node", nodeId: String(sel.nodeId) });
+      });
+    }
+    if (fcIso) {
+      fcIso.addEventListener("click", () => {
+        if (sel.isolateActive) {
+          postToMap({ type: "tririga-isolate", clear: true });
+        } else {
+          postToMap({ type: "tririga-isolate", nodeId: String(sel.nodeId), depth: 2 });
+        }
+      });
+    }
   }
 
   function escapeAttr(text) {
@@ -1051,6 +1206,18 @@
         pendingMapMessage = null;
         postToMap(queued);
       }
+      return;
+    }
+    if (msg.type === "tririga-selection") {
+      lastSelection = {
+        nodeId: msg.nodeId,
+        name: msg.name,
+        mode: msg.mode,
+        lod: msg.lod,
+        neighborCount: msg.neighborCount,
+        isolateActive: !!msg.isolateActive,
+      };
+      renderFocusContext(lastSelection);
     }
   });
 
