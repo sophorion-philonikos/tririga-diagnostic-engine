@@ -93,19 +93,19 @@
             /* highlighted by sim-active reuse */
         }
         #modeStrip {
-            position: absolute; left: 16px; top: 58px; z-index: 1001;
-            display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-            background: rgba(255,255,255,0.96); border: 1px solid #ccc; border-radius: 8px;
-            padding: 6px 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+            position: absolute; left: 16px; top: 48px; z-index: 1001;
+            display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+            background: rgba(255,255,255,0.96); border: 1px solid #ccc; border-radius: 7px;
+            padding: 4px 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);
             max-width: calc(100% - 40px);
         }
         #modeStrip .mode-label {
-            font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+            font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
             text-transform: uppercase; color: #666; padding: 0 2px; white-space: nowrap;
         }
         #modeStrip button {
-            border: 1px solid #bbb; background: #fff; border-radius: 6px;
-            padding: 5px 10px; font-size: 11px; cursor: pointer; color: #333;
+            border: 1px solid #bbb; background: #fff; border-radius: 5px;
+            padding: 3px 8px; font-size: 10px; cursor: pointer; color: #333;
         }
         #modeStrip button.active { background: #17324d; color: #fff; border-color: #17324d; }
         #modeStrip button:hover { border-color: #4da6ff; }
@@ -113,6 +113,7 @@
             background: #eef6fb; border-color: #7ab0d0; color: #1a4a66; font-weight: 600;
         }
         #modeStrip button.guide-btn:hover { background: #e0f0f8; border-color: #3a8ab0; }
+        #modeStrip button.theme-btn { font-weight: 600; }
 
         #howtoGuide {
             display: none; position: absolute; inset: 0; z-index: 2000;
@@ -238,14 +239,26 @@
             outline-offset: 3px;
         }
 
-        /* Neighborhood isolate (opacity only) */
-        .node.iso-dim, .edgePath.iso-dim, .edgeLabel.iso-dim, .cluster.iso-dim { opacity: 0.08; pointer-events: none; }
-        .node.iso-keep, .edgePath.iso-keep, .edgeLabel.iso-keep { opacity: 1; }
+        /* Neighborhood isolate — only dim outsiders. Do NOT force iso-keep to
+           opacity:1 (that overrides What-If sim-dim and leaves a muddy half-dim
+           after Clear isolate). Fade foreignObject/img so tiles actually dim. */
+        #svg-canvas.isolate-on g.node.iso-dim,
+        #svg-canvas.isolate-on g.cluster.iso-dim,
+        #svg-canvas.isolate-on g.edgePath.iso-dim,
+        #svg-canvas.isolate-on g.edgeLabel.iso-dim {
+            opacity: 0.1 !important;
+            pointer-events: none;
+        }
+        #svg-canvas.isolate-on g.node.iso-dim foreignObject,
+        #svg-canvas.isolate-on g.node.iso-dim foreignObject img,
+        #svg-canvas.isolate-on g.cluster.iso-dim foreignObject {
+            opacity: 0.1 !important;
+        }
 
         #lodCue {
             position: absolute; right: 16px; bottom: 16px; z-index: 1001;
-            background: rgba(255,255,255,0.92); border: 1px solid #ccc; border-radius: 6px;
-            padding: 4px 10px; font-size: 11px; color: #555; pointer-events: none;
+            background: rgba(255,255,255,0.92); border: 1px solid #ccc; border-radius: 5px;
+            padding: 3px 8px; font-size: 10px; color: #555; pointer-events: none;
         }
         #isoStatus {
             display: none; margin-top: 8px; font-size: 12px; color: #9ecbff;
@@ -347,56 +360,61 @@
         }
 
         .zoom-toolbar {
-            position: absolute; top: 16px; left: 16px; z-index: 1001;
-            display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.95);
-            border: 1px solid #ccc; border-radius: 8px; padding: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            position: absolute; top: 12px; left: 16px; z-index: 1001;
+            display: flex; gap: 3px; align-items: center; background: rgba(255,255,255,0.95);
+            border: 1px solid #ccc; border-radius: 7px; padding: 3px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         .zoom-toolbar button {
-            width: 32px; height: 28px; border: 1px solid #bbb; border-radius: 5px;
-            background: #fff; color: #333; font-size: 14px; font-weight: 600;
+            width: 28px; height: 24px; border: 1px solid #bbb; border-radius: 4px;
+            background: #fff; color: #333; font-size: 12px; font-weight: 600;
             cursor: pointer; line-height: 1;
         }
         .zoom-toolbar button:hover { background: #eef3ff; border-color: #4da6ff; }
-        .zoom-toolbar button.wide { width: auto; padding: 0 10px; font-size: 11px; letter-spacing: 0.3px; }
+        .zoom-toolbar button.wide { width: auto; padding: 0 8px; font-size: 10px; letter-spacing: 0.2px; }
         .zoom-toolbar .search-wrap {
-            display: flex; align-items: center; gap: 4px;
-            margin-left: 4px; padding-left: 8px; border-left: 1px solid #ddd;
+            display: flex; align-items: center; gap: 3px;
+            margin-left: 3px; padding-left: 6px; border-left: 1px solid #ddd;
         }
         .zoom-toolbar #taskSearch {
-            width: 160px; height: 28px; box-sizing: border-box;
-            border: 1px solid #bbb; border-radius: 5px; padding: 0 8px;
-            font-size: 12px; color: #333; background: #fff;
+            width: 140px; height: 24px; box-sizing: border-box;
+            border: 1px solid #bbb; border-radius: 4px; padding: 0 6px;
+            font-size: 11px; color: #333; background: #fff;
         }
         .zoom-toolbar #taskSearch:focus { outline: none; border-color: #00c3a5; box-shadow: 0 0 0 2px rgba(0,195,165,0.2); }
         .zoom-toolbar #searchStatus {
-            min-width: 36px; font-size: 11px; color: #666; white-space: nowrap;
+            min-width: 28px; font-size: 10px; color: #666; white-space: nowrap;
         }
         .zoom-toolbar #searchClear {
-            width: 28px; font-size: 14px; color: #666;
+            width: 24px; font-size: 12px; color: #666;
         }
 
         .legend {
-            position: absolute; bottom: 20px; left: 20px;
-            max-height: 260px;
+            position: absolute; bottom: 16px; left: 16px;
+            max-height: 220px;
             overflow-y: auto;
             overflow-x: hidden;
-            background: rgba(255,255,255,0.95); padding: 12px 14px;
-            border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #333;
-            z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.95); padding: 8px 10px;
+            border: 1px solid #ccc; border-radius: 7px; font-size: 10px; color: #333;
+            z-index: 1000; box-shadow: 0 3px 8px rgba(0,0,0,0.1);
             pointer-events: auto;
             scrollbar-width: thin;
             scrollbar-color: #bbb transparent;
         }
-        .legend::-webkit-scrollbar { width: 6px; }
+        .legend::-webkit-scrollbar { width: 5px; }
         .legend::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
         .legend::-webkit-scrollbar-track { background: transparent; }
-        .legend-item { display: flex; align-items: center; margin-bottom: 6px; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 4px; }
         .legend-item:last-child { margin-bottom: 0; }
-        .color-box { width: 16px; height: 16px; margin-right: 10px; border-radius: 3px; }
-        #simLegend { display: none; margin-top: 12px; padding-top: 10px; border-top: 1px solid #ddd; }
+        .legend-h {
+            font-weight: 700; margin-bottom: 6px; text-transform: uppercase;
+            font-size: 9px; color: #666; letter-spacing: 0.04em;
+        }
+        .legend-h-sp { margin-top: 10px; }
+        .color-box { width: 13px; height: 13px; margin-right: 7px; border-radius: 2px; }
+        #simLegend { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #ddd; }
         #simLegend.visible { display: block; }
-        .glow-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+        .glow-dot { width: 11px; height: 11px; border-radius: 50%; margin-right: 7px; flex-shrink: 0; }
         .glow-failed { background: #cc0000; box-shadow: 0 0 6px #cc0000; }
         .glow-altered { background: #ff9500; box-shadow: 0 0 6px #ff9500; }
         .glow-broken {
@@ -406,7 +424,7 @@
         .glow-path { background: #c341ff; box-shadow: 0 0 6px #c341ff; }
         .glow-dim { background: #999; opacity: 0.35; }
         
-        .shape-icon { display: inline-block; width: 20px; height: 15px; margin-right: 10px; border: 1px solid #777; }
+        .shape-icon { display: inline-block; width: 16px; height: 12px; margin-right: 7px; border: 1px solid #777; }
         .s-scalene { background: #00b0f0; clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
         .s-oval { background: #00b050; border-radius: 50%; }
         .s-end-oct { background: #ff0000; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
@@ -414,26 +432,100 @@
         .s-query-chevron { background: #ccffcc; clip-path: polygon(0 0, 80% 0, 100% 50%, 80% 100%, 0 100%); }
         .s-rect-p { background: #E9C2E9; border-radius: 2px; }
         .s-notch { background: #6F5DA4; clip-path: polygon(0 0, 100% 0, 100% 20%, 80% 30%, 100% 40%, 100% 60%, 80% 70%, 100% 80%, 100% 100%, 0 100%, 0 80%, 20% 70%, 0 60%, 0 40%, 20% 30%, 0 20%); }
-        .s-fork { background: #eceff4; border-radius: 2px; height: 8px; margin-top: 4px; margin-bottom: 4px; }
+        .s-fork { background: #eceff4; border-radius: 2px; height: 7px; margin-top: 3px; margin-bottom: 3px; }
         .s-temp { background: #86A690; border-radius: 2px; }
         .s-create { background: #c4a574; border-radius: 2px; border: 1px solid #8b6914; }
         .s-iter {
             background: #E3F2FD; border: 2px solid #00b0f0;
-            border-radius: 10px 10px 2px 2px; height: 14px;
+            border-radius: 8px 8px 2px 2px; height: 12px;
         }
         .s-loop-cluster {
             background: #E8F5E9; border: 2px solid #5b7cfa;
-            border-radius: 10px 10px 2px 2px; height: 14px;
+            border-radius: 8px 8px 2px 2px; height: 12px;
         }
         .s-del-ref { background: #BAE7BA; clip-path: polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%); }
         .s-call-wf { background: #87A690; clip-path: polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%, 12% 50%); }
         .s-add-child { background: #CC9CFD; clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%); }
-        .s-break { background: #BAE7BA; border-radius: 50%; width: 14px; height: 14px; }
+        .s-break { background: #BAE7BA; border-radius: 50%; width: 12px; height: 12px; }
         .s-associate { background: #9191D8; clip-path: polygon(0 0, 100% 0, 80% 50%, 100% 100%, 0 100%, 20% 50%); }
         .s-populate { background: #7B92A8; clip-path: polygon(15% 0, 90% 0, 100% 50%, 90% 100%, 15% 100%, 0 50%); }
         .s-distill { background: #9E6C85; clip-path: polygon(10% 0, 85% 0, 100% 50%, 85% 100%, 10% 100%, 0 50%); }
         .s-save-perm { background: #7B5F96; clip-path: polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 80%, 10% 50%, 0 20%); border-radius: 0 8px 8px 0; }
         .s-var { background: #9093B8; clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%); }
+
+        /* --- Map dark mode (canvas + floating chrome only; Diagnostics Panel unchanged) --- */
+        #canvas-container.map-dark {
+            background-color: #151922;
+            background-image: radial-gradient(#2c3444 1px, transparent 1px);
+            border-right-color: #3a4254;
+        }
+        #canvas-container.map-dark .zoom-toolbar,
+        #canvas-container.map-dark #modeStrip,
+        #canvas-container.map-dark .legend,
+        #canvas-container.map-dark #lodCue {
+            background: rgba(28, 33, 46, 0.96);
+            border-color: #4a5568;
+            color: #e2e8f0;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+        }
+        #canvas-container.map-dark .zoom-toolbar button,
+        #canvas-container.map-dark #modeStrip button {
+            background: #252b3a;
+            border-color: #5a6578;
+            color: #e8edf7;
+        }
+        #canvas-container.map-dark .zoom-toolbar button:hover,
+        #canvas-container.map-dark #modeStrip button:hover {
+            border-color: #7eb6ff;
+            background: #303848;
+        }
+        #canvas-container.map-dark #modeStrip button.active {
+            background: #3d6ea5;
+            border-color: #7eb6ff;
+            color: #fff;
+        }
+        #canvas-container.map-dark #modeStrip .mode-label { color: #9aa5b8; }
+        #canvas-container.map-dark #modeStrip button.guide-btn {
+            background: #243044;
+            border-color: #5a8ab0;
+            color: #b8d8f0;
+        }
+        #canvas-container.map-dark #modeStrip button.theme-btn.active-theme {
+            background: #3a2f55;
+            border-color: #c341ff;
+            color: #e8d5ff;
+        }
+        #canvas-container.map-dark .zoom-toolbar .search-wrap { border-left-color: #4a5568; }
+        #canvas-container.map-dark .zoom-toolbar #taskSearch {
+            background: #1c2230;
+            border-color: #5a6578;
+            color: #e8edf7;
+        }
+        #canvas-container.map-dark .zoom-toolbar #searchStatus,
+        #canvas-container.map-dark .zoom-toolbar #searchClear { color: #9aa5b8; }
+        #canvas-container.map-dark #lodCue { color: #9aa5b8; }
+        #canvas-container.map-dark .legend-h { color: #9aa5b8; }
+        #canvas-container.map-dark .shape-icon { border-color: #7a8598; }
+        #canvas-container.map-dark #simLegend { border-top-color: #4a5568; }
+        /* Edge labels: dark chips so TRUE/FALSE stay readable on dark canvas */
+        #canvas-container.map-dark .edgeLabel rect {
+            fill: #252b3a;
+            stroke: #6a7588;
+        }
+        #canvas-container.map-dark .edgeLabel text { fill: #f0b060; }
+        #canvas-container.map-dark .edgeLabel.sim-active text { fill: #e0a0ff !important; }
+        #canvas-container.map-dark .edgeLabel.sim-broken text { fill: #b0b0b0 !important; }
+        /* Slightly brighter default edge stroke for contrast (CSS !important loses to
+           inline styles on path — boost via filter on non-overlay edges only when dimmed) */
+        #canvas-container.map-dark .edgePath:not(.sim-dim):not(.live-trace) path {
+            stroke-opacity: 1;
+        }
+        #canvas-container.map-dark .node.sim-dim,
+        #canvas-container.map-dark .edgePath.sim-dim,
+        #canvas-container.map-dark .edgeLabel.sim-dim,
+        #canvas-container.map-dark .cluster.sim-dim {
+            opacity: 0.18;
+        }
     </style>
 </head>
 <body>
@@ -459,6 +551,7 @@
             <button type="button" data-mode="diff" title="Compare this workflow to another uploaded map (added/removed tasks)">Diff</button>
             <button type="button" id="btnIsolate" title="Dim everything outside the selected task's neighborhood (depth 2)">Isolate</button>
             <button type="button" class="guide-btn" id="btnHowto" title="How to use this viewer">Guide</button>
+            <button type="button" class="theme-btn" id="btnMapDark" title="Toggle dark map background" aria-pressed="false">Dark</button>
         </div>
         <div id="lodCue" aria-live="polite">Detail: Mid</div>
         <div id="howtoGuide" role="dialog" aria-modal="true" aria-labelledby="guideTitle" aria-hidden="true">
@@ -512,11 +605,11 @@
             </div>
         </div>
         <div class="legend">
-            <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">Routing Tracks</div>
+            <div class="legend-h">Routing Tracks</div>
             <div class="legend-item"><div class="color-box" style="background: #e67e22;"></div> Critical Path</div>
             <div class="legend-item"><div class="color-box" style="background: #00c3a5;"></div> Live Trace Log</div>
 
-            <div style="font-weight: bold; margin-top: 15px; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">TRIRIGA Task Legend</div>
+            <div class="legend-h legend-h-sp">TRIRIGA Task Legend</div>
             <div class="legend-item"><div class="shape-icon s-oval"></div> Start Task</div>
             <div class="legend-item"><div class="shape-icon s-end-oct"></div> End Task</div>
             <div class="legend-item"><div class="shape-icon s-scalene"></div> Switch (Decision Gate)</div>
@@ -540,7 +633,7 @@
             <div class="legend-item"><div class="shape-icon s-var"></div> Variables</div>
 
             <div id="simLegend">
-                <div style="font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 10px; color: #666;">What-If Simulation</div>
+                <div class="legend-h">What-If Simulation</div>
                 <div class="legend-item"><div class="glow-dot glow-failed"></div> Failed / skipped task</div>
                 <div class="legend-item"><div class="glow-dot glow-altered"></div> Altered (zero records)</div>
                 <div class="legend-item"><div class="glow-dot glow-broken"></div> Starved dependent</div>
@@ -709,12 +802,37 @@
             return keep;
         }
 
+        function stripIsolateMarks() {
+            var canvas = document.getElementById("svg-canvas");
+            if (canvas) canvas.classList.remove("isolate-on");
+            if (typeof inner === "undefined" || !inner) return;
+            inner.selectAll("g.node, g.cluster, g.edgePath, g.edgeLabel")
+                .classed("iso-keep", false)
+                .classed("iso-dim", false);
+        }
+
+        function restoreOverlayAfterIsolate() {
+            // Re-paint the active analysis layer so Clear isolate never leaves a
+            // hybrid opacity stack (iso-* + sim-dim fighting each other).
+            var mode = window.analysisMode || "topology";
+            if (mode === "whatif" && window.lastSimState && typeof window.applySimulation === "function") {
+                var s = window.lastSimState;
+                window.applySimulation(s.nodeIds, s.edgePairs, s.summaryHtml,
+                    s.alteredIds, s.impactedIds, s.failedIds);
+            } else if (typeof applyAnalysisMode === "function") {
+                applyAnalysisMode(mode);
+            }
+        }
+
         function applyNeighborhoodIsolate(rootId, depth) {
             if (!rootId || typeof inner === "undefined" || !inner) return;
             var keep = neighborhoodIds(rootId, depth == null ? 2 : depth);
             window.isolateActive = true;
             window.isolateKeepIds = keep;
             var total = nodesData.filter(function(n) { return !n.isCluster; }).length;
+            var canvas = document.getElementById("svg-canvas");
+            if (canvas) canvas.classList.add("isolate-on");
+
             graphNodes()
                 .classed("iso-keep", function(d) { return keep.has(String(d)); })
                 .classed("iso-dim", function(d) { return !keep.has(String(d)); });
@@ -740,8 +858,8 @@
             var st = document.getElementById("isoStatus");
             if (st) {
                 st.classList.add("visible");
-                st.textContent = keep.size + " tasks in focus · " +
-                    Math.max(0, total - keep.size) + " dimmed (neighborhood depth 2)";
+                st.textContent = keep.size + " in focus · " +
+                    Math.max(0, total - keep.size) + " dimmed (depth 2)";
             }
             postSelectionToParent(rootId);
         }
@@ -749,12 +867,8 @@
         function clearNeighborhoodIsolate() {
             window.isolateActive = false;
             window.isolateKeepIds = null;
-            if (typeof inner !== "undefined" && inner) {
-                graphNodes().classed("iso-keep", false).classed("iso-dim", false);
-                inner.selectAll("g.edgePath").classed("iso-keep", false).classed("iso-dim", false);
-                inner.selectAll("g.edgeLabel").classed("iso-keep", false).classed("iso-dim", false);
-                inner.selectAll("g.cluster").classed("iso-keep", false).classed("iso-dim", false);
-            }
+            stripIsolateMarks();
+            restoreOverlayAfterIsolate();
             var isoBtn = document.getElementById("btnIsolate");
             if (isoBtn) isoBtn.classList.remove("active");
             var st = document.getElementById("isoStatus");
@@ -928,6 +1042,29 @@
                 ev.stopPropagation();
                 openGuide();
             });
+            var canvasEl = document.getElementById("canvas-container");
+            var darkBtn = document.getElementById("btnMapDark");
+            function applyMapDark(on) {
+                if (!canvasEl) return;
+                canvasEl.classList.toggle("map-dark", !!on);
+                if (darkBtn) {
+                    darkBtn.setAttribute("aria-pressed", on ? "true" : "false");
+                    darkBtn.classList.toggle("active-theme", !!on);
+                    darkBtn.textContent = on ? "Light" : "Dark";
+                    darkBtn.title = on ? "Switch to light map background" : "Toggle dark map background";
+                }
+                try { localStorage.setItem("tririga-map-dark", on ? "1" : "0"); } catch (e) { /* ignore */ }
+            }
+            if (darkBtn) {
+                darkBtn.addEventListener("click", function(ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    applyMapDark(!(canvasEl && canvasEl.classList.contains("map-dark")));
+                });
+                try {
+                    if (localStorage.getItem("tririga-map-dark") === "1") applyMapDark(true);
+                } catch (e) { /* ignore */ }
+            }
             var dismiss = document.getElementById("guideDismiss");
             if (dismiss) dismiss.addEventListener("click", closeGuide);
             var tryTopo = document.getElementById("guideTryTopology");
