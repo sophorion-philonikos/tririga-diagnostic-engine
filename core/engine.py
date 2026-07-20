@@ -399,7 +399,7 @@ class TririgaHybridEngine:
             elements = root.findall('.//Task') + root.findall('.//WorkflowTask') + root.findall('.//step')
             
             array_tags = [
-                'Expression', 'PField', 'PModule', 'PBO', 'PSection', 
+                'Expression', 'PField', 'PModule', 'PBO', 'PSection', 'PItem',
                 'Field', 'TrgtFld', 'SrcFld', 'LFldName', 'RFldName', 
                 'RValue', 'Value', 'ConstantValue', 'Operator',
                 'Action', 'QueryName', 'AssociationName', 'AssocName', 
@@ -508,6 +508,21 @@ class TririgaHybridEngine:
                     if len(ref_rec) > 3:
                         if ref_rec not in node_data['TaskRefRecords']:
                             node_data['TaskRefRecords'].append(ref_rec)
+
+                # Structured Condition/Param extraction for Switch (and similar) expressions.
+                # Keeps p0/p1 → field|item mapping aligned by Param PId (flat PField lists lose that).
+                if 'ConditionParamRecords' not in node_data:
+                    node_data['ConditionParamRecords'] = []
+                param_tags = ['PType', 'PDataId', 'PField', 'PSection', 'PModule', 'PBO', 'PItem']
+                for param in el.findall('.//Condition/Params/Param'):
+                    prec = {'PId': param.get('PId', '')}
+                    for tag in param_tags:
+                        child = param.find(tag)
+                        if child is not None and child.text and child.text.strip():
+                            prec[tag] = child.text.strip()
+                    if prec.get('PField') or prec.get('PItem') or prec.get('PId') != '':
+                        if prec not in node_data['ConditionParamRecords']:
+                            node_data['ConditionParamRecords'].append(prec)
 
                 new_type = node_data.get('Type', node_data.get('type'))
                 if new_type: node_data['type'] = new_type

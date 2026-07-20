@@ -105,7 +105,12 @@ class TaskInsight:
 
         body = []
         for sec in self.mechanics:
-            bullets = "<br/>".join([f"&bull; {esc(b)}" for b in sec.bullets])
+            bullet_bits = []
+            for b in sec.bullets:
+                text = str(b)
+                lead = len(text) - len(text.lstrip(" "))
+                bullet_bits.append(f"&bull; {'&nbsp;' * lead}{esc(text.lstrip(' '))}")
+            bullets = "<br/>".join(bullet_bits)
             body.append(f"<b>{esc(sec.heading)}:</b><br/>{bullets}")
         if self.synopsis:
             body.append(f"<b>Synopsis:</b><br/>{esc(self.synopsis)}")

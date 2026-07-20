@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import base64
 import webbrowser
@@ -19,6 +20,60 @@ from cli.viz_shapes import (
     _stroke_for,
     _svg_text,
 )
+
+
+def _switch_param_label(param):
+    """Human label for a Switch Condition param: PField preferred, else PItem."""
+    if not param:
+        return ""
+    field = (param.get("PField") or "").strip()
+    if field:
+        return field
+    return (param.get("PItem") or "").strip()
+
+
+def _resolve_switch_expressions(expressions, param_records):
+    """Replace p0/p1/… tokens with PField or PItem labels from Condition params."""
+    by_pid = {}
+    for prec in param_records or []:
+        pid = str(prec.get("PId", "")).strip()
+        if pid != "":
+            by_pid[pid] = prec
+
+    def repl(match):
+        label = _switch_param_label(by_pid.get(match.group(1)))
+        return label if label else match.group(0)
+
+    out = []
+    for raw in expressions or []:
+        text = str(raw).strip()
+        if not text:
+            continue
+        out.append(re.sub(r"\bp(\d+)\b", repl, text).strip())
+    return out
+
+
+def _switch_left_field_bullets(param_records):
+    """Indented Module/BO/Section/Field list, or bare PItem when metadata is absent."""
+    bullets = []
+    for prec in param_records or []:
+        module = (prec.get("PModule") or "").strip()
+        bo = (prec.get("PBO") or "").strip()
+        section = (prec.get("PSection") or "").strip()
+        field = (prec.get("PField") or "").strip()
+        item = (prec.get("PItem") or "").strip()
+        if module or bo or section or field:
+            if module:
+                bullets.append(f"Module: {module}")
+            if bo:
+                bullets.append(f"  BO: {bo}")
+            if section:
+                bullets.append(f"  Section: {section}")
+            if field:
+                bullets.append(f"  Field: {field}")
+        elif item:
+            bullets.append(item)
+    return bullets
 
 
 class WorkflowVisualizer:
@@ -184,10 +239,14 @@ class WorkflowVisualizer:
     def _build_mechanic_sections(self, node_data, t_type):
         """Return structured, plain-text mechanic sections (no inline markup)."""
         sections = []
+        t_type = str(t_type)
+        param_records = node_data.get('ConditionParamRecords') or []
 
         expressions = node_data.get('Expression', [])
         if isinstance(expressions, str): expressions = [expressions]
         if expressions:
+            if t_type == '14' and param_records:
+                expressions = _resolve_switch_expressions(expressions, param_records)
             sections.append(MechanicSection('Expressions Evaluated', list(expressions)))
 
         if t_type == '28':
@@ -250,10 +309,15 @@ class WorkflowVisualizer:
             if mapping_strs:
                 sections.append(MechanicSection('Dynamic UI Targets', mapping_strs))
 
-        filters = node_data.get('LFldName', []) + node_data.get('PField', [])
-        if isinstance(filters, str): filters = [filters]
-        if filters:
-            sections.append(MechanicSection('Left Fields Evaluated', list(filters)))
+        if t_type == '14' and param_records:
+            left_bullets = _switch_left_field_bullets(param_records)
+            if left_bullets:
+                sections.append(MechanicSection('Left Fields Evaluated', left_bullets))
+        else:
+            filters = node_data.get('LFldName', []) + node_data.get('PField', [])
+            if isinstance(filters, str): filters = [filters]
+            if filters:
+                sections.append(MechanicSection('Left Fields Evaluated', list(filters)))
 
         constants = node_data.get('ConstantValue', [])
         if isinstance(constants, str): constants = [constants]
