@@ -206,6 +206,116 @@
   #dockToggleBtn { border-color: #7a6bb8; color: #cbb8ff; }
   #dockToggleBtn:hover { background: rgba(195, 65, 255, 0.12); }
 
+  #wfPickerWrap {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: min(420px, 46vw);
+  }
+  #wfPickerWrap.visible { display: flex; }
+  #wfPickerWrap label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    flex: none;
+  }
+  #wfPicker {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  #wfPicker:focus { outline: none; border-color: var(--accent); }
+
+  #dockTabs {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+  }
+  #dockTabs button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #dockTabs button:hover { border-color: var(--accent); color: var(--text); }
+  #dockTabs button.active {
+    background: #17324d;
+    border-color: #4da6ff;
+    color: #fff;
+  }
+  .dock-panel { display: none; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
+  .dock-panel.active { display: flex; }
+
+  #analyzeOutcome {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text);
+    max-height: 420px;
+    overflow: auto;
+  }
+  #analyzeOutcome h4 { margin: 0 0 8px; color: var(--accent); font-size: 14px; }
+  #analyzeOutcome ul { margin: 6px 0; padding-left: 18px; }
+  #analyzeOutcome .an-muted { color: var(--muted); font-size: 12px; }
+  #analyzeOutcome .an-pre {
+    white-space: pre-wrap;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 8px 0;
+  }
+  .analyze-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .analyze-actions button, #analyzeSection button.an-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .analyze-actions button:hover, #analyzeSection button.an-btn:hover {
+    border-color: #4da6ff;
+    color: #8ec8ff;
+  }
+  .analyze-actions button.primary, #analyzeSection button.an-btn.primary {
+    background: #17324d;
+    border-color: #4da6ff;
+    color: #fff;
+  }
+  .an-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .an-row input {
+    flex: 1;
+    min-width: 100px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .an-row input:focus { outline: none; border-color: var(--accent); }
+
   #workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
@@ -536,6 +646,10 @@
 
   <section id="result">
     <div class="result-head">
+      <div id="wfPickerWrap">
+        <label for="wfPicker">Workflow</label>
+        <select id="wfPicker" title="Switch among loaded workflows"></select>
+      </div>
       <span class="wf-name" id="resultWf"></span>
       <span class="meta" id="resultMeta"></span>
       <span class="spacer"></span>
@@ -551,26 +665,67 @@
         <iframe id="mapFrame" title="Workflow blueprint map"></iframe>
       </div>
       <aside id="analysisDock" aria-label="Analysis dock">
-        <div class="dock-section" id="focusSection">
-          <h3>Focus Context</h3>
-          <div id="focusContext">
-            <div class="fc-muted">Click a task on the map to inspect context here.</div>
+        <div id="dockTabs" role="tablist">
+          <button type="button" data-tab="focus" class="active" role="tab">Focus</button>
+          <button type="button" data-tab="analyze" role="tab">Analyze</button>
+          <button type="button" data-tab="whatif" role="tab">What-If</button>
+        </div>
+
+        <div class="dock-panel active" id="panelFocus" data-panel="focus">
+          <div class="dock-section" id="focusSection">
+            <h3>Focus Context</h3>
+            <div id="focusContext">
+              <div class="fc-muted">Click a task on the map to inspect context here.</div>
+            </div>
           </div>
         </div>
-        <div class="dock-section" id="simSection">
-          <h3>What-If Simulation</h3>
-          <div class="sim-bar" style="padding:0;border:none;background:transparent;">
-            <label for="simInput" class="visually-hidden" style="position:absolute;left:-9999px;">What-If Simulation</label>
-            <input type="text" id="simInput"
-                   placeholder='Try a What-If (or click a suggestion chip)'>
-            <button type="button" id="simRunBtn">Simulate</button>
-            <button type="button" id="simClearBtn">Clear</button>
+
+        <div class="dock-panel" id="panelAnalyze" data-panel="analyze">
+          <div class="dock-section" id="analyzeSection">
+            <h3>Analyze</h3>
+            <div class="an-muted" style="color:var(--muted);font-size:12px;margin-bottom:6px;">
+              CLI diagnostics for the active workflow. Uses the focused task when set.
+            </div>
+            <div class="analyze-actions">
+              <button type="button" class="an-btn primary" id="anExplainBtn">Explain task</button>
+              <button type="button" class="an-btn" id="anPurposeBtn">Purpose + paths</button>
+              <button type="button" class="an-btn" id="anOrphansBtn">Orphans</button>
+              <button type="button" class="an-btn" id="anFailureBtn">Failure analysis</button>
+            </div>
+            <div class="an-row">
+              <input type="text" id="anRefsInput" placeholder="Find refs: field / section / term" autocomplete="off">
+              <button type="button" class="an-btn" id="anRefsBtn">Find refs</button>
+            </div>
+            <div class="an-row">
+              <input type="text" id="anPathFrom" placeholder="Path from (id or name)" autocomplete="off">
+              <input type="text" id="anPathTo" placeholder="Path to (id or name)" autocomplete="off">
+              <button type="button" class="an-btn" id="anPathBtn">Trace path</button>
+            </div>
           </div>
-          <div id="simChips" class="chips" style="margin:10px 0 0;"></div>
+          <div class="dock-section">
+            <h3>Analysis Results</h3>
+            <div id="analyzeOutcome">
+              <div class="an-muted">Run an analysis action above.</div>
+            </div>
+          </div>
         </div>
-        <div class="dock-section" id="simResultsSection">
-          <h3 class="sim-heading">Simulation Results</h3>
-          <div id="simOutcome"></div>
+
+        <div class="dock-panel" id="panelWhatIf" data-panel="whatif">
+          <div class="dock-section" id="simSection">
+            <h3>What-If Simulation</h3>
+            <div class="sim-bar" style="padding:0;border:none;background:transparent;">
+              <label for="simInput" class="visually-hidden" style="position:absolute;left:-9999px;">What-If Simulation</label>
+              <input type="text" id="simInput"
+                     placeholder='Try a What-If (or click a suggestion chip)'>
+              <button type="button" id="simRunBtn">Simulate</button>
+              <button type="button" id="simClearBtn">Clear</button>
+            </div>
+            <div id="simChips" class="chips" style="margin:10px 0 0;"></div>
+          </div>
+          <div class="dock-section" id="simResultsSection">
+            <h3 class="sim-heading">Simulation Results</h3>
+            <div id="simOutcome"></div>
+          </div>
         </div>
       </aside>
     </div>
@@ -592,6 +747,8 @@
   let lastMapHtml = null;
   let lastSessionId = null;
   let lastDiff = null;
+  let lastDetectedWorkflows = [];
+  let switchingWorkflow = false;
 
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("fileInput");
@@ -772,24 +929,36 @@
     lastSessionId = payload.session_id || null;
     lastDiff = payload.diff || null;
     lastMapHtml = null;
+    lastDetectedWorkflows = payload.detected_workflows || [];
+    applyWorkspacePayload(payload, { isInitial: true });
+  }
 
-    document.getElementById("resultWf").textContent = payload.workflow;
+  function applyWorkspacePayload(payload, opts) {
+    opts = opts || {};
+    lastDiff = payload.diff || lastDiff;
+
+    document.getElementById("resultWf").textContent = payload.workflow || "";
 
     const metaParts = [];
     if (payload.wfiid) metaParts.push("WFIID " + payload.wfiid);
-    metaParts.push(payload.trace_summary.length
-      ? payload.trace_summary.length + " live-traced steps highlighted"
+    const steps = (payload.trace_summary || []).length;
+    metaParts.push(steps
+      ? steps + " live-traced steps highlighted"
       : "static blueprint (no live trace)");
-    if (payload.detected_workflows.length > 1) {
-      metaParts.push(payload.detected_workflows.length + " workflows loaded");
+    const detected = payload.detected_workflows || lastDetectedWorkflows;
+    if (detected.length > 1) {
+      metaParts.push(detected.length + " workflows loaded");
     }
     document.getElementById("resultMeta").textContent = metaParts.join(" \u00b7 ");
+
+    populateWfPicker(detected, payload.workflow);
 
     const traceDetails = document.getElementById("traceDetails");
     const traceList = document.getElementById("traceList");
     traceList.textContent = "";
-    traceDetails.hidden = payload.trace_summary.length === 0;
-    payload.trace_summary.forEach((step, i) => {
+    const summary = payload.trace_summary || [];
+    traceDetails.hidden = summary.length === 0;
+    summary.forEach((step, i) => {
       const li = document.createElement("li");
       const prefix = i === 0 ? "START: " : "\u2192 ";
       li.textContent = prefix + "Task " + step.id + " | Type " + step.type + " | '" + step.name + "' ";
@@ -797,12 +966,100 @@
       ctx.className = "ctx";
       ctx.textContent = step.context;
       li.appendChild(ctx);
+      li.style.cursor = "pointer";
+      li.title = "Focus task on map";
+      li.addEventListener("click", () => focusTaskOnMap(step.id));
       traceList.appendChild(li);
     });
 
+    renderSimChips(payload.sim_chips || []);
+    if (payload.sim_placeholder) {
+      simInput.placeholder = payload.sim_placeholder;
+    }
+
+    // Cache-bust so the iframe reloads after switch (same session URL).
+    if (payload.map_url) {
+      const bust = (payload.map_url.indexOf("?") >= 0 ? "&" : "?") + "t=" + Date.now();
+      mapFrame.src = payload.map_url + bust;
+    } else if (payload.map_html) {
+      lastMapHtml = payload.map_html;
+      mapFrame.srcdoc = payload.map_html;
+    }
+    viewerReady = false;
+    pendingMapMessage = null;
+
+    if (opts.isInitial) {
+      showNote(payload.note);
+      if (payload.viz_render_errors && payload.viz_render_errors.length) {
+        showNote(
+          (payload.note ? payload.note + "\n\n" : "") +
+          "Visualization failed to render due to: " + payload.viz_render_errors.join("; ")
+        );
+      }
+      result.classList.add("visible");
+      result.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (payload.viz_render_errors && payload.viz_render_errors.length) {
+      showNote("Visualization failed: " + payload.viz_render_errors.join("; "));
+    }
+
+    lastSelection = null;
+    renderFocusContext(null);
+    showAnalyzeOutcome('<div class="an-muted">Run an analysis action above.</div>');
+
+    // Restore or clear What-If overlay for this workflow.
+    if (payload.last_sim && payload.last_sim.mode === "what_if") {
+      applySimPayload(payload.last_sim);
+    } else if (payload.last_sim && payload.last_sim.mode === "did_query") {
+      showSimOutcome(
+        "<h4>Query Answer</h4>" + escapeHtml(payload.last_sim.answer || "") +
+        "<div class='sim-hint'>" + escapeHtml(payload.last_sim.evidence || "") + "</div>"
+      );
+      pendingMapMessage = lastDiff ? {
+        type: "tririga-diff-overlay",
+        added: lastDiff.added || [],
+        removed: lastDiff.removed || [],
+        other: lastDiff.other_workflow || "",
+      } : { type: "tririga-simulation-clear" };
+    } else {
+      showSimOutcome("");
+      if (lastDiff) {
+        pendingMapMessage = {
+          type: "tririga-diff-overlay",
+          added: lastDiff.added || [],
+          removed: lastDiff.removed || [],
+          other: lastDiff.other_workflow || "",
+        };
+      } else {
+        pendingMapMessage = { type: "tririga-simulation-clear" };
+      }
+    }
+  }
+
+  function populateWfPicker(detected, activeName) {
+    const wrap = document.getElementById("wfPickerWrap");
+    const picker = document.getElementById("wfPicker");
+    if (!wrap || !picker) return;
+    const list = detected || [];
+    lastDetectedWorkflows = list;
+    picker.textContent = "";
+    list.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d.workflow;
+      let label = d.workflow;
+      if (d.wfiid) label += " · WFIID " + d.wfiid;
+      if (d.steps) label += " · " + d.steps + " steps";
+      opt.textContent = label;
+      if (d.workflow === activeName) opt.selected = true;
+      picker.appendChild(opt);
+    });
+    wrap.classList.toggle("visible", list.length > 1);
+    document.getElementById("resultWf").style.display = list.length > 1 ? "none" : "";
+  }
+
+  function renderSimChips(chips) {
     const chipsEl = document.getElementById("simChips");
     chipsEl.textContent = "";
-    (payload.sim_chips || []).forEach((chip) => {
+    (chips || []).forEach((chip) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "chip";
@@ -814,39 +1071,59 @@
       });
       chipsEl.appendChild(btn);
     });
-    if (payload.sim_placeholder) {
-      simInput.placeholder = payload.sim_placeholder;
-    }
+  }
 
-    // Prefer map_url (avoids stuffing HTML into JSON); fall back to inline HTML.
-    if (payload.map_url) {
-      mapFrame.src = payload.map_url;
-    } else if (payload.map_html) {
-      lastMapHtml = payload.map_html;
-      mapFrame.srcdoc = payload.map_html;
+  async function switchWorkflow(name) {
+    if (!lastSessionId || !name || switchingWorkflow) return;
+    switchingWorkflow = true;
+    document.body.classList.add("busy");
+    showError("");
+    try {
+      const resp = await fetch("/api/switch-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: lastSessionId, workflow: name }),
+      });
+      let payload;
+      try {
+        payload = await resp.json();
+      } catch {
+        throw new Error("Server returned an unreadable response (HTTP " + resp.status + ").");
+      }
+      if (!resp.ok) throw new Error(payload.error || "Switch failed (HTTP " + resp.status + ").");
+      if (payload.detected_workflows) lastDetectedWorkflows = payload.detected_workflows;
+      applyWorkspacePayload(payload, { isInitial: false });
+    } catch (err) {
+      showError(err.message || String(err));
+    } finally {
+      switchingWorkflow = false;
+      document.body.classList.remove("busy");
     }
-    viewerReady = false;
-    pendingMapMessage = null;
-    showNote(payload.note);
-    if (payload.viz_render_errors && payload.viz_render_errors.length) {
-      showNote(
-        (payload.note ? payload.note + "\n\n" : "") +
-        "Visualization failed to render due to: " + payload.viz_render_errors.join("; ")
-      );
-    }
-    showSimOutcome("");
-    result.classList.add("visible");
-    result.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
-    // Push Diff overlay once the viewer is ready.
-    if (lastDiff) {
-      pendingMapMessage = {
-        type: "tririga-diff-overlay",
-        added: lastDiff.added || [],
-        removed: lastDiff.removed || [],
-        other: lastDiff.other_workflow || "",
-      };
-    }
+  const wfPicker = document.getElementById("wfPicker");
+  if (wfPicker) {
+    wfPicker.addEventListener("change", () => {
+      switchWorkflow(wfPicker.value);
+    });
+  }
+
+  /* --- Dock tabs --- */
+  function setDockTab(tab) {
+    document.querySelectorAll("#dockTabs button").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-tab") === tab);
+    });
+    document.querySelectorAll(".dock-panel").forEach((p) => {
+      p.classList.toggle("active", p.getAttribute("data-panel") === tab);
+    });
+  }
+  document.querySelectorAll("#dockTabs button").forEach((btn) => {
+    btn.addEventListener("click", () => setDockTab(btn.getAttribute("data-tab")));
+  });
+
+  function showAnalyzeOutcome(html) {
+    const el = document.getElementById("analyzeOutcome");
+    if (el) el.innerHTML = html || "";
   }
 
   document.getElementById("openTabBtn").addEventListener("click", () => {
@@ -907,9 +1184,12 @@
       '<button type="button" id="fcFocusBtn">Focus on map</button>' +
       '<button type="button" id="fcIsolateBtn">' +
       (sel.isolateActive ? "Clear isolate" : "Isolate neighborhood") +
-      "</button></div>";
+      "</button>" +
+      '<button type="button" id="fcExplainBtn">Explain task</button>' +
+      "</div>";
     const fcFocus = document.getElementById("fcFocusBtn");
     const fcIso = document.getElementById("fcIsolateBtn");
+    const fcExplain = document.getElementById("fcExplainBtn");
     if (fcFocus) {
       fcFocus.addEventListener("click", () => {
         postToMap({ type: "tririga-focus-node", nodeId: String(sel.nodeId) });
@@ -922,6 +1202,12 @@
         } else {
           postToMap({ type: "tririga-isolate", nodeId: String(sel.nodeId), depth: 2 });
         }
+      });
+    }
+    if (fcExplain) {
+      fcExplain.addEventListener("click", () => {
+        setDockTab("analyze");
+        runAnalyze("explain_task", { task: String(sel.nodeId) });
       });
     }
   }
@@ -1218,6 +1504,10 @@
         isolateActive: !!msg.isolateActive,
       };
       renderFocusContext(lastSelection);
+      const fromInput = document.getElementById("anPathFrom");
+      if (fromInput && lastSelection.nodeId) {
+        fromInput.value = String(lastSelection.nodeId);
+      }
     }
   });
 
@@ -1240,97 +1530,8 @@
         throw new Error("Server returned an unreadable response (HTTP " + resp.status + ").");
       }
       if (!resp.ok) throw new Error(payload.error || "Simulation failed (HTTP " + resp.status + ").");
-
-      if (payload.mode === "did_query") {
-        postToMap({ type: "tririga-simulation-clear" });
-        showSimOutcome(
-          "<h4>Query Answer</h4>" + escapeHtml(payload.answer) +
-          "<div class='sim-hint'>" + escapeHtml(payload.evidence) + "</div>"
-        );
-        return;
-      }
-
-      let html = "<h4>Simulated Outcome — " + escapeHtml(payload.workflow) + "</h4>";
-
-      const altered = payload.altered_tasks || [];
-      const failed = payload.failed_tasks || [];
-      const impacts = payload.impacts || [];
-      const impactTree = payload.impact_tree || [];
-      if (impactTree.length) {
-        html += renderImpactTree(impactTree);
-        html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
-                " &nbsp; <span class='badge altered'></span>altered source task" +
-                " &nbsp; <span class='badge broken'></span>starved dependent task" +
-                " &nbsp; <span class='badge info'></span>field / ledger note" +
-                "<br>Groups are expandable — root and direct dependents open by default.</div>";
-      } else if (failed.length || altered.length || impacts.length) {
-        html += "<ul class='impact-list'>";
-        for (const ft of failed) {
-          let line = ft.node_type_name + " (Type " + ft.node_type + ") '" + ft.node_name +
-                     "' (ID: " + ft.node_id + ") FAILED / skipped.";
-          if (ft.node_type === "23") {
-            const meta = [];
-            if (ft.sections && ft.sections.length) meta.push("sections: " + ft.sections.join(", "));
-            if (ft.tabs && ft.tabs.length) meta.push("tabs: " + ft.tabs.join(", "));
-            if (ft.fields && ft.fields.length) meta.push("fields: " + ft.fields.join(", "));
-            if (meta.length) {
-              line += " UI not updated (" + meta.join("; ") + ")";
-              if (ft.bo) line += " on " + ft.bo;
-            }
-          } else if (ft.fields && ft.fields.length) {
-            line += " Fields not updated: " + ft.fields.join(", ");
-            if (ft.bo) line += " on " + ft.bo;
-          }
-          const failMap = {};
-          failMap[String(ft.node_id)] = "failed";
-          html += "<li><span class='badge failed'></span><span>" +
-            linkifyTaskRefs(line, failMap) + "</span></li>";
-        }
-        for (const a of altered) {
-          const altMap = {};
-          altMap[String(a.node_id)] = "altered";
-          html += "<li><span class='badge altered'></span><span>" +
-            linkifyTaskRefs(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
-                       "' (ID: " + a.node_id + ") simulated with zero records / null object token.",
-                       altMap) +
-            "</span></li>";
-        }
-        html += "</ul>";
-        if (impacts.length) html += renderFlatImpacts(impacts);
-        html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
-                " &nbsp; <span class='badge altered'></span>altered source task" +
-                " &nbsp; <span class='badge broken'></span>starved dependent task" +
-                " &nbsp; <span class='badge info'></span>field / ledger note</div>";
-      }
-
-      // Impact/altered narratives already render above with badges; keep only
-      // the remaining summary lines to avoid duplication.
-      const impactSentences = new Set(impacts.map((i) => i.sentence));
-      const rest = payload.summary.filter((line) =>
-        !impactSentences.has(line) &&
-        !line.startsWith("Simulated a zero-records") &&
-        !line.startsWith("Simulated execution failure"));
-      if (rest.length) {
-        html += "<ul>";
-        for (const line of rest) html += "<li>" + escapeHtml(line) + "</li>";
-        html += "</ul>";
-      }
-      if (payload.unmatched_phrases && payload.unmatched_phrases.length) {
-        html += "<div class='sim-hint'>Unmatched phrase(s): " +
-          escapeHtml(payload.unmatched_phrases.map((p) => "'" + p + "'").join(", ")) +
-          ". Tip: name the decision gate, task, or field as it appears on the map.</div>";
-      }
-      showSimOutcome(html);
-
-      postToMap({
-        type: "tririga-simulation",
-        nodeIds: payload.path_node_ids,
-        edgePairs: payload.path_edges,
-        summaryHtml: buildSimSummaryHtml(payload),
-        alteredIds: payload.altered_node_ids || [],
-        impactedIds: payload.impacted_node_ids || [],
-        failedIds: payload.failed_node_ids || [],
-      });
+      applySimPayload(payload);
+      setDockTab("whatif");
     } catch (err) {
       showSimOutcome("<h4>Simulation Error</h4>" + escapeHtml(err.message || String(err)));
     } finally {
@@ -1338,6 +1539,288 @@
       document.body.classList.remove("busy");
     }
   }
+
+  function applySimPayload(payload) {
+    if (payload.mode === "did_query") {
+      postToMap({ type: "tririga-simulation-clear" });
+      showSimOutcome(
+        "<h4>Query Answer</h4>" + escapeHtml(payload.answer) +
+        "<div class='sim-hint'>" + escapeHtml(payload.evidence) + "</div>"
+      );
+      return;
+    }
+
+    let html = "<h4>Simulated Outcome — " + escapeHtml(payload.workflow) + "</h4>";
+
+    const altered = payload.altered_tasks || [];
+    const failed = payload.failed_tasks || [];
+    const impacts = payload.impacts || [];
+    const impactTree = payload.impact_tree || [];
+    if (impactTree.length) {
+      html += renderImpactTree(impactTree);
+      html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
+              " &nbsp; <span class='badge altered'></span>altered source task" +
+              " &nbsp; <span class='badge broken'></span>starved dependent task" +
+              " &nbsp; <span class='badge info'></span>field / ledger note" +
+              "<br>Groups are expandable — root and direct dependents open by default.</div>";
+    } else if (failed.length || altered.length || impacts.length) {
+      html += "<ul class='impact-list'>";
+      for (const ft of failed) {
+        let line = ft.node_type_name + " (Type " + ft.node_type + ") '" + ft.node_name +
+                   "' (ID: " + ft.node_id + ") FAILED / skipped.";
+        if (ft.node_type === "23") {
+          const meta = [];
+          if (ft.sections && ft.sections.length) meta.push("sections: " + ft.sections.join(", "));
+          if (ft.tabs && ft.tabs.length) meta.push("tabs: " + ft.tabs.join(", "));
+          if (ft.fields && ft.fields.length) meta.push("fields: " + ft.fields.join(", "));
+          if (meta.length) {
+            line += " UI not updated (" + meta.join("; ") + ")";
+            if (ft.bo) line += " on " + ft.bo;
+          }
+        } else if (ft.fields && ft.fields.length) {
+          line += " Fields not updated: " + ft.fields.join(", ");
+          if (ft.bo) line += " on " + ft.bo;
+        }
+        const failMap = {};
+        failMap[String(ft.node_id)] = "failed";
+        html += "<li><span class='badge failed'></span><span>" +
+          linkifyTaskRefs(line, failMap) + "</span></li>";
+      }
+      for (const a of altered) {
+        const altMap = {};
+        altMap[String(a.node_id)] = "altered";
+        html += "<li><span class='badge altered'></span><span>" +
+          linkifyTaskRefs(a.node_type_name + " (Type " + a.node_type + ") '" + a.node_name +
+                     "' (ID: " + a.node_id + ") simulated with zero records / null object token.",
+                     altMap) +
+          "</span></li>";
+      }
+      html += "</ul>";
+      if (impacts.length) html += renderFlatImpacts(impacts);
+      html += "<div class='impact-legend'><span class='badge failed'></span>failed task" +
+              " &nbsp; <span class='badge altered'></span>altered source task" +
+              " &nbsp; <span class='badge broken'></span>starved dependent task" +
+              " &nbsp; <span class='badge info'></span>field / ledger note</div>";
+    }
+
+    const impactSentences = new Set(impacts.map((i) => i.sentence));
+    const rest = (payload.summary || []).filter((line) =>
+      !impactSentences.has(line) &&
+      !line.startsWith("Simulated a zero-records") &&
+      !line.startsWith("Simulated execution failure"));
+    if (rest.length) {
+      html += "<ul>";
+      for (const line of rest) html += "<li>" + escapeHtml(line) + "</li>";
+      html += "</ul>";
+    }
+    if (payload.unmatched_phrases && payload.unmatched_phrases.length) {
+      html += "<div class='sim-hint'>Unmatched phrase(s): " +
+        escapeHtml(payload.unmatched_phrases.map((p) => "'" + p + "'").join(", ")) +
+        ". Tip: name the decision gate, task, or field as it appears on the map.</div>";
+    }
+    showSimOutcome(html);
+
+    const simMsg = {
+      type: "tririga-simulation",
+      nodeIds: payload.path_node_ids,
+      edgePairs: payload.path_edges,
+      summaryHtml: buildSimSummaryHtml(payload),
+      alteredIds: payload.altered_node_ids || [],
+      impactedIds: payload.impacted_node_ids || [],
+      failedIds: payload.failed_node_ids || [],
+    };
+    if (viewerReady) {
+      postToMap(simMsg);
+    } else {
+      pendingMapMessage = simMsg;
+    }
+  }
+
+  async function runAnalyze(op, extra) {
+    extra = extra || {};
+    showError("");
+    showAnalyzeOutcome('<div class="an-muted">Running…</div>');
+    setDockTab("analyze");
+    document.body.classList.add("busy");
+    try {
+      const body = Object.assign({ session_id: lastSessionId, op: op }, extra);
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      let payload;
+      try {
+        payload = await resp.json();
+      } catch {
+        throw new Error("Server returned an unreadable response (HTTP " + resp.status + ").");
+      }
+      if (!resp.ok) throw new Error(payload.error || "Analyze failed (HTTP " + resp.status + ").");
+      renderAnalyzeResult(payload);
+    } catch (err) {
+      showAnalyzeOutcome("<h4>Analyze Error</h4>" + escapeHtml(err.message || String(err)));
+    } finally {
+      document.body.classList.remove("busy");
+    }
+  }
+
+  function renderAnalyzeResult(payload) {
+    const op = payload.op;
+    if (op === "explain_task") {
+      showAnalyzeOutcome(
+        "<h4>Explain — " + escapeHtml(payload.name) + "</h4>" +
+        (payload.html || ("<div class='an-pre'>" + escapeHtml(payload.text || "") + "</div>"))
+      );
+      if (payload.task_id) focusTaskOnMap(payload.task_id);
+      return;
+    }
+    if (op === "purpose") {
+      let html = "<h4>Purpose — " + escapeHtml(payload.name || payload.workflow) + "</h4>";
+      html += "<div class='an-pre'>" + escapeHtml(payload.summary || "") + "</div>";
+      if (payload.notes && payload.notes.length) {
+        html += "<ul>" + payload.notes.map((n) => "<li>" + escapeHtml(n) + "</li>").join("") + "</ul>";
+      }
+      html += "<div class='an-muted'>" + (payload.paths_returned || 0) + " of " +
+        (payload.path_count || 0) + " logical path(s) shown.</div>";
+      (payload.paths || []).forEach((p) => {
+        html += "<div class='an-pre'>" + escapeHtml(p.narrative || "") + "</div>";
+      });
+      showAnalyzeOutcome(html);
+      return;
+    }
+    if (op === "refs") {
+      let html = "<h4>References — " + escapeHtml(payload.term) + "</h4>";
+      if (!payload.hits || !payload.hits.length) {
+        html += "<div class='an-muted'>No tasks reference this term.</div>";
+      } else {
+        html += "<ul>";
+        payload.hits.forEach((h) => {
+          html += "<li>" + taskRefHtml(h.id, h.name, escapeHtml(h.name) + " (" + escapeHtml(h.id) + ")") +
+            " · Type " + escapeHtml(h.type) + " · " + escapeHtml((h.roles || []).join(", ")) + "</li>";
+        });
+        html += "</ul>";
+      }
+      showAnalyzeOutcome(html);
+      return;
+    }
+    if (op === "path") {
+      const names = payload.path_names || [];
+      const ids = payload.path_ids || [];
+      let html = "<h4>Path (" + (payload.length || ids.length) + " steps)</h4><ol>";
+      ids.forEach((id, i) => {
+        html += "<li>" + taskRefHtml(id, names[i], escapeHtml(names[i] || id) + " (" + escapeHtml(id) + ")") + "</li>";
+      });
+      html += "</ol>";
+      showAnalyzeOutcome(html);
+      if (ids.length) {
+        const edges = [];
+        for (let i = 0; i < ids.length - 1; i++) edges.push([ids[i], ids[i + 1]]);
+        postToMap({
+          type: "tririga-simulation",
+          nodeIds: ids,
+          edgePairs: edges,
+          summaryHtml: "<div class='sim-summary'><h3>Path highlight</h3><p>" +
+            escapeHtml(names.join(" → ")) + "</p></div>",
+          alteredIds: [],
+          impactedIds: [],
+          failedIds: [],
+        });
+      }
+      return;
+    }
+    if (op === "orphans") {
+      let html = "<h4>Orphans</h4>";
+      if (payload.healthy) {
+        html += "<div class='an-muted'>Healthy. No orphans in this workflow.</div>";
+      } else {
+        html += "<ul>";
+        (payload.orphans || []).forEach((o) => {
+          html += "<li>" + taskRefHtml(o.id, o.name, escapeHtml(o.name) + " (" + escapeHtml(o.id) + ")") +
+            " · Type " + escapeHtml(o.type) + "</li>";
+        });
+        html += "</ul>";
+      }
+      showAnalyzeOutcome(html);
+      return;
+    }
+    if (op === "failure") {
+      let html = "<h4>Failure analysis — " +
+        taskRefHtml(payload.task_id, payload.task_name,
+          escapeHtml(payload.task_name) + " (" + escapeHtml(payload.task_id) + ")") +
+        "</h4>";
+      (payload.summary || []).forEach((line) => {
+        html += "<div>" + escapeHtml(line) + "</div>";
+      });
+      if (payload.predecessors && payload.predecessors.length) {
+        html += "<h4 style='margin-top:12px'>Predecessors</h4><ul>";
+        payload.predecessors.forEach((p) => {
+          html += "<li>" + taskRefHtml(p.id, p.name, escapeHtml(p.name) + " (" + escapeHtml(p.id) + ")") +
+            " · Type " + escapeHtml(p.type);
+          if (p.constraints && p.constraints.length) {
+            html += "<ul>";
+            p.constraints.forEach((c) => {
+              html += "<li class='an-muted'>" + escapeHtml(c.kind) + ": " + escapeHtml(c.detail) + "</li>";
+            });
+            html += "</ul>";
+          }
+          html += "</li>";
+        });
+        html += "</ul>";
+      }
+      showAnalyzeOutcome(html);
+      if (payload.task_id) focusTaskOnMap(payload.task_id);
+      return;
+    }
+    showAnalyzeOutcome("<div class='an-pre'>" + escapeHtml(JSON.stringify(payload, null, 2)) + "</div>");
+  }
+
+  function focusedTaskToken() {
+    return lastSelection && lastSelection.nodeId ? String(lastSelection.nodeId) : "";
+  }
+
+  document.getElementById("anExplainBtn").addEventListener("click", () => {
+    const task = focusedTaskToken() || document.getElementById("anPathFrom").value.trim();
+    if (!task) {
+      showAnalyzeOutcome("<div class='an-muted'>Select a task on the map (or enter an id in Path from) first.</div>");
+      return;
+    }
+    runAnalyze("explain_task", { task: task });
+  });
+  document.getElementById("anPurposeBtn").addEventListener("click", () => {
+    runAnalyze("purpose", { path_limit: 12 });
+  });
+  document.getElementById("anOrphansBtn").addEventListener("click", () => {
+    runAnalyze("orphans", {});
+  });
+  document.getElementById("anFailureBtn").addEventListener("click", () => {
+    const task = focusedTaskToken() || document.getElementById("anPathFrom").value.trim();
+    if (!task) {
+      showAnalyzeOutcome("<div class='an-muted'>Select a task on the map first.</div>");
+      return;
+    }
+    runAnalyze("failure", { task: task });
+  });
+  document.getElementById("anRefsBtn").addEventListener("click", () => {
+    const term = document.getElementById("anRefsInput").value.trim();
+    if (!term) {
+      showAnalyzeOutcome("<div class='an-muted'>Enter a field, section, or term.</div>");
+      return;
+    }
+    runAnalyze("refs", { term: term });
+  });
+  document.getElementById("anRefsInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("anRefsBtn").click();
+  });
+  document.getElementById("anPathBtn").addEventListener("click", () => {
+    let from = document.getElementById("anPathFrom").value.trim();
+    const to = document.getElementById("anPathTo").value.trim();
+    if (!from && focusedTaskToken()) from = focusedTaskToken();
+    if (!from || !to) {
+      showAnalyzeOutcome("<div class='an-muted'>Provide both Path from and Path to.</div>");
+      return;
+    }
+    runAnalyze("path", { from: from, to: to });
+  });
 
   simRunBtn.addEventListener("click", runSimulation);
   simInput.addEventListener("keydown", (e) => {
@@ -1347,6 +1830,13 @@
     simInput.value = "";
     showSimOutcome("");
     postToMap({ type: "tririga-simulation-clear" });
+    if (lastSessionId) {
+      fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: lastSessionId, clear: true }),
+      }).catch(function () { /* ignore */ });
+    }
   });
 })();
 </script>

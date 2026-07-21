@@ -48,6 +48,36 @@ class TaskInsight:
     def display_subtitle(self):
         return self.subtitle or type_display_name(self.type_code)
 
+    def to_dict(self):
+        """JSON-serializable form for web /api/analyze explain_task."""
+        return {
+            'task_id': self.task_id,
+            'name': self.name,
+            'type_code': self.type_code,
+            'type_label': self.display_subtitle(),
+            'bo': self.bo,
+            'subtitle': self.subtitle,
+            'synopsis': self.synopsis,
+            'mechanics': [
+                {'heading': s.heading, 'bullets': list(s.bullets)}
+                for s in self.mechanics
+            ],
+            'payload_blocks': [
+                {
+                    'heading': b.heading,
+                    'note': b.note,
+                    'rows': [{'key': k, 'value': v} for k, v in b.rows],
+                }
+                for b in self.payload_blocks
+            ],
+            'routes': list(self.routes),
+            'flags': list(self.flags),
+            'sourced_from_id': self.sourced_from_id,
+            'sourced_from_label': self.sourced_from_label,
+            'html': self.render_html(),
+            'text': self.render_cli(),
+        }
+
     @staticmethod
     def format_payload_rows_cli(rows, indent="        "):
         """Shared 3-column payload row formatter used by the CLI renderer."""

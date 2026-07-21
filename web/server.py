@@ -20,6 +20,7 @@ from core.engine import TririgaHybridEngine
 from cli.router import TririgaNLPRouter
 from cli.visualizer import WorkflowVisualizer
 from cli import simulation
+from cli import analysis_api
 from cli import graph_utils
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
@@ -126,6 +127,132 @@ def _workflow_fingerprint(engine, wf_name):
     )
 
 
+def _trace_summary_from_steps(trace):
+    return [
+        {'id': step['id'], 'name': step['name'], 'type': step['type'], 'context': step['context']}
+        for step in (trace or [])
+    ]
+
+
+def _render_map_html(engine, wf_name, trace_ids):
+    """Build map HTML for one workflow; returns (html, viz_errors)."""
+    visualizer = WorkflowVisualizer(engine)
+    try:
+        return visualizer.build_html(wf_name, live_trace_ids=trace_ids or []), []
+    except Exception as exc:
+        import traceback
+        reasons = [f"{type(exc).__name__}: {exc}"]
+        for line in reversed(traceback.format_exc().splitlines()):
+            if 'File "' in line and ('cli/' in line or 'core/' in line or 'web/' in line):
+                reasons.append(line.strip())
+                break
+        html = (
+            "<!DOCTYPE html><html><body style='font-family:Segoe UI,sans-serif;"
+            "background:#2b2b2b;color:#ffb3b3;padding:24px;'>"
+            "<h2>Visualization failed to render</h2>"
+            f"<pre>{chr(10).join(reasons)}</pre></body></html>"
+        )
+        return html, reasons
+
+
+def _diff_for(session, wf_name):
+    fingerprints = session.get('fingerprints') or {}
+    others = [n for n in session['engine'].loaded_workflow_names if n != wf_name]
+    if not others:
+        return None
+    a = set(fingerprints.get(wf_name, []))
+    b = set(fingerprints.get(others[0], []))
+    return {
+        'other_workflow': others[0],
+        'added': sorted(a - b),
+        'removed': sorted(b - a),
+        'shared': sorted(a & b),
+    }
+
+
+def _sync_active_mirrors(session):
+    """Keep legacy top-level keys pointing at the active workflow bundle."""
+    active = session['active_workflow']
+    bundle = session['workflows'][active]
+    session['workflow'] = active
+    session['trace_ids'] = list(bundle.get('trace_ids') or [])
+    session['map_html'] = bundle.get('map_html')
+
+
+def _ensure_map_html(session, wf_name):
+    """Lazy-build map HTML for a workflow bundle. Mutates session."""
+    bundle = session['workflows'][wf_name]
+    if bundle.get('map_html') is not None:
+        return bundle
+    html, errs = _render_map_html(
+        session['engine'], wf_name, bundle.get('trace_ids') or []
+    )
+    bundle['map_html'] = html
+    bundle['viz_error'] = errs or None
+    return bundle
+
+
+def _active_response(session_id, session):
+    """JSON slice the UI needs after visualize or switch."""
+    wf = session['active_workflow']
+    bundle = session['workflows'][wf]
+    detected = [
+        {
+            'workflow': name,
+            'wfiid': session['workflows'][name].get('wfiid'),
+            'steps': len(session['workflows'][name].get('trace_summary') or []),
+        }
+        for name in session['engine'].loaded_workflow_names
+    ]
+    return {
+        'session_id': session_id,
+        'map_url': f'/api/map/{session_id}',
+        'workflow': wf,
+        'wfiid': bundle.get('wfiid'),
+        'detected_workflows': detected,
+        'trace_summary': list(bundle.get('trace_summary') or []),
+        'sim_chips': list(bundle.get('sim_chips') or []),
+        'sim_placeholder': bundle.get('sim_placeholder') or '',
+        'diff': _diff_for(session, wf),
+        'last_sim': bundle.get('last_sim'),
+        'viz_render_errors': list(bundle.get('viz_error') or []),
+        'map_html': None,
+    }
+
+
+def _get_session(session_id):
+    """Resolve session by id, else most recent (single-tab convenience)."""
+    session = _sessions.get(session_id) if session_id else None
+    if session is None and _sessions:
+        session = _sessions[list(_sessions.keys())[-1]]
+    return session
+
+
+def switch_workflow(session_id, workflow):
+    """Activate another loaded workflow; lazy-build its map. Returns UI slice."""
+    workflow = str(workflow or '').strip()
+    if not workflow:
+        raise ValueError('Provide a workflow name to switch to.')
+    with _session_lock:
+        session = _get_session(session_id)
+        if session is None:
+            raise ValueError('No workflow is loaded yet. Upload files and click Visualize first.')
+        if workflow not in session['workflows']:
+            names = ', '.join(session['workflows'].keys())
+            raise ValueError(f"Unknown workflow '{workflow}'. Loaded: {names}")
+        session['active_workflow'] = workflow
+        _ensure_map_html(session, workflow)
+        _sync_active_mirrors(session)
+        # Resolve actual session id for map_url (fallback path may lack client id).
+        sid = session_id
+        if not sid or sid not in _sessions:
+            for k, v in _sessions.items():
+                if v is session:
+                    sid = k
+                    break
+        return _active_response(sid, session)
+
+
 def process_visualization_request(uploads):
     """Core ingestion + trace + render pipeline, fully in-memory.
 
@@ -172,9 +299,11 @@ def process_visualization_request(uploads):
     router = TririgaNLPRouter(engine, offline_mode=True)
 
     detected = []
-    target_wf, target_trace, target_wfiid = None, [], None
+    target_wf, target_wfiid = None, None
     note = None
     log_text = None
+    # name -> (wfiid, raw_trace_steps)
+    traces_by_wf = {}
 
     if server_logs:
         log_text = server_logs[0][1].decode('utf-8', errors='ignore')
@@ -182,6 +311,7 @@ def process_visualization_request(uploads):
 
         for wf_name in engine.loaded_workflow_names:
             wfiid, trace, _records, _counts = router.extract_execution_trace(log_lines, wf_name)
+            traces_by_wf[wf_name] = (wfiid, trace)
             detected.append({
                 'workflow': wf_name,
                 'wfiid': wfiid,
@@ -189,90 +319,69 @@ def process_visualization_request(uploads):
             })
             if wfiid is not None:
                 if target_wfiid is None or int(wfiid) > int(target_wfiid):
-                    target_wf, target_trace, target_wfiid = wf_name, trace, wfiid
+                    target_wf, target_wfiid = wf_name, wfiid
 
         if target_wf is None:
             note = ("No execution of the loaded workflow(s) was found in the uploaded log. "
                     "Rendering a static blueprint instead. Ensure TRIRIGA Workflow Logging "
                     "(Start, End, and Steps) was enabled when the log was captured.")
     else:
-        detected = [{'workflow': name, 'wfiid': None, 'steps': 0} for name in engine.loaded_workflow_names]
+        for name in engine.loaded_workflow_names:
+            traces_by_wf[name] = (None, [])
+            detected.append({'workflow': name, 'wfiid': None, 'steps': 0})
         note = "No server log (.log) uploaded. Rendering a static blueprint with no live-trace overlay."
 
     if target_wf is None:
         target_wf = engine.loaded_workflow_names[0]
 
-    live_trace_ids = [step['id'] for step in target_trace]
-    visualizer = WorkflowVisualizer(engine)
-    map_html = None
-    viz_render_errors = []
-    try:
-        map_html = visualizer.build_html(target_wf, live_trace_ids=live_trace_ids)
-    except Exception as exc:
-        import traceback
-        reasons = [f"{type(exc).__name__}: {exc}"]
-        for line in reversed(traceback.format_exc().splitlines()):
-            if 'File "' in line and ('cli/' in line or 'core/' in line or 'web/' in line):
-                reasons.append(line.strip())
-                break
-        viz_render_errors = reasons
-        map_html = (
-            "<!DOCTYPE html><html><body style='font-family:Segoe UI,sans-serif;"
-            "background:#2b2b2b;color:#ffb3b3;padding:24px;'>"
-            "<h2>Visualization failed to render</h2>"
-            f"<pre>{chr(10).join(reasons)}</pre></body></html>"
-        )
-
-    session_id = _new_session_id()
     fingerprints = {
         name: _workflow_fingerprint(engine, name)
         for name in engine.loaded_workflow_names
     }
-    with _session_lock:
-        _sessions[session_id] = {
-            'engine': engine,
-            'router': router,
-            'workflow': target_wf,
-            'trace_ids': live_trace_ids,
-            'map_html': map_html,
-            'log_text': log_text,
-            'fingerprints': fingerprints,
+
+    workflows = {}
+    for name in engine.loaded_workflow_names:
+        wfiid, trace = traces_by_wf.get(name, (None, []))
+        chips = _build_sim_chips(engine, name)
+        workflows[name] = {
+            'wfiid': wfiid,
+            'trace_ids': [step['id'] for step in trace],
+            'trace_summary': _trace_summary_from_steps(trace),
+            'map_html': None,
+            'sim_chips': chips,
+            'sim_placeholder': _build_sim_placeholder(chips, name),
+            'last_sim': None,
+            'viz_error': None,
         }
 
-    trace_summary = [
-        {'id': step['id'], 'name': step['name'], 'type': step['type'], 'context': step['context']}
-        for step in target_trace
-    ]
+    primary = workflows[target_wf]
+    map_html, viz_render_errors = _render_map_html(
+        engine, target_wf, primary['trace_ids']
+    )
+    primary['map_html'] = map_html
+    primary['viz_error'] = viz_render_errors or None
 
-    # Diff vs second loaded workflow (if any): ids only for overlay.
-    diff = None
-    others = [n for n in engine.loaded_workflow_names if n != target_wf]
-    if others:
-        a = set(fingerprints.get(target_wf, []))
-        b = set(fingerprints.get(others[0], []))
-        diff = {
-            'other_workflow': others[0],
-            'added': sorted(a - b),
-            'removed': sorted(b - a),
-            'shared': sorted(a & b),
-        }
-
-    sim_chips = _build_sim_chips(engine, target_wf)
-    return {
-        'session_id': session_id,
-        'map_url': f'/api/map/{session_id}',
+    session_id = _new_session_id()
+    session = {
+        'engine': engine,
+        'router': router,
+        'log_text': log_text,
+        'fingerprints': fingerprints,
+        'active_workflow': target_wf,
+        'workflows': workflows,
+        # Compat mirrors for /api/map and /api/simulate
         'workflow': target_wf,
-        'wfiid': target_wfiid,
-        'detected_workflows': detected,
-        'trace_summary': trace_summary,
-        'note': note,
-        'viz_render_errors': viz_render_errors,
-        'sim_chips': sim_chips,
-        'sim_placeholder': _build_sim_placeholder(sim_chips, target_wf),
-        'diff': diff,
-        # Backward-compatible: omit huge body by default; clients should use map_url.
-        'map_html': None,
+        'trace_ids': list(primary['trace_ids']),
+        'map_html': map_html,
     }
+    with _session_lock:
+        _sessions[session_id] = session
+
+    result = _active_response(session_id, session)
+    result['note'] = note
+    result['detected_workflows'] = detected
+    result['viz_render_errors'] = viz_render_errors
+    return result
 
 
 class DiagnosticWebHandler(BaseHTTPRequestHandler):
@@ -294,6 +403,18 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_json_body(self):
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+        except ValueError:
+            length = 0
+        if length <= 0:
+            return None, 'Empty request body.'
+        try:
+            return json.loads(self.rfile.read(length).decode('utf-8')), None
+        except (ValueError, UnicodeDecodeError):
+            return None, 'Expected a JSON body.'
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -314,12 +435,19 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
 
         if path.startswith('/api/map/'):
             sid = path[len('/api/map/'):].strip('/')
+            html = None
             with _session_lock:
                 sess = _sessions.get(sid)
-            if not sess or not sess.get('map_html'):
+                if sess:
+                    active = sess.get('active_workflow')
+                    if active and active in sess.get('workflows', {}):
+                        _ensure_map_html(sess, active)
+                        _sync_active_mirrors(sess)
+                    html = sess.get('map_html')
+            if not html:
                 self._send_html(404, '<html><body>Map session not found.</body></html>')
                 return
-            self._send_html(200, sess['map_html'])
+            self._send_html(200, html)
             return
 
         self._send_json(404, {'error': 'Not found'})
@@ -327,6 +455,12 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/api/simulate':
             self._handle_simulate()
+            return
+        if self.path == '/api/switch-workflow':
+            self._handle_switch_workflow()
+            return
+        if self.path == '/api/analyze':
+            self._handle_analyze()
             return
         if self.path != '/api/visualize':
             self._send_json(404, {'error': 'Not found'})
@@ -361,19 +495,71 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
 
         self._send_json(200, result)
 
-    def _handle_simulate(self):
+    def _handle_switch_workflow(self):
+        payload, err = self._read_json_body()
+        if err:
+            self._send_json(400, {'error': err})
+            return
+        session_id = str(payload.get('session_id', '')).strip()
+        workflow = payload.get('workflow', '')
         try:
-            length = int(self.headers.get('Content-Length', 0))
-        except ValueError:
-            length = 0
-        if length <= 0:
+            result = switch_workflow(session_id, workflow)
+        except ValueError as e:
+            self._send_json(400, {'error': str(e)})
+            return
+        except Exception as e:
+            self._send_json(500, {'error': f'Unexpected switch error: {e}'})
+            return
+        self._send_json(200, result)
+
+    def _handle_analyze(self):
+        payload, err = self._read_json_body()
+        if err:
+            self._send_json(400, {'error': err})
+            return
+        session_id = str(payload.get('session_id', '')).strip()
+        op = payload.get('op', '')
+        with _session_lock:
+            session = _get_session(session_id)
+        if session is None:
+            self._send_json(400, {
+                'error': 'No workflow is loaded yet. Upload files and click Visualize first.'
+            })
+            return
+        wf_name = str(payload.get('workflow') or session.get('active_workflow') or '').strip()
+        try:
+            result = analysis_api.run_analyze(session['router'], wf_name, op, payload)
+        except ValueError as e:
+            self._send_json(400, {'error': str(e)})
+            return
+        except Exception as e:
+            self._send_json(500, {'error': f'Unexpected analyze error: {e}'})
+            return
+        self._send_json(200, result)
+
+    def _handle_simulate(self):
+        payload, err = self._read_json_body()
+        if err:
+            self._send_json(400, {'error': err})
+            return
+        if payload is None:
             self._send_json(400, {'error': 'Empty request body.'})
             return
 
-        try:
-            payload = json.loads(self.rfile.read(length).decode('utf-8'))
-        except (ValueError, UnicodeDecodeError):
-            self._send_json(400, {'error': 'Expected a JSON body: {"query": "..."}.'})
+        session_id = str(payload.get('session_id', '')).strip()
+
+        if payload.get('clear'):
+            with _session_lock:
+                session = _get_session(session_id)
+                if session is None:
+                    self._send_json(400, {
+                        'error': 'No workflow is loaded yet. Upload files and click Visualize first.'
+                    })
+                    return
+                active = session.get('active_workflow') or session.get('workflow')
+                if active and active in session.get('workflows', {}):
+                    session['workflows'][active]['last_sim'] = None
+            self._send_json(200, {'ok': True, 'cleared': True})
             return
 
         query = str(payload.get('query', '')).strip()
@@ -381,27 +567,32 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             self._send_json(400, {'error': 'Provide a simulation question, e.g. "What if the approval is denied?".'})
             return
 
-        session_id = str(payload.get('session_id', '')).strip()
         with _session_lock:
-            session = _sessions.get(session_id) if session_id else None
-            # Fallback: most recent session (single-tab convenience).
-            if session is None and _sessions:
-                session = _sessions[list(_sessions.keys())[-1]]
-
-        if session is None:
-            self._send_json(400, {'error': 'No workflow is loaded yet. Upload files and click Visualize first.'})
-            return
+            session = _get_session(session_id)
+            if session is None:
+                self._send_json(400, {'error': 'No workflow is loaded yet. Upload files and click Visualize first.'})
+                return
+            engine = session['engine']
+            workflow = session['workflow']
+            trace_ids = list(session.get('trace_ids') or [])
+            active = session.get('active_workflow') or workflow
 
         try:
             result = simulation.run_simulation(
-                session['engine'], session['workflow'], query,
-                trace_ids=session['trace_ids'])
+                engine, workflow, query, trace_ids=trace_ids)
         except ValueError as e:
             self._send_json(400, {'error': str(e)})
             return
         except Exception as e:
             self._send_json(500, {'error': f'Unexpected simulation error: {e}'})
             return
+
+        with _session_lock:
+            sess = _get_session(session_id)
+            if sess is not None:
+                wf_key = sess.get('active_workflow') or active
+                if wf_key in sess.get('workflows', {}):
+                    sess['workflows'][wf_key]['last_sim'] = result
 
         self._send_json(200, result)
 
