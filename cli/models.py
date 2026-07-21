@@ -109,7 +109,8 @@ class TaskInsight:
             for b in sec.bullets:
                 text = str(b)
                 lead = len(text) - len(text.lstrip(" "))
-                bullet_bits.append(f"&bull; {'&nbsp;' * lead}{esc(text.lstrip(' '))}")
+                # Indent the bullet itself (not only the label text).
+                bullet_bits.append(f"{'&nbsp;' * lead}&bull; {esc(text.lstrip(' '))}")
             bullets = "<br/>".join(bullet_bits)
             body.append(f"<b>{esc(sec.heading)}:</b><br/>{bullets}")
         if self.synopsis:
