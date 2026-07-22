@@ -12,7 +12,8 @@ TRIRIGA Diagnostic Engine — offline/live workflow diagnostics.
 | `cli/simulation/` | What-If NL parse, tokens, starvation, impact trees |
 | `cli/router.py` + `cli/intents.py` | NLP chat dispatch |
 | `cli/inventory.py` / `cli/relations.py` / `cli/knowledge.py` | Inventory, routes, glossary |
-| `web/` | Local upload UI + `/api/visualize`, `/api/map/<session>`, `/api/simulate` |
+| `web/` | Local upload UI + `/api/visualize`, `/api/map/<session>`, `/api/simulate`; Generator page `/generator.html` + `/api/generator/*` |
+| `om_gen/` | Constrained NL/JSON IR → flat OM zip (isolated from diagnostic map) |
 | `integrations/` | SSH log client |
 
 ## Hard rules (layout)

@@ -1,0 +1,1509 @@
+<Workflow>
+    <Header Type="0" WfStatus="10" IgnoreModuleLevel="0" InstanceData="0" LockRecord="0"
+        Modifier="0">
+        <ObjectLabelName><![CDATA[IBM-T 11.0]]></ObjectLabelName>
+        <Name><![CDATA[triPeople - Synchronous - Refresh Group and Licenses]]></Name>
+        <Module><![CDATA[triPeople]]></Module>
+        <BO><![CDATA[triPeople]]></BO>
+        <EventName><![CDATA[Pre-Create]]></EventName>
+        <Description><![CDATA[]]></Description>
+        <AssociationName><![CDATA[]]></AssociationName>
+        <UpdatedBy><![CDATA[NO3829110485, KE8371103948 - 8072842122]]></UpdatedBy>
+        <AssociatedBO><![CDATA[]]></AssociatedBO>
+        <AssociatedModule><![CDATA[triPeople]]></AssociatedModule>
+    </Header>
+    <Tasks>
+        <Task Id="133050" Type="28" FilterOperator="10" RecurrenceId="0" MapId="10434" SRCTaskId="0"
+            TRGTTaskId="0" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0" AssignToFlag="1"
+            EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Update triPeople to reset password]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[Set Password back to password]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[triPeople]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[triPeople]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[triPeople]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="10434" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[triPeople]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[Detail]]></TrgtSec>
+                    <TrgtFld><![CDATA[triPasswordTX]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="10434" Type="40">
+                    <FldVal><![CDATA[password]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[triPeople]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[Detail]]></TrgtSec>
+                    <TrgtFld><![CDATA[triPasswordPA]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="154935" Type="32" FilterOperator="10" RecurrenceId="0" MapId="-1"
+            SRCTaskId="133032" TRGTTaskId="133032" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Delete Reference to Group Details from My Profile]]></TaskLabel>
+            <EventName><![CDATA[WFDELETESEC]]></EventName>
+            <Description><![CDATA[Since this is an embedded section the old references need to be deleted before they are copied again from triPeople.]]></Description>
+            <DeleteSection><![CDATA[Group Details]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[My Profile]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="133032">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="1" RefTaskId="133032">
+                    <RefSec><![CDATA[Group Details]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[System]]></RefModule>
+                    <RefObject><![CDATA[Group Details]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="154936" Type="32" FilterOperator="10" RecurrenceId="0" MapId="-1"
+            SRCTaskId="133032" TRGTTaskId="133032" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Delete Reference to License Details from My Profile]]></TaskLabel>
+            <EventName><![CDATA[WFDELETESEC]]></EventName>
+            <Description><![CDATA[Since this is an embedded section the old references need to be deleted before they are copied again from triPeople.]]></Description>
+            <DeleteSection><![CDATA[Licence Details]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[My Profile]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="133032">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="1" RefTaskId="133032">
+                    <RefSec><![CDATA[Licence Details]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[System]]></RefModule>
+                    <RefObject><![CDATA[Licence Details]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="158538" Type="14" FilterOperator="10" RecurrenceId="0" MapId="327390"
+            SRCTaskId="-1" TRGTTaskId="158539" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[133050;158539;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[toupper (p0 ) == "REMOVEDUSER"  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[field]]></PType>
+                        <PDataId><![CDATA[0]]></PDataId>
+                        <PField><![CDATA[triPasswordTX]]></PField>
+                        <PSection><![CDATA[Detail]]></PSection>
+                        <PModule><![CDATA[triPeople]]></PModule>
+                        <PBO><![CDATA[triPeople]]></PBO>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="158539" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="315077" Type="14" FilterOperator="10" RecurrenceId="0" MapId="327391"
+            SRCTaskId="-1" TRGTTaskId="315078" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[315081;315078;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 == ""  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[field]]></PType>
+                        <PDataId><![CDATA[0]]></PDataId>
+                        <PField><![CDATA[triPasswordPA]]></PField>
+                        <PSection><![CDATA[Detail]]></PSection>
+                        <PModule><![CDATA[triPeople]]></PModule>
+                        <PBO><![CDATA[triPeople]]></PBO>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="315078" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="315081" Type="28" FilterOperator="10" RecurrenceId="0" MapId="97752"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Update triPeople Password from My Profile]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[triPeople]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[triPeople]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="133032">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="97752" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[triPeople]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[My Profile]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[Detail]]></TrgtSec>
+                    <TrgtFld><![CDATA[triPasswordPA]]></TrgtFld>
+                    <SrcTab><![CDATA[My Profile]]></SrcTab>
+                    <SrcSec><![CDATA[TRIRIGA Account]]></SrcSec>
+                    <SrcFld><![CDATA[Password]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="0" Type="1" FilterOperator="10" RecurrenceId="0" MapId="327389" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Start]]></TaskLabel>
+            <EventName><![CDATA[Pre-Create]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[triPeople]]></BO>
+            <AssociatedModule><![CDATA[triPeople]]></AssociatedModule>
+            <AssociatedBO><![CDATA[]]></AssociatedBO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[ ]]></Expression>
+            </Condition>
+        </Task>
+        <Task Id="133031" Type="9" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="133032" Type="29" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="0"
+            TRGTTaskId="0" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0" AssignToFlag="1"
+            EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Get My Profile associated to triPeople]]></TaskLabel>
+            <EventName><![CDATA[GETLIST]]></EventName>
+            <Description><![CDATA[Get MyProfile Count]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[Associated To]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[My Profile]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="2" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Associated To]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="2" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Associated To]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="133049" Type="28" FilterOperator="10" RecurrenceId="0" MapId="33043" SRCTaskId="0"
+            TRGTTaskId="0" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0" AssignToFlag="1"
+            EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Update MyProfile from triPeople]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[Update MyProfile Record from triPeople]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[Associated To]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triPeople]]></Module>
+            <BO><![CDATA[My Profile]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="133032">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Associated To]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[My Profile]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triPeople]]></RefModule>
+                    <RefObject><![CDATA[triPeople]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="33043" Type="5">
+                    <FldVal><![CDATA[Associated To]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[]]></TrgtTab>
+                    <TrgtSec><![CDATA[]]></TrgtSec>
+                    <TrgtFld><![CDATA[]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="20">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[Licence Details]]></TrgtSec>
+                    <TrgtFld><![CDATA[]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[triLicenceDetails]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="20">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[Group Details]]></TrgtSec>
+                    <TrgtFld><![CDATA[]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[triGroupsDetails]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[SysReserveFlag]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[SysReserveFlag]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[SysReserveKey]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[SysReserveKey]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[Active End Date]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[RecordInformation]]></SrcSec>
+                    <SrcFld><![CDATA[Active End Date]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[Active Start Date]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[RecordInformation]]></SrcSec>
+                    <SrcFld><![CDATA[Active Start Date]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[LocationName]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[LocationName]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[OrgName]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[RecordInformation]]></SrcSec>
+                    <SrcFld><![CDATA[OrgName]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[RecordInformation]]></SrcSec>
+                    <SrcFld><![CDATA[GeographyName]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[PeopleFullName]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triNameTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triIdTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triIdTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triAddressTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triAddressTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triCityTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triCityTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triFirstNameTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triFirstNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[First Name]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triFirstNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triHomePhoneTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triHomePhoneTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triImageIM]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triImageIM]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[Last Name]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triLastNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triLastNameTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triLastNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triMailStopTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triMailStopTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triMobileTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triMobileTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triNickNameTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triNickNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[PassQuestion]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triPassQuestionTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[Service Only]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triServiceOnlyBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[SignaturePassword]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triSignaturePasswordPA]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triStateProvTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triStateProvTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[Preferences]]></TrgtSec>
+                    <TrgtFld><![CDATA[Timezones]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triTimeZonesCL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[UserGroup]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserGroupLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[User Account]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[UserName]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserNameTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[UsereMailQ]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserMailQBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triWorkFaxTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triWorkFaxTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triWorkPhoneTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triWorkPhoneTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triZipPostalTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triZipPostalTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triEmailTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triEmailTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triPrefixLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triPrefixLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[User Type]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserTypeLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triTitleTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triTitleTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triLocationBO]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[triSpacePrimaryLocation]]></SrcSec>
+                    <SrcFld><![CDATA[triPathTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triGeographyLookupTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triGeographyLookupTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triCountryTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triCountryTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triCountyTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triCountyTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triMetroTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triMetroTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triRegionTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triRegionTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triWorldRegionTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triWorldRegionTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triOrganizationBO]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[triPrimaryOrganization]]></SrcSec>
+                    <SrcFld><![CDATA[triPathTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[Preferences]]></TrgtSec>
+                    <TrgtFld><![CDATA[Language]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserLanguageLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triLanguageLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserLanguageLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[eMail]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[eMail]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triApprovalAmountNU]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triApprovalAmountNU]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triDelegateToTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triDelegateToTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triUserStatusCL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triUserStatusCL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triExternalLoginTX]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triExternalLoginTX]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triExternalPasswordPA]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triExternalPasswordPA]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[Currency]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triCurrencyUO]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triAreaUO]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triAreaUO]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triLengthUO]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triLengthUO]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[DisableCompanyBL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triDisableCompanyBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[MenuLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triMenuLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[ProjectMenuLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triProjectMenuLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[HomePageLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triHomePageLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[ProjectHomePageLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triProjectHomePageLI]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[SiteMapBL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triSiteMapBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[My Profile]]></TrgtTab>
+                    <TrgtSec><![CDATA[TRIRIGA Account]]></TrgtSec>
+                    <TrgtFld><![CDATA[Password]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triPasswordPA]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triAccessibilityBL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triAccessibilityBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triSkipNavigationBL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triSkipNavigationBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triEnableBidiBL]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triEnableBidiBL]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="33043" Type="10">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triPeople]]></TrgtModule>
+                    <TrgtBo><![CDATA[My Profile]]></TrgtBo>
+                    <SrcModule><![CDATA[triPeople]]></SrcModule>
+                    <SrcBo><![CDATA[triPeople]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[triBaseTextDirectionLI]]></TrgtFld>
+                    <SrcTab><![CDATA[General]]></SrcTab>
+                    <SrcSec><![CDATA[Detail]]></SrcSec>
+                    <SrcFld><![CDATA[triBaseTextDirectionLI]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+    </Tasks>
+    <WFSteps>
+        <WFStep Id="0" Type="1" ParId="-1" />
+        <WFStep Id="133031" Type="9" ParId="133049" />
+        <WFStep Id="133032" Type="29" ParId="0" />
+        <WFStep Id="133049" Type="28" ParId="315078" />
+        <WFStep Id="133050" Type="28" ParId="158538" />
+        <WFStep Id="154935" Type="32" ParId="133032" />
+        <WFStep Id="154936" Type="32" ParId="154935" />
+        <WFStep Id="158538" Type="14" ParId="154936" />
+        <WFStep Id="158539" Type="12" ParId="133050" />
+        <WFStep Id="158539" Type="12" ParId="158538" />
+        <WFStep Id="315077" Type="14" ParId="158539" />
+        <WFStep Id="315078" Type="12" ParId="315077" />
+        <WFStep Id="315078" Type="12" ParId="315081" />
+        <WFStep Id="315081" Type="28" ParId="315077" />
+    </WFSteps>
+</Workflow>

@@ -1,0 +1,57 @@
+{
+  "header": {
+    "name": "triBuilding - Synchronous - Append Z to Name",
+    "module": "Location",
+    "bo": "triBuilding",
+    "event_name": "triSave",
+    "description": "Append Z to triNameTX on Save",
+    "object_label_name": "In Progress 0.0"
+  },
+  "tasks": [
+    {
+      "key": "start",
+      "type": "1",
+      "label": "Start"
+    },
+    {
+      "key": "mod1",
+      "type": "28",
+      "label": "Append Z to Name",
+      "event_name": "Append",
+      "module": "Location",
+      "bo": "triBuilding",
+      "mappings": [
+        {
+          "field": "triNameTX",
+          "value": "triNameTX + \"Z\"",
+          "map_type": "80",
+          "trgt_module": "Location",
+          "trgt_bo": "triBuilding",
+          "trgt_tab": "General",
+          "trgt_sec": "General"
+        }
+      ],
+      "refs": [
+        {
+          "ref_task_id": "0",
+          "ref_type": "0",
+          "use_type": "1",
+          "module": "Location",
+          "bo": "triBuilding"
+        },
+        {
+          "ref_task_id": "0",
+          "ref_type": "1",
+          "use_type": "2",
+          "module": "Location",
+          "bo": "triBuilding"
+        }
+      ]
+    },
+    {
+      "key": "end",
+      "type": "9",
+      "label": "End"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "header": {
+    "name": "cst om_gen Core Types Smoke",
+    "module": "Location",
+    "bo": "triBuilding",
+    "event_name": "Pre-Create",
+    "description": "Multi-type emitter coverage recipe",
+    "object_label_name": "In Progress 0.0"
+  },
+  "tasks": [
+    {"key": "start", "type": "1", "label": "Start"},
+    {"key": "var1", "type": "40", "label": "VAR_NAME", "module": "Location", "bo": "triBuilding"},
+    {"key": "asg1", "type": "41", "label": "Assign VAR", "trgt_task_id": "var1", "src_task_id": "0"},
+    {"key": "tmp1", "type": "25", "label": "Get Temp", "module": "Location", "bo": "triBuilding"},
+    {
+      "key": "cr1", "type": "27", "label": "Create", "event_name": "triCreate",
+      "module": "Location", "bo": "triBuilding",
+      "mappings": [{"field": "triNameTX", "value": "X", "map_type": "40", "trgt_module": "Location", "trgt_bo": "triBuilding"}]
+    },
+    {
+      "key": "mod1", "type": "28", "label": "Modify", "event_name": "Append",
+      "module": "Location", "bo": "triBuilding",
+      "mappings": [{"field": "triNameTX", "value": "Y", "map_type": "40", "trgt_module": "Location", "trgt_bo": "triBuilding"}]
+    },
+    {"key": "sv1", "type": "26", "label": "Save Permanent"},
+    {
+      "key": "q1", "type": "22", "label": "Query Buildings",
+      "filter_bo": "triBuilding - Existing Query", "filter_module": "Location", "filter_bo_bo": "triBuilding",
+      "module": "Location", "bo": "triBuilding"
+    },
+    {
+      "key": "r1", "type": "29", "label": "Retrieve", "event_name": "GETLIST",
+      "module": "Location", "bo": "triBuilding"
+    },
+    {
+      "key": "call1", "type": "38", "label": "Call WF",
+      "filter_bo": "Some Existing Workflow", "filter_module": "Location", "filter_bo_bo": "triBuilding",
+      "module": "Location", "bo": "triBuilding"
+    },
+    {
+      "key": "trig1", "type": "31", "label": "Trigger", "event_name": "triActivate",
+      "module": "Location", "bo": "triBuilding"
+    },
+    {
+      "key": "asc1", "type": "30", "label": "Associate", "event_name": "Associate",
+      "service_association": "Has", "module": "Location", "bo": "triBuilding"
+    },
+    {
+      "key": "md1", "type": "23", "label": "Metadata",
+      "module": "Location", "bo": "triBuilding",
+      "gui_mappings": [{"prop_type": "1", "prop_val": "true", "tab": "General", "section": "General", "field": "triNameTX", "bo": "triBuilding", "bo_module": "Location"}]
+    },
+    {
+      "key": "sw1", "type": "14", "label": "Switch", "event_name": "0=true;1=false;",
+      "target_association": "jtrue;jfalse;",
+      "condition": {"expression": "true", "params": []}
+    },
+    {"key": "jtrue", "type": "12", "label": "J True"},
+    {"key": "jfalse", "type": "12", "label": "J False"},
+    {
+      "key": "it1", "type": "24", "label": "Iterator",
+      "target_association": "ibody;iexit;", "assignee_task_id": "ibody",
+      "module": "Location", "bo": "triBuilding"
+    },
+    {"key": "ibody", "type": "12", "label": "Iter Body"},
+    {"key": "iexit", "type": "12", "label": "Iter Exit"},
+    {"key": "lp1", "type": "20", "label": "Loop"},
+    {
+      "key": "br1", "type": "21", "label": "Break", "event_name": "0=true;1=false;",
+      "target_association": "iexit;end;"
+    },
+    {"key": "end", "type": "9", "label": "End"}
+  ],
+  "edges": [
+    {"from": "start", "to": "var1"},
+    {"from": "var1", "to": "asg1"},
+    {"from": "asg1", "to": "tmp1"},
+    {"from": "tmp1", "to": "cr1"},
+    {"from": "cr1", "to": "mod1"},
+    {"from": "mod1", "to": "sv1"},
+    {"from": "sv1", "to": "q1"},
+    {"from": "q1", "to": "r1"},
+    {"from": "r1", "to": "call1"},
+    {"from": "call1", "to": "trig1"},
+    {"from": "trig1", "to": "asc1"},
+    {"from": "asc1", "to": "md1"},
+    {"from": "md1", "to": "sw1"},
+    {"from": "sw1", "to": "jtrue"},
+    {"from": "sw1", "to": "jfalse"},
+    {"from": "jtrue", "to": "it1"},
+    {"from": "jfalse", "to": "it1"},
+    {"from": "it1", "to": "ibody"},
+    {"from": "it1", "to": "iexit"},
+    {"from": "ibody", "to": "lp1"},
+    {"from": "lp1", "to": "br1"},
+    {"from": "br1", "to": "iexit"},
+    {"from": "iexit", "to": "end"}
+  ]
+}

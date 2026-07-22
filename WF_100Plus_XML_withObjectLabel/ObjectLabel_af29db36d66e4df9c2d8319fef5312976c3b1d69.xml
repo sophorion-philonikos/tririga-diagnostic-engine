@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IBM Confidential OCO Source Materials --><!-- (C) COPYRIGHT IBM CORP. 2011-2026 --><!-- The source code for this program is not published or otherwise divested of its trade secrets, irrespective of what has been deposited with the U.S. Copyright Office. --><BoRecords>     <BoRecord BoId="10030442" RecordId="-1" BoName="triPlatformObjectLabelManager" GUIId="10043144" GUIName="triPlatformObjectLabel" ModuleId="23423" ModuleName="triPlatformObjectLabelManager" CompanyId="208133" ParentName="" ActionName="" ObjState="Created" SourceId="33114534">
+<BoSectionName NameValue="System Info">
+                     <Review___Status>
+                         
+                     </Review___Status>
+                     <Prior___State>
+                         Created
+                     </Prior___State>
+                     <LocationId>
+                         
+                     </LocationId>
+                     <OrganizationId>
+                         
+                     </OrganizationId>
+                     <GeographyId>
+                         
+                     </GeographyId>
+                     <CreatedBy>
+                         221931
+                     </CreatedBy>
+                     <ModifiedBy>
+                         
+                     </ModifiedBy>
+                     <CreatedTime>
+                         1634346590504
+                     </CreatedTime>
+                     <ModifiedTime>
+                         1761368399190
+                     </ModifiedTime>
+                     <Type>
+                         10030442
+                     </Type>
+                     <Parent>
+                         
+                     </Parent>
+         </BoSectionName>
+<BoSectionName NameValue="General">
+                     <GeographyName>
+                         
+                     </GeographyName>
+                     <triObjectLabelMergedFrom>
+                         
+                     </triObjectLabelMergedFrom>
+                     <triObjectLabelProcessMessageTX>
+                         Your request is queued for processing. A notification will be sent when it is complete.
+                     </triObjectLabelProcessMessageTX>
+                     <triObjectLabelOwnerTX>
+                         IBM-T
+                     </triObjectLabelOwnerTX>
+                     <triObjectLabelDateDT>
+                         
+                     </triObjectLabelDateDT>
+                     <triObjectLabelByTX>
+                         
+                     </triObjectLabelByTX>
+                     <triObjectLabelFromTX>
+                         IBM-T-10.6.1
+                     </triObjectLabelFromTX>
+                     <triObjectLabelDescriptionTX>
+                         IBM TRIRIGA Application release 10.7.0
+                     </triObjectLabelDescriptionTX>
+                     <LocationName>
+                         
+                     </LocationName>
+                     <triObjectLabelVersionTX>
+                         10.7.0
+                     </triObjectLabelVersionTX>
+                     <OrgName>
+                         
+                     </OrgName>
+                     <triObjectLabelDisplayTX>
+                         IBM-T-10.7.0
+                     </triObjectLabelDisplayTX>
+         </BoSectionName>
+<Associations><Association><Name><![CDATA[ ]]></Name><TargetModule><![CDATA[triPlatformObjectLabelManager]]></TargetModule><TargetBo><![CDATA[triPlatformObjectLabelManager]]></TargetBo><TargetObjectName><![CDATA[\IBM-T 10.7.0.1 LA]]></TargetObjectName></Association><Association><Name><![CDATA[ ]]></Name><TargetModule><![CDATA[triPlatformObjectLabelManager]]></TargetModule><TargetBo><![CDATA[triPlatformObjectLabelManager]]></TargetBo><TargetObjectName><![CDATA[\IBM-T 10.8.0]]></TargetObjectName></Association><Association><Name><![CDATA[From]]></Name><TargetModule><![CDATA[triPlatformObjectLabelManager]]></TargetModule><TargetBo><![CDATA[triPlatformObjectLabelManager]]></TargetBo><TargetObjectName><![CDATA[\IBM-T 10.6.1]]></TargetObjectName></Association></Associations>     </BoRecord>
+</BoRecords>

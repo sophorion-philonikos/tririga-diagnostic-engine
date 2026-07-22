@@ -22,6 +22,11 @@ from cli.visualizer import WorkflowVisualizer
 from cli import simulation
 from cli import analysis_api
 from cli import graph_utils
+from om_gen.build import build_from_ir
+from om_gen.emit_workflow import ir_to_preview_graph, workflow_filename
+from om_gen.nl_recipe import SUPPORTED_NL_HELP, nl_to_recipe
+from om_gen.parse_recipe import ir_to_recipe_dict, recipe_to_ir
+from om_gen.validate import ValidationError, validate_ir
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
@@ -30,6 +35,67 @@ ALLOWED_EXTENSIONS = {'.zip', '.log', '.xml', '.txt'}
 # Per-browser session store (token -> session dict). Multi-tab safe.
 _session_lock = threading.Lock()
 _sessions = {}
+
+
+def generator_parse(payload):
+    """Parse NL (+ optional name/module/bo) → IR recipe dict + preview graph."""
+    prompt = str(payload.get('prompt') or payload.get('description') or '').strip()
+    if not prompt:
+        raise ValueError('Provide a workflow description (prompt).')
+    name = str(payload.get('name') or '').strip()
+    module = str(payload.get('module') or '').strip()
+    bo = str(payload.get('bo') or '').strip()
+    event_name = str(payload.get('event_name') or payload.get('event') or '').strip()
+    recipe = nl_to_recipe(
+        prompt, name=name, module=module, bo=bo, event_name=event_name,
+    )
+    if name:
+        recipe['header']['name'] = name
+    if module:
+        recipe['header']['module'] = module
+    if bo:
+        recipe['header']['bo'] = bo
+    ir = recipe_to_ir(recipe)
+    validate_ir(ir)
+    nodes, edges = ir_to_preview_graph(ir)
+    return {
+        'ir': ir_to_recipe_dict(ir),
+        'nodes': nodes,
+        'edges': edges,
+    }
+
+
+def generator_compile(payload):
+    """Compile IR or NL into flat OM zip bytes + suggested filename."""
+    ir = None
+    if payload.get('ir'):
+        ir = recipe_to_ir(payload['ir'])
+        validate_ir(ir)
+        data = build_from_ir(ir)
+    elif payload.get('prompt') or payload.get('description'):
+        prompt = str(payload.get('prompt') or payload.get('description'))
+        name = str(payload.get('name') or '')
+        module = str(payload.get('module') or '')
+        bo = str(payload.get('bo') or '')
+        event_name = str(payload.get('event_name') or '')
+        recipe = nl_to_recipe(
+            prompt, name=name, module=module, bo=bo, event_name=event_name,
+        )
+        if name:
+            recipe['header']['name'] = name
+        if module:
+            recipe['header']['module'] = module
+        if bo:
+            recipe['header']['bo'] = bo
+        ir = recipe_to_ir(recipe)
+        data = build_from_ir(ir)
+    else:
+        raise ValueError('Provide ir or prompt to compile.')
+    if not isinstance(data, (bytes, bytearray)):
+        raise RuntimeError('Compiler did not return zip bytes.')
+    base = workflow_filename(ir).replace('.xml', '')
+    return bytes(data), f'{base}.zip'
+
 
 
 def _new_session_id():
@@ -403,6 +469,17 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_bytes(self, status, data, content_type, headers=None):
+        body = data if isinstance(data, (bytes, bytearray)) else bytes(data)
+        self.send_response(status)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(body)))
+        if headers:
+            for k, v in headers.items():
+                self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json_body(self):
         try:
             length = int(self.headers.get('Content-Length', 0))
@@ -433,6 +510,25 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        if path in ('/generator', '/generator.html'):
+            gen_path = os.path.join(STATIC_DIR, 'generator.html')
+            try:
+                with open(gen_path, 'rb') as f:
+                    body = f.read()
+            except FileNotFoundError:
+                self._send_json(500, {'error': f'Missing UI file: {gen_path}'})
+                return
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if path == '/api/generator/nl-help':
+            self._send_json(200, {'help': SUPPORTED_NL_HELP})
+            return
+
         if path.startswith('/api/map/'):
             sid = path[len('/api/map/'):].strip('/')
             html = None
@@ -461,6 +557,12 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
         if self.path == '/api/analyze':
             self._handle_analyze()
+            return
+        if self.path == '/api/generator/parse':
+            self._handle_generator_parse()
+            return
+        if self.path == '/api/generator/compile':
+            self._handle_generator_compile()
             return
         if self.path != '/api/visualize':
             self._send_json(404, {'error': 'Not found'})
@@ -494,6 +596,43 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(200, result)
+
+    def _handle_generator_parse(self):
+        payload, err = self._read_json_body()
+        if err:
+            self._send_json(400, {'error': err})
+            return
+        try:
+            result = generator_parse(payload or {})
+        except (ValueError, ValidationError) as e:
+            self._send_json(400, {'error': str(e)})
+            return
+        except Exception as e:
+            self._send_json(500, {'error': f'Unexpected generator parse error: {e}'})
+            return
+        self._send_json(200, result)
+
+    def _handle_generator_compile(self):
+        payload, err = self._read_json_body()
+        if err:
+            self._send_json(400, {'error': err})
+            return
+        try:
+            data, filename = generator_compile(payload or {})
+        except (ValueError, ValidationError) as e:
+            self._send_json(400, {'error': str(e)})
+            return
+        except Exception as e:
+            self._send_json(500, {'error': f'Unexpected generator compile error: {e}'})
+            return
+        self._send_bytes(
+            200,
+            data,
+            'application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+            },
+        )
 
     def _handle_switch_workflow(self):
         payload, err = self._read_json_body()

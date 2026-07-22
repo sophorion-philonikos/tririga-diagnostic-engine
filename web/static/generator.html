@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>TRIRIGA Workflow Generator</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@5.16.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a222c;
+    --border: #2c3a4a;
+    --text: #e8eef4;
+    --muted: #8b9aab;
+    --accent: #3d9cf0;
+    --accent2: #2ecc9a;
+    --danger: #e74c3c;
+    --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: radial-gradient(1200px 600px at 10% -10%, #1a2a3a 0%, var(--bg) 55%);
+    color: var(--text); font-family: var(--font);
+  }
+  header {
+    display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 1.25rem; letter-spacing: 0.02em; }
+  header a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+  header a:hover { text-decoration: underline; }
+  .sub { color: var(--muted); font-size: 0.85rem; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) 1fr;
+    gap: 1rem;
+    padding: 1rem 1.5rem 2rem;
+    max-width: 1400px; margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem;
+  }
+  label { display: block; font-size: 0.75rem; color: var(--muted); margin: 0.6rem 0 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  input, textarea {
+    width: 100%; background: #0d1218; border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 0.55rem 0.65rem;
+    font: inherit; font-size: 0.9rem;
+  }
+  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, monospace; font-size: 0.82rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+  button {
+    border: none; border-radius: 6px; padding: 0.55rem 0.9rem;
+    font: inherit; font-size: 0.9rem; cursor: pointer;
+    background: var(--accent); color: #fff; font-weight: 600;
+  }
+  button.secondary { background: #2a3544; color: var(--text); }
+  button.ok { background: var(--accent2); color: #0a1a14; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 0.8rem; margin-top: 0.75rem; line-height: 1.4; }
+  .err { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; white-space: pre-wrap; }
+  .okmsg { color: var(--accent2); font-size: 0.85rem; margin-top: 0.5rem; }
+  #jsonPreview {
+    width: 100%; min-height: 180px; max-height: 280px;
+    font-family: ui-monospace, monospace; font-size: 0.75rem;
+  }
+  .map-wrap { display: flex; flex-direction: column; min-height: 520px; }
+  .map-wrap h2 { margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 600; }
+  #previewSvg {
+    flex: 1; width: 100%; min-height: 480px;
+    background: #0a0e13; border: 1px solid var(--border); border-radius: 8px;
+  }
+  .node rect { stroke: #4a5d72; stroke-width: 1.5px; fill: #1e2a36; }
+  .node text { fill: var(--text); font-size: 12px; font-family: var(--font); }
+  .edgePath path { stroke: #5a6d82; fill: none; stroke-width: 1.5px; }
+  .node.t1 rect { fill: #1a3a2a; stroke: #2ecc9a; }
+  .node.t9 rect { fill: #3a1a1a; stroke: #e74c3c; }
+  .node.t28 rect { fill: #1a2a3a; stroke: #3d9cf0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Workflow Generator</h1>
+  <span class="sub">Describe → preview map → export flat OM zip</span>
+  <a href="/">← Diagnostic Engine</a>
+</header>
+<main>
+  <section class="panel">
+    <label for="wfName">Workflow Name</label>
+    <input id="wfName" value='triBuilding - Synchronous - Append Z to Name' />
+
+    <label for="module">Module</label>
+    <input id="module" value="Location" />
+
+    <label for="bo">Business Object</label>
+    <input id="bo" value="triBuilding" />
+
+    <label for="prompt">Description (constrained NL)</label>
+    <textarea id="prompt">On Location::triBuilding triSave: modify set triNameTX = triNameTX + "Z"</textarea>
+
+    <div class="actions">
+      <button id="parseBtn" type="button">Parse &amp; Preview</button>
+      <button id="exportBtn" type="button" class="ok" disabled>Export OM Zip</button>
+      <button id="helpBtn" type="button" class="secondary">NL Help</button>
+    </div>
+    <div id="status" class="hint"></div>
+    <div id="error" class="err" hidden></div>
+
+    <label for="jsonPreview">JSON IR</label>
+    <textarea id="jsonPreview" readonly placeholder="Parsed IR appears here…"></textarea>
+    <p class="hint">
+      Use verbs from NL Help. If the preview map does not match your intent, revise the description and Parse again before exporting.
+    </p>
+  </section>
+
+  <section class="panel map-wrap">
+    <h2>Generated workflow preview</h2>
+    <svg id="previewSvg"></svg>
+  </section>
+</main>
+<script>
+(function () {
+  let lastIR = null;
+
+  const $ = (id) => document.getElementById(id);
+  const errEl = $('error');
+  const statusEl = $('status');
+
+  function showError(msg) {
+    errEl.hidden = !msg;
+    errEl.textContent = msg || '';
+  }
+
+  function renderPreview(nodes, edges) {
+    const svg = d3.select('#previewSvg');
+    svg.selectAll('*').remove();
+    if (!nodes || !nodes.length) return;
+
+    const g = new dagreD3.graphlib.Graph().setGraph({
+      rankdir: 'TB', nodesep: 28, ranksep: 40, marginx: 20, marginy: 20,
+    }).setDefaultEdgeLabel(function () { return {}; });
+
+    nodes.forEach(function (n) {
+      g.setNode(n.id, {
+        label: (n.label || n.id) + '\n[' + (n.typeName || n.type) + ']',
+        rx: 4, ry: 4,
+        class: 't' + n.type,
+        paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
+      });
+    });
+    (edges || []).forEach(function (e) {
+      if (g.hasNode(e.from) && g.hasNode(e.to)) {
+        g.setEdge(e.from, e.to, { curve: d3.curveBasis });
+      }
+    });
+
+    const inner = svg.append('g');
+    const render = new dagreD3.render();
+    render(inner, g);
+
+    const svgNode = svg.node();
+    const w = svgNode.clientWidth || 600;
+    const h = svgNode.clientHeight || 480;
+    const graphW = g.graph().width || 1;
+    const graphH = g.graph().height || 1;
+    const scale = Math.min(1.2, Math.min((w - 40) / graphW, (h - 40) / graphH));
+    const x = (w - graphW * scale) / 2;
+    const y = 20;
+    inner.attr('transform', 'translate(' + x + ',' + y + ') scale(' + scale + ')');
+  }
+
+  async function parse() {
+    showError('');
+    statusEl.textContent = 'Parsing…';
+    statusEl.className = 'hint';
+    $('exportBtn').disabled = true;
+    lastIR = null;
+    const body = {
+      name: $('wfName').value.trim(),
+      module: $('module').value.trim(),
+      bo: $('bo').value.trim(),
+      prompt: $('prompt').value.trim(),
+    };
+    try {
+      const res = await fetch('/api/generator/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showError(data.error || 'Parse failed');
+        statusEl.textContent = '';
+        renderPreview([], []);
+        return;
+      }
+      lastIR = data.ir;
+      $('jsonPreview').value = JSON.stringify(data.ir, null, 2);
+      renderPreview(data.nodes || [], data.edges || []);
+      $('exportBtn').disabled = false;
+      statusEl.textContent = 'Parsed OK — check the preview map, then Export.';
+      statusEl.className = 'okmsg';
+    } catch (e) {
+      showError(String(e));
+      statusEl.textContent = '';
+    }
+  }
+
+  async function exportZip() {
+    showError('');
+    if (!lastIR) {
+      showError('Parse first.');
+      return;
+    }
+    statusEl.textContent = 'Compiling OM zip…';
+    try {
+      const res = await fetch('/api/generator/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ir: lastIR }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(function () { return {}; });
+        showError(data.error || 'Compile failed');
+        statusEl.textContent = '';
+        return;
+      }
+      const blob = await res.blob();
+      const disp = res.headers.get('Content-Disposition') || '';
+      let fname = 'om_gen_workflow.zip';
+      const m = /filename="?([^";]+)"?/.exec(disp);
+      if (m) fname = m[1];
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      statusEl.textContent = 'Downloaded ' + fname;
+      statusEl.className = 'okmsg';
+    } catch (e) {
+      showError(String(e));
+      statusEl.textContent = '';
+    }
+  }
+
+  async function showHelp() {
+    try {
+      const res = await fetch('/api/generator/nl-help');
+      const data = await res.json();
+      $('prompt').value = (data.help || '') + '\n\n# Example:\n' + $('prompt').value;
+    } catch (e) {
+      showError(String(e));
+    }
+  }
+
+  $('parseBtn').addEventListener('click', parse);
+  $('exportBtn').addEventListener('click', exportZip);
+  $('helpBtn').addEventListener('click', showHelp);
+})();
+</script>
+</body>
+</html>

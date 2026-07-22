@@ -57,6 +57,16 @@ Then open `http://127.0.0.1:<port>/` in a browser.
 5. Use viewer modes: Topology / Live Trace / What-If / Diff; **Isolate** dims outside a task neighborhood.
 6. **Open map in new tab** for a full-window viewer; **Hide dock** collapses the analysis column.
 
+#### Workflow Generator page
+
+From the diagnostic header click **Workflow Generator →**, or open `http://127.0.0.1:<port>/generator.html`.
+
+1. Enter **Workflow Name**, **Module**, **BO**, and a constrained NL description (see `python3 -m om_gen nl-help`).
+2. Click **Parse & Preview** — JSON IR appears and a **dedicated** Dagre map shows Start → tasks → End (separate from the diagnostic viewer).
+3. If the map does not match intent, revise the description and parse again.
+4. Click **Export OM Zip** — downloads a flat package (`AllObjects.xml` + `ObjectLabel_*.xml` + `Workflow_*.xml`).
+5. Import in TRIRIGA Object Migration. If ObjectLabel import fails, swap fixtures per [`om_gen/IMPORT.md`](om_gen/IMPORT.md).
+
 ## Interactive CLI commands (after prompt)
 
 Typical prompts once the engine is loaded:
@@ -72,6 +82,29 @@ Typical prompts once the engine is loaded:
 
 Exact NLP routing lives in `cli/router.py` / `cli/commands/`.
 
+## OM workflow generator (`om_gen`)
+
+Isolated package: JSON recipe or constrained NL → flat TRIRIGA OM `.zip`.
+Does **not** change diagnostic visualize/simulate/map contracts.
+
+```bash
+# Minimal Start→End smoke zip
+python3 -m om_gen minimal --out /tmp/minimal.zip
+
+# From JSON recipe
+python3 -m om_gen build --recipe om_gen/examples/demo_modify.json --out /tmp/demo.zip
+
+# From constrained NL
+python3 -m om_gen nl --prompt 'On Location::triBuilding triSave: modify set triNameTX = triNameTX + "Z"' --out /tmp/nl.zip
+
+python3 -m om_gen types
+python3 -m om_gen nl-help
+```
+
+Per-type emitter dictionary: [`docs/om_gen_task_dictionary.md`](docs/om_gen_task_dictionary.md).
+
+**Limits (v1):** Query/Call name objects that must already exist (no Query Type-4 packaging). Freeform LLM planning is out of scope.
+
 ## Tests
 
 Run the full unit suite:
@@ -84,6 +117,7 @@ Targeted (examples):
 
 ```bash
 python3 -m unittest tests.test_viz_shapes tests.test_viz_node_parity tests.test_viz_svg_escape -v
+python3 -m unittest tests.test_om_gen -v
 python3 -m unittest tests.test_runbook -v
 ```
 

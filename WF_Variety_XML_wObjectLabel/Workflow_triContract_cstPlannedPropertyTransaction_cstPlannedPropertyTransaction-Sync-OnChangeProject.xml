@@ -1,0 +1,1367 @@
+<Workflow>
+    <Header Type="2" WfStatus="10" IgnoreModuleLevel="0" InstanceData="0" LockRecord="0"
+        Modifier="0">
+        <ObjectLabelName><![CDATA[In Progress 0.0]]></ObjectLabelName>
+        <Name><![CDATA[cstPlannedPropertyTransaction - Sync - OnChange Project]]></Name>
+        <Module><![CDATA[triContract]]></Module>
+        <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+        <EventName><![CDATA[Pre-Create]]></EventName>
+        <Description><![CDATA[]]></Description>
+        <AssociationName><![CDATA[]]></AssociationName>
+        <UpdatedBy><![CDATA[NO3829110485, KE8371103948 - 8072842122]]></UpdatedBy>
+        <AssociatedBO><![CDATA[]]></AssociatedBO>
+        <AssociatedModule><![CDATA[triContract]]></AssociatedModule>
+    </Header>
+    <Tasks>
+        <Task Id="333209" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346896"
+            SRCTaskId="-1" TRGTTaskId="333210" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[332833;333213;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 > 0  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[item]]></PType>
+                        <PDataId><![CDATA[332832]]></PDataId>
+                        <PItem><![CDATA[Result Count]]></PItem>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="333208" Type="28" FilterOperator="10" RecurrenceId="0" MapId="108156"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Clear Geography]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="108156" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="333204" Type="28" FilterOperator="10" RecurrenceId="0" MapId="108155"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Clear Location]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="108155" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[LocationName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="333210" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="333213" Type="28" FilterOperator="10" RecurrenceId="0" MapId="108157"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Clear Org]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="108157" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[OrgName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="332787" Type="9" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="0" Type="1" FilterOperator="10" RecurrenceId="0" MapId="346897" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Start]]></TaskLabel>
+            <EventName><![CDATA[Pre-Create]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssociatedModule><![CDATA[triContract]]></AssociatedModule>
+            <AssociatedBO><![CDATA[]]></AssociatedBO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[ ]]></Expression>
+            </Condition>
+        </Task>
+        <Task Id="332788" Type="29" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Get Location from Project]]></TaskLabel>
+            <EventName><![CDATA[GETLIST]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[Location]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="9" RefTaskId="332790">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Has Primary Location]]></RefAssoc>
+                    <RefModule><![CDATA[Location]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332790">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triProject]]></RefModule>
+                    <RefObject><![CDATA[triCapitalProject]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="332789" Type="25" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Get Temp Record]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="332792" Type="28" FilterOperator="10" RecurrenceId="0" MapId="107855"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Update PPT location with Project Location]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332788">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[Location]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="107855" Type="70">
+                    <FldVal><![CDATA[Source]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[Location]]></SrcModule>
+                    <SrcBo><![CDATA[Location]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[LocationName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="332790" Type="22" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Get Project]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <FilterClass><![CDATA[19]]></FilterClass>
+            <Module><![CDATA[triProject]]></Module>
+            <BO><![CDATA[triCapitalProject]]></BO>
+            <FilterBo><![CDATA[cstCapitalProject - WORKFLOW - All Project]]></FilterBo>
+            <FilterBoBO><![CDATA[triCapitalProject]]></FilterBoBO>
+            <FilterModule><![CDATA[triProject]]></FilterModule>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <TaskFilters>
+                <TaskFilter SeqId="1" LDataType="320" RDataType="320" LListFlg="0" RListFlg="0"
+                    RListType="1" CnstFlg="0" Operator="10" AssociatedToName=""
+                    AssociatedToTaskId="0" AssociatedToWithChildren="0">
+                    <LSecName><![CDATA[RecordInformation]]></LSecName>
+                    <LFldName><![CDATA[triIdTX]]></LFldName>
+                    <RSecName><![CDATA[RecordInformation]]></RSecName>
+                    <RFldName><![CDATA[cstTransaction1ProjectIDTX]]></RFldName>
+                    <RValue><![CDATA[]]></RValue>
+                </TaskFilter>
+            </TaskFilters>
+        </Task>
+        <Task Id="332831" Type="28" FilterOperator="10" RecurrenceId="0" MapId="107866"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Update PPT Geography from Project]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332830">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[Geography]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="107866" Type="70">
+                    <FldVal><![CDATA[Source]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[Geography]]></SrcModule>
+                    <SrcBo><![CDATA[Geography]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="332833" Type="28" FilterOperator="10" RecurrenceId="0" MapId="107867"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Update PPT Organization from Project]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332832">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[Organization]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="107867" Type="70">
+                    <FldVal><![CDATA[Source]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[Organization]]></SrcModule>
+                    <SrcBo><![CDATA[Organization]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[OrgName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="332830" Type="29" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Get Geography from Project]]></TaskLabel>
+            <EventName><![CDATA[GETLIST]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[Geography]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="9" RefTaskId="332790">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Primary Geography]]></RefAssoc>
+                    <RefModule><![CDATA[Geography]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332790">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triProject]]></RefModule>
+                    <RefObject><![CDATA[triCapitalProject]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="332832" Type="29" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Get Organization from location]]></TaskLabel>
+            <EventName><![CDATA[GETLIST]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[Organization]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="9" RefTaskId="332788">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Has Using Organization]]></RefAssoc>
+                    <RefModule><![CDATA[Organization]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332790">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triProject]]></RefModule>
+                    <RefObject><![CDATA[triCapitalProject]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+        <Task Id="333200" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346898"
+            SRCTaskId="-1" TRGTTaskId="333201" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[332792;333204;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 > 0  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[item]]></PType>
+                        <PDataId><![CDATA[332788]]></PDataId>
+                        <PItem><![CDATA[Result Count]]></PItem>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="333201" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="333205" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346899"
+            SRCTaskId="-1" TRGTTaskId="333206" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[332831;333208;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 > 0  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[item]]></PType>
+                        <PDataId><![CDATA[332830]]></PDataId>
+                        <PItem><![CDATA[Result Count]]></PItem>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="333206" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="333354" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346900"
+            SRCTaskId="-1" TRGTTaskId="333355" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[333359;333355;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 == ""  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[field]]></PType>
+                        <PDataId><![CDATA[332789]]></PDataId>
+                        <PField><![CDATA[cstTransaction1ProjectIDTX]]></PField>
+                        <PSection><![CDATA[RecordInformation]]></PSection>
+                        <PModule><![CDATA[triContract]]></PModule>
+                        <PBO><![CDATA[cstPlannedPropertyTransaction]]></PBO>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="333355" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="333359" Type="28" FilterOperator="10" RecurrenceId="0" MapId="108254"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Clear Project details]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="108254" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="108254" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[LocationName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="108254" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[OrgName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+                <ObjMapping Id="108254" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[triContract]]></SrcModule>
+                    <SrcBo><![CDATA[cstPlannedPropertyTransaction]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[RecordInformation]]></TrgtSec>
+                    <TrgtFld><![CDATA[cstTransaction1ProjectNameTX]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="333360" Type="19" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="334404" Type="28" FilterOperator="10" RecurrenceId="0" MapId="109254"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Modify PPT Geo from Project]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332830">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[Geography]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="109254" Type="70">
+                    <FldVal><![CDATA[Source]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[Geography]]></SrcModule>
+                    <SrcBo><![CDATA[Geography]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="334400" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346901"
+            SRCTaskId="-1" TRGTTaskId="334401" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[334404;334405;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 > 0  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[item]]></PType>
+                        <PDataId><![CDATA[332830]]></PDataId>
+                        <PItem><![CDATA[Result Count]]></PItem>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="334396" Type="14" FilterOperator="10" RecurrenceId="0" MapId="346902"
+            SRCTaskId="-1" TRGTTaskId="334397" AssigneeTaskId="0" SortCount="1" UseMap="1"
+            LockUser="0" AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0"
+            DateContext="0" ServiceContext="1">
+            <TaskLabel><![CDATA[Switch]]></TaskLabel>
+            <EventName><![CDATA[0=true;1=false;]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[334400;333200;]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+            <Condition>
+                <Expression><![CDATA[p0 > 0  ]]></Expression>
+                <Params>
+                    <Param PId="0">
+                        <PType><![CDATA[item]]></PType>
+                        <PDataId><![CDATA[334394]]></PDataId>
+                        <PItem><![CDATA[Result Count]]></PItem>
+                    </Param>
+                </Params>
+            </Condition>
+        </Task>
+        <Task Id="334397" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="334401" Type="12" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[]]></TaskLabel>
+            <EventName><![CDATA[]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[]]></Module>
+            <BO><![CDATA[]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs />
+        </Task>
+        <Task Id="334405" Type="28" FilterOperator="10" RecurrenceId="0" MapId="109253"
+            SRCTaskId="-1" TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Clear PPT Geo]]></TaskLabel>
+            <EventName><![CDATA[Append]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[2]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[cstPlannedPropertyTransaction]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="-1" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="332830">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[Geography]]></RefModule>
+                    <RefObject><![CDATA[]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+            <ObjMappings>
+                <ObjMapping Id="109253" Type="40">
+                    <FldVal><![CDATA[]]></FldVal>
+                    <SrcFldVal><![CDATA[]]></SrcFldVal>
+                    <TrgtModule><![CDATA[triContract]]></TrgtModule>
+                    <TrgtBo><![CDATA[cstPlannedPropertyTransaction]]></TrgtBo>
+                    <SrcModule><![CDATA[Geography]]></SrcModule>
+                    <SrcBo><![CDATA[Geography]]></SrcBo>
+                    <TrgtTab><![CDATA[General]]></TrgtTab>
+                    <TrgtSec><![CDATA[General]]></TrgtSec>
+                    <TrgtFld><![CDATA[GeographyName]]></TrgtFld>
+                    <SrcTab><![CDATA[]]></SrcTab>
+                    <SrcSec><![CDATA[]]></SrcSec>
+                    <SrcFld><![CDATA[]]></SrcFld>
+                </ObjMapping>
+            </ObjMappings>
+        </Task>
+        <Task Id="334394" Type="29" FilterOperator="10" RecurrenceId="0" MapId="-1" SRCTaskId="-1"
+            TRGTTaskId="-1" AssigneeTaskId="0" SortCount="1" UseMap="1" LockUser="0"
+            AssignToFlag="1" EstEndInDays="0" EstEndInHrs="0" EstEndInMins="0" DateContext="0"
+            ServiceContext="1">
+            <TaskLabel><![CDATA[Retrieve RE Lease from PPT]]></TaskLabel>
+            <EventName><![CDATA[GETLIST]]></EventName>
+            <Description><![CDATA[]]></Description>
+            <DeleteSection><![CDATA[]]></DeleteSection>
+            <SumSection><![CDATA[]]></SumSection>
+            <SumField><![CDATA[]]></SumField>
+            <FilterSection><![CDATA[]]></FilterSection>
+            <FilterField><![CDATA[]]></FilterField>
+            <FilterValue><![CDATA[]]></FilterValue>
+            <ServiceAssociation><![CDATA[]]></ServiceAssociation>
+            <TargetAssociation><![CDATA[]]></TargetAssociation>
+            <TransactionType><![CDATA[0]]></TransactionType>
+            <Status><![CDATA[0]]></Status>
+            <ParametersMapId><![CDATA[-1]]></ParametersMapId>
+            <FormulaRecalc><![CDATA[0]]></FormulaRecalc>
+            <Module><![CDATA[triContract]]></Module>
+            <BO><![CDATA[triRealEstateContract]]></BO>
+            <AssignToUserMod><![CDATA[]]></AssignToUserMod>
+            <AssignToUserBO><![CDATA[]]></AssignToUserBO>
+            <AssignToUser><![CDATA[]]></AssignToUser>
+            <TaskRefs>
+                <TaskRef RefType="0" UseType="1" TaskRefType="0" CtxType="9" RefTaskId="332789">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[Contract For]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[triRealEstateContract]]></RefObject>
+                    <RefRecordMod><![CDATA[]]></RefRecordMod>
+                    <RefRecordBO><![CDATA[]]></RefRecordBO>
+                    <RefRecord><![CDATA[]]></RefRecord>
+                </TaskRef>
+                <TaskRef RefType="1" UseType="2" TaskRefType="0" CtxType="-1" RefTaskId="0">
+                    <RefSec><![CDATA[]]></RefSec>
+                    <RefField><![CDATA[]]></RefField>
+                    <RefAssoc><![CDATA[]]></RefAssoc>
+                    <RefModule><![CDATA[triContract]]></RefModule>
+                    <RefObject><![CDATA[cstPlannedPropertyTransaction]]></RefObject>
+                </TaskRef>
+            </TaskRefs>
+        </Task>
+    </Tasks>
+    <WFSteps>
+        <WFStep Id="0" Type="1" ParId="-1" />
+        <WFStep Id="332787" Type="9" ParId="334397" />
+        <WFStep Id="332788" Type="29" ParId="334394" />
+        <WFStep Id="332789" Type="25" ParId="0" />
+        <WFStep Id="332790" Type="22" ParId="332789" />
+        <WFStep Id="332792" Type="28" ParId="333200" />
+        <WFStep Id="332830" Type="29" ParId="332788" />
+        <WFStep Id="332831" Type="28" ParId="333205" />
+        <WFStep Id="332832" Type="29" ParId="332830" />
+        <WFStep Id="332833" Type="28" ParId="333209" />
+        <WFStep Id="333200" Type="14" ParId="334396" />
+        <WFStep Id="333201" Type="12" ParId="332792" />
+        <WFStep Id="333201" Type="12" ParId="333204" />
+        <WFStep Id="333204" Type="28" ParId="333200" />
+        <WFStep Id="333205" Type="14" ParId="333201" />
+        <WFStep Id="333206" Type="12" ParId="332831" />
+        <WFStep Id="333206" Type="12" ParId="333208" />
+        <WFStep Id="333208" Type="28" ParId="333205" />
+        <WFStep Id="333209" Type="14" ParId="333206" />
+        <WFStep Id="333210" Type="12" ParId="332833" />
+        <WFStep Id="333210" Type="12" ParId="333213" />
+        <WFStep Id="333213" Type="28" ParId="333209" />
+        <WFStep Id="333354" Type="14" ParId="332790" />
+        <WFStep Id="333355" Type="12" ParId="333354" />
+        <WFStep Id="333355" Type="12" ParId="333360" />
+        <WFStep Id="333359" Type="28" ParId="333354" />
+        <WFStep Id="333360" Type="19" ParId="333359" />
+        <WFStep Id="334394" Type="29" ParId="333355" />
+        <WFStep Id="334396" Type="14" ParId="332832" />
+        <WFStep Id="334397" Type="12" ParId="333210" />
+        <WFStep Id="334397" Type="12" ParId="334401" />
+        <WFStep Id="334400" Type="14" ParId="334396" />
+        <WFStep Id="334401" Type="12" ParId="334404" />
+        <WFStep Id="334401" Type="12" ParId="334405" />
+        <WFStep Id="334404" Type="28" ParId="334400" />
+        <WFStep Id="334405" Type="28" ParId="334400" />
+    </WFSteps>
+</Workflow>
