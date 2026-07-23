@@ -13,14 +13,14 @@ from om_gen.build import (
     minimal_start_end_ir,
 )
 from om_gen.dictionary import supported_type_codes, TASK_TYPES
-from om_gen.nl_recipe import SUPPORTED_NL_HELP
+from om_gen.intent import INTENT_NL_HELP
 from om_gen import TYPE_NAMES
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog='om_gen',
-        description='Compile JSON recipe or constrained NL into a flat TRIRIGA OM zip.',
+        description='Compile JSON recipe, constrained NL, or plain-English intent into a flat TRIRIGA OM zip.',
     )
     sub = parser.add_subparsers(dest='cmd', required=True)
 
@@ -28,7 +28,7 @@ def main(argv=None) -> int:
     p_build.add_argument('--recipe', required=True, help='Path to recipe JSON')
     p_build.add_argument('--out', required=True, help='Output zip path')
 
-    p_nl = sub.add_parser('nl', help='Build from constrained NL prompt')
+    p_nl = sub.add_parser('nl', help='Build from constrained NL or intent prompt')
     p_nl.add_argument('--prompt', required=True)
     p_nl.add_argument('--out', required=True)
     p_nl.add_argument('--name', default='')
@@ -44,7 +44,7 @@ def main(argv=None) -> int:
     p_min.add_argument('--event', default='Pre-Create')
 
     sub.add_parser('types', help='List supported task types')
-    sub.add_parser('nl-help', help='Show constrained NL grammar')
+    sub.add_parser('nl-help', help='Show constrained NL + intent help')
 
     args = parser.parse_args(argv)
 
@@ -55,7 +55,7 @@ def main(argv=None) -> int:
         return 0
 
     if args.cmd == 'nl-help':
-        print(SUPPORTED_NL_HELP)
+        print(INTENT_NL_HELP)
         return 0
 
     if args.cmd == 'minimal':

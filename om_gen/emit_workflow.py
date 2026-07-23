@@ -172,6 +172,7 @@ def _emit_task_refs(refs: List[TaskRefIR]) -> str:
 
 
 def _emit_condition(cond: Optional[ConditionIR]) -> str:
+    """Emit Condition with corpus Param child-element shape (not attr PType/PDataId)."""
     if cond is None:
         return (
             '<Condition>'
@@ -181,14 +182,17 @@ def _emit_condition(cond: Optional[ConditionIR]) -> str:
         )
     lines = ['<Condition>', _tag('Expression', cond.expression or ''), '<Params>']
     for p in cond.params:
-        lines.append(
-            f'<Param PId="{escape(p.p_id)}" PType="{escape(p.p_type)}" '
-            f'PDataId="{escape(p.p_data_id)}">'
-        )
-        lines.append(_tag('PField', p.p_field))
-        lines.append(_tag('PSection', p.p_section))
-        lines.append(_tag('PModule', p.p_module))
-        lines.append(_tag('PBO', p.p_bo))
+        # Corpus: <Param PId="n"><PType/><PDataId/> then field kids or PItem
+        lines.append(f'<Param PId="{escape(p.p_id)}">')
+        lines.append(_tag('PType', p.p_type or 'field'))
+        lines.append(_tag('PDataId', p.p_data_id or '0'))
+        if (p.p_type or 'field') == 'item' or p.p_item:
+            lines.append(_tag('PItem', p.p_item or 'Result Count'))
+        else:
+            lines.append(_tag('PField', p.p_field))
+            lines.append(_tag('PSection', p.p_section))
+            lines.append(_tag('PModule', p.p_module))
+            lines.append(_tag('PBO', p.p_bo))
         lines.append('</Param>')
     lines.append('</Params></Condition>')
     return '\n'.join(lines)
@@ -309,7 +313,8 @@ def _emit_task(task: TaskIR, header_mod: str, header_bo: str) -> str:
         lines.append(_tag('FilterBo', task.filter_bo))
         lines.append(_tag('FilterBoBO', task.filter_bo_bo or bo))
         lines.append(_tag('FilterModule', task.filter_module or mod))
-        if task.filter_class:
+        # Type 22 always emits FilterClass (empty if unknown); others only when set
+        if task.type == '22' or task.filter_class:
             lines.append(_tag('FilterClass', task.filter_class))
 
     if (

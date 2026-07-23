@@ -61,6 +61,7 @@ def _condition(c: Optional[Dict[str, Any]]) -> Optional[ConditionIR]:
             p_section=str(p.get('p_section', p.get('section', ''))),
             p_module=str(p.get('p_module', p.get('module', ''))),
             p_bo=str(p.get('p_bo', p.get('bo', ''))),
+            p_item=str(p.get('p_item', p.get('item', ''))),
         ))
     return ConditionIR(expression=str(c.get('expression') or ''), params=params)
 
@@ -180,6 +181,7 @@ def ir_to_recipe_dict(ir: WorkflowIR) -> Dict[str, Any]:
                     'p_id': p.p_id, 'p_type': p.p_type, 'p_data_id': p.p_data_id,
                     'p_field': p.p_field, 'p_section': p.p_section,
                     'p_module': p.p_module, 'p_bo': p.p_bo,
+                    'p_item': p.p_item,
                 } for p in t.condition.params],
             }
         if t.gui_mappings:

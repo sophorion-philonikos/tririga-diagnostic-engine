@@ -24,7 +24,7 @@ from cli import analysis_api
 from cli import graph_utils
 from om_gen.build import build_from_ir
 from om_gen.emit_workflow import ir_to_preview_graph, workflow_filename
-from om_gen.nl_recipe import SUPPORTED_NL_HELP, nl_to_recipe
+from om_gen.intent import INTENT_NL_HELP, IntentError, parse_prompt
 from om_gen.parse_recipe import ir_to_recipe_dict, recipe_to_ir
 from om_gen.validate import ValidationError, validate_ir
 
@@ -38,7 +38,7 @@ _sessions = {}
 
 
 def generator_parse(payload):
-    """Parse NL (+ optional name/module/bo) → IR recipe dict + preview graph."""
+    """Parse NL/intent (+ optional name/module/bo) → IR recipe dict + preview graph."""
     prompt = str(payload.get('prompt') or payload.get('description') or '').strip()
     if not prompt:
         raise ValueError('Provide a workflow description (prompt).')
@@ -46,7 +46,7 @@ def generator_parse(payload):
     module = str(payload.get('module') or '').strip()
     bo = str(payload.get('bo') or '').strip()
     event_name = str(payload.get('event_name') or payload.get('event') or '').strip()
-    recipe = nl_to_recipe(
+    recipe = parse_prompt(
         prompt, name=name, module=module, bo=bo, event_name=event_name,
     )
     if name:
@@ -66,7 +66,7 @@ def generator_parse(payload):
 
 
 def generator_compile(payload):
-    """Compile IR or NL into flat OM zip bytes + suggested filename."""
+    """Compile IR or NL/intent into flat OM zip bytes + suggested filename."""
     ir = None
     if payload.get('ir'):
         ir = recipe_to_ir(payload['ir'])
@@ -78,7 +78,7 @@ def generator_compile(payload):
         module = str(payload.get('module') or '')
         bo = str(payload.get('bo') or '')
         event_name = str(payload.get('event_name') or '')
-        recipe = nl_to_recipe(
+        recipe = parse_prompt(
             prompt, name=name, module=module, bo=bo, event_name=event_name,
         )
         if name:
@@ -526,7 +526,7 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
 
         if path == '/api/generator/nl-help':
-            self._send_json(200, {'help': SUPPORTED_NL_HELP})
+            self._send_json(200, {'help': INTENT_NL_HELP})
             return
 
         if path.startswith('/api/map/'):
@@ -604,6 +604,9 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
         try:
             result = generator_parse(payload or {})
+        except IntentError as e:
+            self._send_json(400, e.to_dict())
+            return
         except (ValueError, ValidationError) as e:
             self._send_json(400, {'error': str(e)})
             return
@@ -619,6 +622,9 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
             return
         try:
             data, filename = generator_compile(payload or {})
+        except IntentError as e:
+            self._send_json(400, e.to_dict())
+            return
         except (ValueError, ValidationError) as e:
             self._send_json(400, {'error': str(e)})
             return

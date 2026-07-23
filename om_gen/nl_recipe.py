@@ -41,6 +41,9 @@ Modify field sets:
 
 Example:
   On Location::triBuilding triSave: modify set triNameTX = triNameTX + "Z"
+
+For plain-English intent (append Z, field-null Switch, result-count after retrieve),
+see: python3 -m om_gen nl-help  (includes intent examples).
 """
 
 _HEADER_RE = re.compile(

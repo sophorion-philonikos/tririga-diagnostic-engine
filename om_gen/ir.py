@@ -44,6 +44,7 @@ class ConditionParamIR:
     p_section: str = ''
     p_module: str = ''
     p_bo: str = ''
+    p_item: str = ''  # e.g. "Result Count" when p_type=item
 
 
 @dataclass

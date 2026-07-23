@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Union
 
+from om_gen.intent import parse_prompt
 from om_gen.ir import EdgeIR, HeaderIR, TaskIR, WorkflowIR
-from om_gen.nl_recipe import nl_to_recipe
 from om_gen.pack_om import pack_om_zip
 from om_gen.parse_recipe import load_recipe_file, recipe_to_ir
 from om_gen.validate import validate_ir
@@ -34,7 +34,7 @@ def build_from_nl(
     bo: str = '',
     event_name: str = '',
 ) -> Union[bytes, str]:
-    recipe = nl_to_recipe(
+    recipe = parse_prompt(
         prompt, name=name, module=module, bo=bo, event_name=event_name,
     )
     return build_from_recipe(recipe, out_path=out_path)
