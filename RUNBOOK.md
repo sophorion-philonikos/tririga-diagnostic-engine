@@ -67,9 +67,11 @@ From the diagnostic header click **Workflow Generator →**, or open `http://127
 4. Click **Export OM Zip** — downloads a flat package (`AllObjects.xml` + `ObjectLabel_*.xml` + `Workflow_*.xml`).
 5. Import in TRIRIGA Object Migration. If ObjectLabel import fails, swap fixtures per [`om_gen/IMPORT.md`](om_gen/IMPORT.md).
 
-**Dual path:** prompts matching `On Module::BO Event:` use constrained grammar; otherwise the intent layer uses **slot extraction** (paraphrases OK — e.g. *modifies…by adding the letter Z when the user clicks save*, *gets building records…greater than 0…append 123GG*). Form Name/Module/BO win when filled. Query tasks need an existing Query object name (`FilterBo`) — naming only a BO fails with guidance to provide the name or say *retrieve*. Bare “result count > 0” without a Query/Retrieve target fails. Unknown field/event phrases fail closed.
+**Dual path:** prompts matching `On Module::BO Event:` use constrained grammar; otherwise the intent layer uses **slot extraction** (paraphrases OK — e.g. *modifies…by adding the letter Z when the user clicks save*, *name field is blank, add a Z to it, otherwise…*, *gets building records…greater than 0*). Form Name/Module/BO win when filled. Empty predicates: blank / missing / unset / empty / null. Query tasks need an existing Query object name (`FilterBo`). Bare “result count > 0” without a Query/Retrieve target fails. Unrecognized `if … otherwise` predicates fail closed (no silent Modify-only).
 
-**Add synonyms:** lowercase phrase keys in [`om_gen/module_bo_synonyms.py`](om_gen/module_bo_synonyms.py) (`EVENT_SYNONYMS`, `MODULE_BO_PHRASES`) and [`om_gen/field_synonyms.py`](om_gen/field_synonyms.py) (`_GLOBAL` / `_BY_BO`). Longest match wins; do not invent unresolved phrases at parse time.
+**Module/BO catalog:** [`tririga_modules_bos.json`](tririga_modules_bos.json) is the authoritative Module→BO list (~99 modules / ~1700 BOs). Generator Module/BO fields are cascading comboboxes loaded from `GET /api/generator/catalog` (via [`om_gen/oob_catalog.py`](om_gen/oob_catalog.py)); free-typed custom Module/BO values are still allowed. Refresh the dropdowns by replacing that JSON file and restarting the web server.
+
+**Add synonyms (events/fields/NL phrases):** lowercase phrase keys in [`om_gen/module_bo_synonyms.py`](om_gen/module_bo_synonyms.py) and [`om_gen/field_synonyms.py`](om_gen/field_synonyms.py). Longest match wins; do not invent unresolved phrases at parse time.
 
 ## Interactive CLI commands (after prompt)
 
@@ -128,7 +130,7 @@ Targeted (examples):
 
 ```bash
 python3 -m unittest tests.test_viz_shapes tests.test_viz_node_parity tests.test_viz_svg_escape -v
-python3 -m unittest tests.test_om_gen tests.test_om_gen_intent -v
+python3 -m unittest tests.test_om_gen tests.test_om_gen_intent tests.test_oob_catalog -v
 python3 -m unittest tests.test_runbook -v
 ```
 

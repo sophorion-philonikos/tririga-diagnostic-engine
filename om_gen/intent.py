@@ -28,13 +28,19 @@ _PREAMBLE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Field-null / empty predicate
+# Empty-family tokens used in field predicates
+_EMPTY_WORDS = r'(?:null|empty|blank|missing|unset)'
+# Field-null / empty predicate (blank/missing/unset/empty/null + negations)
 _IF_FIELD_RE = re.compile(
     r'\bif\s+(?:the\s+)?(?P<sub>.*?)\s+'
-    r'(?P<pred>is\s+not\s+(?:null|empty)|isn\'t\s+(?:null|empty)|not\s+null|not\s+empty|'
-    r'is\s+(?:null|empty)|equals?\s+empty)\b',
+    r'(?P<pred>is\s+not\s+' + _EMPTY_WORDS + r'|isn\'t\s+' + _EMPTY_WORDS
+    + r'|not\s+' + _EMPTY_WORDS
+    + r'|is\s+' + _EMPTY_WORDS
+    + r'|equals?\s+(?:' + _EMPTY_WORDS + r'))\b',
     re.IGNORECASE | re.DOTALL,
 )
+_IF_OTHERWISE_RE = re.compile(r'\bif\b.*\b(?:otherwise|else)\b', re.IGNORECASE | re.DOTALL)
+_ARTICLES = frozenset({'a', 'an', 'the'})
 
 # Count gate: result count / count + comparison words + N
 _COUNT_RE = re.compile(
@@ -65,21 +71,12 @@ _QUERY_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Append/add literal to field — several shapes
-_APPEND_TO_FIELD_RE = re.compile(
-    r'\b(?:append(?:ing)?|add(?:ing)?)\s+'
-    r'(?:(?:the\s+)?(?:letter|character|characters)\s+)?'
-    r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)\s+'
-    r'to\s+(?:the\s+)?(?P<field>.+?)'
-    r'(?=\s+when\b|\s+on\s+save\b|\s+on\s+pre|\s*;|\s+otherwise|\s+else|,?\s+and\s+if\b|$)',
-    re.IGNORECASE,
-)
-
-# modifies/updates <field> by adding/appending [letter] LIT
+# modifies/updates <field> by adding/appending …
 _MODIFY_BY_ADD_RE = re.compile(
     r'\b(?:modif(?:y|ies)|updates?)\s+(?:the\s+)?(?P<field>.+?)\s+'
     r'by\s+(?:append(?:ing)?|add(?:ing)?)\s+'
     r'(?:(?:the\s+)?(?:letter|character|characters)\s+)?'
+    r'(?:(?:a|an|the)\s+)?'
     r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)\b',
     re.IGNORECASE,
 )
@@ -97,6 +94,7 @@ Intent (plain English) — slot extraction, paraphrases OK:
   Make a workflow that retrieves building records, and if the result count is greater than 0, then append Z to the building's name field
   … gets building records … more than 0 … append 123GG to the building's name field
   If the building record's name field is not null, append Z to the name; otherwise do nothing
+  Create a workflow so that if the building record's name field is blank, add a Z to it, otherwise don't do anything
   Query \"triBuilding - Existing Query\"; if result count > 0 then append Z to the name
 
 Rules:
@@ -104,12 +102,16 @@ Rules:
   - \"Create/Make a workflow that…\" is a preamble (not Type 27 Create Record).
   - Events: save/clicks save → triSave; pre-create → Pre-Create; see om_gen/module_bo_synonyms.py.
   - Fields: name → triNameTX; unknown phrases error — add synonyms in om_gen/field_synonyms.py.
-  - Null/empty → Expression p0 == \"\" / p0 != \"\" with Param field binding.
+  - Null/empty/blank/missing/unset → Expression p0 == \"\" / p0 != \"\" with Param field binding.
+  - \"add a Z\" → literal Z (article skipped). Pronoun \"it\" → last mentioned field.
+  - if … otherwise with unrecognized predicate → error (no silent Modify-only).
   - Result count ONLY after Query(22) or Retrieve(29) that names WHAT.
   - Query needs an existing Query object name (FilterBo); BO-only → error (use retrieve).
+  - Module→BO dropdown catalog: tririga_modules_bos.json via /api/generator/catalog.
 
 Add synonyms: edit EVENT_SYNONYMS / MODULE_BO_PHRASES in module_bo_synonyms.py
 or _GLOBAL / _BY_BO in field_synonyms.py (lowercase phrase keys; longest match wins).
+Refresh Module/BO lists by replacing tririga_modules_bos.json at the repo root.
 
 """ + SUPPORTED_NL_HELP
 
@@ -254,7 +256,8 @@ def extract_slots(
         )
     if not mod or not bob:
         raise IntentError(
-            'Could not determine Module/BO. Fill the Module and BO form fields, '
+            'Could not determine Module/BO. Fill the Module and BO form fields '
+            '(see Generator catalog from tririga_modules_bos.json), '
             'or name a known record type (e.g. building, land).',
             code='module_bo_unresolved',
         )
@@ -286,8 +289,22 @@ def extract_slots(
     if not slots.count:
         slots.field_pred = _extract_field_pred(text, mod, bob)
 
-    # Modify / append
-    slots.modify = _extract_modify(text, mod, bob)
+    # if … otherwise/else without a recognized predicate or count → fail closed
+    if (
+        not slots.count
+        and not slots.field_pred
+        and _IF_OTHERWISE_RE.search(text)
+    ):
+        span = _unrecognized_if_span(text)
+        raise IntentError(
+            f'Unrecognized if/otherwise condition {span!r}. '
+            f'Use blank/empty/null/missing/unset (or not …), or a result-count gate after retrieve/query.',
+            code='unrecognized_predicate',
+            span=span,
+        )
+
+    # Modify / append (uses field_pred for pronoun "it")
+    slots.modify = _extract_modify(text, mod, bob, field_pred=slots.field_pred)
 
     # Default event when modify-like and no event found
     if not slots.event and slots.modify:
@@ -437,9 +454,21 @@ def _extract_source(text: str, mod: str, bob: str) -> Optional[SourceSlot]:
 
 def _null_expression(pred: str) -> str:
     p = pred.lower()
-    if 'not' in p or "isn't" in p or 'isnt' in p:
+    # Negations: is not blank, isn't empty, not null, …
+    if re.search(r'\bnot\b|isn\'t|isnt', p):
         return 'p0 != ""'
     return 'p0 == ""'
+
+
+def _unrecognized_if_span(text: str) -> str:
+    m = re.search(
+        r'\bif\b(.{0,80}?)(?:\botherwise\b|\belse\b)',
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        return ('if' + m.group(1)).strip()[:100]
+    return text[:80]
 
 
 def _resolve_field_phrase(phrase: str, mod: str, bob: str) -> Tuple[str, str]:
@@ -492,46 +521,139 @@ def _normalize_literal(lit: str) -> str:
     return lit
 
 
-def _extract_modify(text: str, mod: str, bob: str) -> Optional[ModifySlot]:
+def _reject_article_literal(lit: str) -> str:
+    """Reject articles mistaken as literals; raise unknown_literal if empty."""
+    lit = _normalize_literal(lit)
+    if lit.lower() in _ARTICLES or not lit:
+        raise IntentError(
+            f'Could not determine append/add literal (got {lit!r}). '
+            f'Use e.g. "add a Z", "append \\"123GG\\"", or "adding the letter Z".',
+            code='unknown_literal',
+            span=lit or '',
+        )
+    return lit
+
+
+def _extract_append_literal(
+    text: str,
+) -> Optional[Tuple[str, Optional[str], str]]:
+    """Return (literal, field_phrase_or_None, span) with article-safe priority."""
+    # 1) letter/character(s) X
+    m = re.search(
+        r'\b(?:append(?:ing)?|add(?:ing)?)\s+'
+        r'(?:(?:the\s+)?(?:letter|character|characters)\s+)'
+        r'(?P<lit>"[^"]+"|\'[^\']+\'|\S+)'
+        r'(?:\s+to\s+(?:the\s+)?(?P<field>.+?))?'
+        r'(?=\s+when\b|\s+on\s+save\b|\s+on\s+pre|\s*;|\s+otherwise|\s+else|,?\s+and\s+if\b|$)',
+        text,
+        re.I,
+    )
+    if m:
+        lit = _reject_article_literal(m.group('lit'))
+        fld = (m.group('field') or '').strip() or None
+        return lit, fld, m.group(0)
+
+    # 2) quoted after append/add
+    m = re.search(
+        r'\b(?:append(?:ing)?|add(?:ing)?)\s+(?P<lit>"[^"]+"|\'[^\']+\')'
+        r'(?:\s+to\s+(?:the\s+)?(?P<field>.+?))?'
+        r'(?=\s+when\b|\s+on\s+save\b|\s+on\s+pre|\s*;|\s+otherwise|\s+else|,?\s+and\s+if\b|$)',
+        text,
+        re.I,
+    )
+    if m:
+        lit = _reject_article_literal(m.group('lit'))
+        fld = (m.group('field') or '').strip() or None
+        return lit, fld, m.group(0)
+
+    # 3) add/append a|an|the TOKEN  (token after article = literal)
+    m = re.search(
+        r'\b(?:append(?:ing)?|add(?:ing)?)\s+(?:a|an|the)\s+'
+        r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)'
+        r'(?:\s+to\s+(?:the\s+)?(?P<field>.+?))?'
+        r'(?=\s+when\b|\s+on\s+save\b|\s+on\s+pre|\s*;|\s+otherwise|\s+else'
+        r'|,?\s+and\s+if\b|\s*,|\s*$)',
+        text,
+        re.I,
+    )
+    if m:
+        lit = _reject_article_literal(m.group('lit'))
+        fld = (m.group('field') or '').strip() or None
+        if fld:
+            fld = re.sub(r'\s+when\s+the\s+user\s+clicks\s+save.*$', '', fld, flags=re.I).strip()
+        return lit, fld, m.group(0)
+
+    # 4) add/append TOKEN to field (TOKEN not an article)
+    m = re.search(
+        r'\b(?:append(?:ing)?|add(?:ing)?)\s+(?!a\b|an\b|the\b)'
+        r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)\s+'
+        r'to\s+(?:the\s+)?(?P<field>.+?)'
+        r'(?=\s+when\b|\s+on\s+save\b|\s+on\s+pre|\s*;|\s+otherwise|\s+else|,?\s+and\s+if\b|$)',
+        text,
+        re.I,
+    )
+    if m:
+        lit = _reject_article_literal(m.group('lit'))
+        fld = m.group('field').strip()
+        fld = re.sub(r'\s+when\s+the\s+user\s+clicks\s+save.*$', '', fld, flags=re.I).strip()
+        return lit, fld, m.group(0)
+
+    # 5) bare add/append TOKEN (no "to") — not article
+    m = re.search(
+        r'\b(?:append(?:ing)?|add(?:ing)?)\s+(?!a\b|an\b|the\b)'
+        r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)\b',
+        text,
+        re.I,
+    )
+    if m:
+        lit = _reject_article_literal(m.group('lit'))
+        return lit, None, m.group(0)
+
+    return None
+
+
+def _resolve_modify_field(
+    field_phrase: Optional[str],
+    text: str,
+    mod: str,
+    bob: str,
+    field_pred: Optional[FieldPredSlot],
+) -> Tuple[str, str]:
+    """Resolve target field; pronoun 'it' → pred field or name."""
+    phrase = (field_phrase or '').strip()
+    if not phrase or phrase.lower() in ('it', 'itself'):
+        if field_pred:
+            return field_pred.field, field_pred.section
+        if re.search(r'\bname\b', text, re.I):
+            return _resolve_field_phrase('name', mod, bob)
+        return 'triNameTX', 'General'
+    phrase = re.sub(r'\s+when\s+the\s+user\s+clicks\s+save.*$', '', phrase, flags=re.I).strip()
+    return _resolve_field_phrase(phrase, mod, bob)
+
+
+def _extract_modify(
+    text: str,
+    mod: str,
+    bob: str,
+    *,
+    field_pred: Optional[FieldPredSlot] = None,
+) -> Optional[ModifySlot]:
     m = _MODIFY_BY_ADD_RE.search(text)
     if m:
-        lit = _normalize_literal(m.group('lit'))
+        lit = _reject_article_literal(m.group('lit'))
         field, section = _resolve_field_phrase(m.group('field'), mod, bob)
         return ModifySlot(
             field=field, section=section, literal=lit,
             formula=f'{field} + "{lit}"', span=m.group(0),
         )
 
-    m = _APPEND_TO_FIELD_RE.search(text)
-    if m:
-        lit = _normalize_literal(m.group('lit'))
-        field_phrase = m.group('field').strip()
-        field_phrase = re.sub(
-            r'\s+when\s+the\s+user\s+clicks\s+save.*$', '', field_phrase, flags=re.I,
-        ).strip()
-        field, section = _resolve_field_phrase(field_phrase, mod, bob)
+    got = _extract_append_literal(text)
+    if got:
+        lit, field_phrase, span = got
+        field, section = _resolve_modify_field(field_phrase, text, mod, bob, field_pred)
         return ModifySlot(
             field=field, section=section, literal=lit,
-            formula=f'{field} + "{lit}"', span=m.group(0),
-        )
-
-    # Bare "append Z" / "add Z" without "to …" — default name field
-    m = re.search(
-        r'\b(?:append(?:ing)?|add(?:ing)?)\s+'
-        r'(?:(?:the\s+)?(?:letter|character|characters)\s+)?'
-        r'(?P<lit>"[^"]+"|\'[^\']+\'|[A-Za-z0-9_]+)\b',
-        text,
-        re.I,
-    )
-    if m:
-        lit = _normalize_literal(m.group('lit'))
-        # Prefer name if mention of name elsewhere
-        field, section = 'triNameTX', 'General'
-        if re.search(r'\bname\b', text, re.I):
-            field, section = _resolve_field_phrase('name', mod, bob)
-        return ModifySlot(
-            field=field, section=section, literal=lit,
-            formula=f'{field} + "{lit}"', span=m.group(0),
+            formula=f'{field} + "{lit}"', span=span,
         )
 
     mm = _MODIFY_SET_RE.search(text)
@@ -541,8 +663,6 @@ def _extract_modify(text: str, mod: str, bob: str) -> Optional[ModifySlot]:
         field, section = _resolve_field_phrase(fld_phrase, mod, bob)
         if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
             lit = val[1:-1]
-            formula = lit if not re.search(r'[+\-*/]', val) else val
-            # For set with formula-like keep as value
             if re.search(r'[+\-*/]', val):
                 return ModifySlot(
                     field=field, section=section, literal='',
@@ -550,10 +670,8 @@ def _extract_modify(text: str, mod: str, bob: str) -> Optional[ModifySlot]:
                 )
             return ModifySlot(
                 field=field, section=section, literal=lit,
-                formula=f'{field} + "{lit}"' if False else lit,  # literal set = map 40 path via formula empty?
-                span=mm.group(0),
+                formula=lit, span=mm.group(0),
             )
-        # formula assignment
         return ModifySlot(
             field=field, section=section, literal='',
             formula=val, span=mm.group(0),

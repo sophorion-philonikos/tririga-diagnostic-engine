@@ -322,5 +322,44 @@ class TestSlotParaphrases(unittest.TestCase):
         self.assertIn('triNameTX+"Z"', self._mod_value(recipe))
 
 
+class TestBlankPredicateAndLiterals(unittest.TestCase):
+    def _mod_value(self, recipe):
+        mod = next(t for t in recipe['tasks'] if t['type'] == '28')
+        return mod['mappings'][0]['value'].replace(' ', '')
+
+    def test_blank_switch_add_a_z_to_it(self):
+        recipe = parse_prompt(
+            "Create a workflow so that if the building record's name field is blank, "
+            "add a Z to it, otherwise don't do anything.",
+            module='Location',
+            bo='triBuilding',
+        )
+        types = [t['type'] for t in recipe['tasks']]
+        self.assertEqual(types, ['1', '14', '28', '12', '9'])
+        sw = next(t for t in recipe['tasks'] if t['type'] == '14')
+        self.assertEqual(sw['condition']['expression'].strip(), 'p0 == ""')
+        self.assertEqual(sw['condition']['params'][0]['p_field'], 'triNameTX')
+        self.assertIn('triNameTX+"Z"', self._mod_value(recipe))
+
+    def test_add_a_z_literal_not_article(self):
+        recipe = parse_prompt(
+            'add a Z to the name',
+            module='Location',
+            bo='triBuilding',
+        )
+        self.assertIn('triNameTX+"Z"', self._mod_value(recipe))
+        self.assertNotIn('+"a"', self._mod_value(recipe))
+
+    def test_unrecognized_if_otherwise_fails(self):
+        with self.assertRaises(IntentError) as ctx:
+            parse_prompt(
+                "Create a workflow so that if the building record's name field "
+                "is flibbertigibbet, add a Z to it, otherwise don't do anything.",
+                module='Location',
+                bo='triBuilding',
+            )
+        self.assertEqual(ctx.exception.code, 'unrecognized_predicate')
+
+
 if __name__ == '__main__':
     unittest.main()

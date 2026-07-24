@@ -25,6 +25,7 @@ from cli import graph_utils
 from om_gen.build import build_from_ir
 from om_gen.emit_workflow import ir_to_preview_graph, workflow_filename
 from om_gen.intent import INTENT_NL_HELP, IntentError, parse_prompt
+from om_gen.oob_catalog import catalog_payload
 from om_gen.parse_recipe import ir_to_recipe_dict, recipe_to_ir
 from om_gen.validate import ValidationError, validate_ir
 
@@ -527,6 +528,13 @@ class DiagnosticWebHandler(BaseHTTPRequestHandler):
 
         if path == '/api/generator/nl-help':
             self._send_json(200, {'help': INTENT_NL_HELP})
+            return
+
+        if path == '/api/generator/catalog':
+            try:
+                self._send_json(200, catalog_payload())
+            except (OSError, ValueError, json.JSONDecodeError) as e:
+                self._send_json(500, {'error': f'Catalog load failed: {e}'})
             return
 
         if path.startswith('/api/map/'):

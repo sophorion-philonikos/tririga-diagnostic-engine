@@ -95,12 +95,15 @@
     <input id="wfName" value='triBuilding - Synchronous - Append Z to Name' />
 
     <label for="module">Module</label>
-    <input id="module" value="Location" />
+    <input id="module" list="moduleList" value="Location" autocomplete="off" />
+    <datalist id="moduleList"></datalist>
 
     <label for="bo">Business Object</label>
-    <input id="bo" value="triBuilding" />
+    <input id="bo" list="boList" value="triBuilding" autocomplete="off" />
+    <datalist id="boList"></datalist>
+    <p class="hint">Module/BO lists load from <code>tririga_modules_bos.json</code> (cascading). You may also type a custom Module or BO.</p>
 
-    <label for="prompt">Description (constrained NL)</label>
+    <label for="prompt">Description (constrained NL or plain English)</label>
     <textarea id="prompt">On Location::triBuilding triSave: modify set triNameTX = triNameTX + "Z"</textarea>
 
     <div class="actions">
@@ -126,6 +129,7 @@
 <script>
 (function () {
   let lastIR = null;
+  let catalogModules = {};
 
   const $ = (id) => document.getElementById(id);
   const errEl = $('error');
@@ -134,6 +138,37 @@
   function showError(msg) {
     errEl.hidden = !msg;
     errEl.textContent = msg || '';
+  }
+
+  function fillDatalist(listEl, values) {
+    listEl.innerHTML = '';
+    (values || []).forEach(function (v) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      listEl.appendChild(opt);
+    });
+  }
+
+  function refreshBoOptions() {
+    const mod = $('module').value.trim();
+    const bos = catalogModules[mod] || [];
+    fillDatalist($('boList'), bos.slice().sort());
+  }
+
+  async function loadCatalog() {
+    try {
+      const res = await fetch('/api/generator/catalog');
+      const data = await res.json();
+      if (!res.ok) {
+        showError(data.error || 'Failed to load Module/BO catalog');
+        return;
+      }
+      catalogModules = data.modules || {};
+      fillDatalist($('moduleList'), Object.keys(catalogModules).sort());
+      refreshBoOptions();
+    } catch (e) {
+      showError('Catalog load error: ' + String(e));
+    }
   }
 
   function renderPreview(nodes, edges) {
@@ -260,9 +295,12 @@
     }
   }
 
+  $('module').addEventListener('change', refreshBoOptions);
+  $('module').addEventListener('input', refreshBoOptions);
   $('parseBtn').addEventListener('click', parse);
   $('exportBtn').addEventListener('click', exportZip);
   $('helpBtn').addEventListener('click', showHelp);
+  loadCatalog();
 })();
 </script>
 </body>
